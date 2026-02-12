@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RaveLink Bridge | Hue + WiZ Music Sync for Streamers</title>
+  <meta
+    name="description"
+    content="RaveLink Bridge is a local Philips Hue and WiZ music-sync engine for streamers. Audio-reactive scenes, Twitch reward hooks, and fast setup on Windows."
+  />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="RaveLink Bridge | Hue + WiZ Music Sync for Streamers" />
+  <meta
+    property="og:description"
+    content="Audio-reactive Hue + WiZ lighting bridge with optional Twitch channel points hooks."
+  />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="RaveLink Bridge | Hue + WiZ Music Sync for Streamers" />
+  <meta
+    name="twitter:description"
+    content="Local music-sync lighting engine for Philips Hue and WiZ on Windows."
+  />
+  <style>
+    :root {
+      --bg: #f4f2ea;
+      --ink: #1f2431;
+      --accent: #9f2d00;
+      --accent-2: #006d77;
+      --panel: #fffef8;
+      --edge: #d2cbc0;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 90% -10%, #d8efe9 0%, transparent 55%),
+        radial-gradient(900px 400px at -10% 0%, #ffe8d6 0%, transparent 58%),
+        var(--bg);
+      line-height: 1.55;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 18px 44px;
+    }
+
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--edge);
+      border-radius: 20px;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+      line-height: 1.2;
+      color: #2a180f;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+      color: #2b2f40;
+    }
+
+    p { margin: 10px 0; }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0 0;
+    }
+
+    .chip {
+      border: 1px solid var(--edge);
+      border-radius: 999px;
+      background: #fff;
+      padding: 6px 11px;
+      font-size: 0.82rem;
+    }
+
+    .cta {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 10px 14px;
+      border: 1px solid #2f4f56;
+      color: #fff;
+      background: var(--accent-2);
+      font-weight: 700;
+    }
+
+    .btn.alt {
+      background: var(--accent);
+      border-color: #7d2b10;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--edge);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    code {
+      background: #f1eee7;
+      border: 1px solid #dfd8cc;
+      border-radius: 6px;
+      padding: 1px 5px;
+    }
+
+    pre {
+      margin: 8px 0 0;
+      background: #1f2431;
+      color: #f5f7fb;
+      border-radius: 10px;
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    .faq dt {
+      margin-top: 10px;
+      font-weight: 700;
+    }
+  </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "RaveLink Bridge",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Windows",
+    "description": "Local audio-reactive lighting bridge for Philips Hue and WiZ with optional Twitch command hooks."
+  }
+  </script>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>RaveLink Bridge: Hue + WiZ Music Sync for Streamers</h1>
+      <p>
+        RaveLink Bridge is a local Node.js engine that turns live audio into real-time smart lighting effects
+        for Philips Hue and WiZ. It is built for creators who want responsive music-sync visuals without cloud lag.
+      </p>
+      <div class="cta">
+        <a class="btn" id="repoLink" href="https://github.com/NameSRoby/ravelink-bridge">View on GitHub</a>
+        <a class="btn alt" id="releaseLink" href="https://github.com/NameSRoby/ravelink-bridge/releases/latest">Download Latest Release</a>
+        <a class="btn" id="kofiLink" href="https://ko-fi.com/namesroby">Support on Ko-fi</a>
+      </div>
+      <div class="chips">
+        <span class="chip">Philips Hue</span>
+        <span class="chip">WiZ</span>
+        <span class="chip">Music Sync Lights</span>
+        <span class="chip">Audio Reactive</span>
+        <span class="chip">Twitch Channel Points</span>
+        <span class="chip">Mod Support</span>
+        <span class="chip">Windows</span>
+      </div>
+    </section>
+
+    <section class="grid" style="margin-top: 14px;">
+      <article class="card">
+        <h2>How It Works</h2>
+        <p>
+          The engine continuously analyzes audio level, peaks, transients, and spectrum movement, then emits
+          scheduler-guarded lighting intents. Hue updates are rate-controlled for stability; WiZ updates stay quick
+          for punchy response.
+        </p>
+      </article>
+      <article class="card">
+        <h2>Quick Start</h2>
+        <p>Install and run locally:</p>
+        <pre><code>npm install
+npm start</code></pre>
+        <p>Open <code>http://127.0.0.1:5050</code>, pair Hue, then add WiZ IPs in Fixtures.</p>
+      </article>
+      <article class="card">
+        <h2>Who It Is For</h2>
+        <p>
+          Streamers, DJs, creators, and home setup builders looking for a local Hue/WiZ bridge with fast
+          audio-reactive behavior and optional Twitch automation.
+        </p>
+      </article>
+      <article class="card">
+        <h2>Extensible Mods</h2>
+        <p>
+          Includes a local mod loader with lifecycle hooks and mod HTTP endpoints so you can extend behavior
+          without forking core server logic.
+        </p>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top: 12px;">
+      <h2>Common Questions</h2>
+      <dl class="faq">
+        <dt>Can this sync Philips Hue and WiZ lights with music?</dt>
+        <dd>Yes. RaveLink Bridge controls both ecosystems and maps live audio behavior to light output.</dd>
+
+        <dt>Is this local or cloud-based?</dt>
+        <dd>Local. It runs on your machine and serves the control UI at <code>127.0.0.1:5050</code> by default.</dd>
+
+        <dt>Can Twitch channel points trigger effects?</dt>
+        <dd>Yes, via optional integrations and local endpoints.</dd>
+
+        <dt>Can I extend behavior with custom mods?</dt>
+        <dd>Yes. A mod loader is included with an example mod and reload endpoints.</dd>
+      </dl>
+    </section>
+
+    <section class="card" style="margin-top: 12px;">
+      <h2>Attribution / Notices</h2>
+      <p>
+        Third-party dependencies, licenses, and protocol/documentation references are listed in
+        <a id="noticesLink" href="https://github.com/NameSRoby/ravelink-bridge/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    (function setRepoLinks() {
+      const host = String(location.hostname || "").toLowerCase();
+      const parts = String(location.pathname || "").split("/").filter(Boolean);
+      const user = host.endsWith(".github.io") ? host.replace(".github.io", "") : "";
+      const repo = parts.length ? parts[0] : "";
+
+      if (!user || !repo) return;
+      const repoUrl = "https://github.com/" + user + "/" + repo;
+      const releaseUrl = repoUrl + "/releases/latest";
+      const noticesUrl = repoUrl + "/blob/main/THIRD_PARTY_NOTICES.md";
+
+      const repoLink = document.getElementById("repoLink");
+      const releaseLink = document.getElementById("releaseLink");
+      const noticesLink = document.getElementById("noticesLink");
+
+      if (repoLink) repoLink.href = repoUrl;
+      if (releaseLink) releaseLink.href = releaseUrl;
+      if (noticesLink) noticesLink.href = noticesUrl;
+    })();
+  </script>
+</body>
+</html>

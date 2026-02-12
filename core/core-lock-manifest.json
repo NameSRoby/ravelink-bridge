@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "description": "Optional core-protection targets. Files in this list are toggled read-only/writable by scripts/core-lock.js.",
+  "files": [
+    "package.json",
+    "server.js",
+    "core/rave-engine.js",
+    "core/audio.js",
+    "core/fixtures.js",
+    "core/mods/mod-loader.js",
+    "scripts/start-bridge.js",
+    "scripts/stop-bridge.js"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "hello-mod",
+  "name": "Hello Mod",
+  "version": "1.0.0",
+  "description": "Example mod that logs lifecycle hooks and exposes a small test endpoint.",
+  "main": "index.js",
+  "enabled": false
+}

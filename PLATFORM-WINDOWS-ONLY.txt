@@ -1,0 +1,8 @@
+RaveLink Bridge - Windows Build
+
+Official packaged target: Windows 10/11 (x64).
+Linux/macOS are not currently official packaged targets.
+
+Launchers:
+- RaveLink-Bridge.bat
+- RaveLink-Bridge-Stop.bat

@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "targetZone": "all",
+  "transitionMs": 400,
+  "start": {
+    "enabled": true,
+    "brightnessPercent": 80,
+    "delayMs": 0
+  },
+  "stop": {
+    "enabled": true,
+    "brightnessPercent": 100,
+    "delayMs": 0
+  }
+}
