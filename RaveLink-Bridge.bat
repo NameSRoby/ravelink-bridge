@@ -49,9 +49,6 @@ if exist "%HUE_CERT%" (
 echo [RaveLink] Bridge URL: http://127.0.0.1:5050
 echo [RaveLink] Press Ctrl+C in this window to stop the bridge.
 echo.
-if /I not "%RAVELINK_NO_BROWSER%"=="1" (
-  start "" "http://127.0.0.1:5050"
-)
 call npm.cmd start
 set "EXIT_CODE=%ERRORLEVEL%"
 

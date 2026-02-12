@@ -3,6 +3,7 @@
 If you are setting up StreamElements rewards integration, use:
 
 - `PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
+- `reward-listener.template.js` (same sanitized template)
 
 Quick steps:
 1. Open that file.
@@ -12,4 +13,4 @@ Quick steps:
 5. Add that widget in OBS as a Browser Source.
 
 Legacy copy also exists at:
-- `integrations/streamelements/reward-listener.template.js`
+- `INTEGRATIONS_TWITCH/streamelements/reward-listener.template.js`

@@ -123,7 +123,7 @@ Notes:
 ### Option A: StreamElements Widget (overlay logic)
 
 Template file:
-- `integrations/START-HERE-STREAMELEMENTS-WIDGET-TEMPLATE/PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
+- `INTEGRATIONS_TWITCH/START-HERE-STREAMELEMENTS-WIDGET-TEMPLATE/PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
 
 Steps:
 1. Create Twitch rewards for your actions (for example `Color`, `Teach`, `Rave`).

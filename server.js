@@ -22,7 +22,7 @@ const axios = require("axios");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 
 // ======================================================
 // CORE
@@ -64,6 +64,7 @@ const RUNTIME_DIR = path.join(__dirname, ".runtime");
 const PID_FILE = path.join(RUNTIME_DIR, "bridge.pid");
 const HUE_PAIR_APP_NAME = "hue-bridge-final";
 const TWITCH_COLOR_CONFIG_PATH = path.join(__dirname, "core", "twitch.color.config.json");
+const SYSTEM_CONFIG_PATH = path.join(__dirname, "core", "system.config.json");
 const MODS_README_PATH = path.join(__dirname, "docs", "MODS.md");
 const TWITCH_COLOR_TARGETS = new Set(["hue", "wiz", "both", "other"]);
 const TWITCH_COLOR_PREFIX_RE = /^[a-z][a-z0-9_-]{0,31}$/;
@@ -76,6 +77,11 @@ const TWITCH_COLOR_CONFIG_DEFAULT = Object.freeze({
     wiz: "wiz",
     other: ""
   })
+});
+const SYSTEM_CONFIG_DEFAULT = Object.freeze({
+  version: 1,
+  autoLaunchBrowser: true,
+  browserLaunchDelayMs: 1200
 });
 let HueSyncCtor = null;
 
@@ -133,6 +139,58 @@ function isLoopbackRequest(req) {
     remote.startsWith("::ffff:127.")
   );
 }
+
+function parseBooleanLoose(value, fallback = false) {
+  if (value === true || value === false) return value;
+  if (value === 1 || value === "1") return true;
+  if (value === 0 || value === "0") return false;
+  if (typeof value === "string") {
+    const raw = value.trim().toLowerCase();
+    if (raw === "true" || raw === "on" || raw === "yes") return true;
+    if (raw === "false" || raw === "off" || raw === "no") return false;
+  }
+  return fallback;
+}
+
+function clampSystemBrowserLaunchDelayMs(value, fallback = SYSTEM_CONFIG_DEFAULT.browserLaunchDelayMs) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(250, Math.min(15000, Math.round(n)));
+}
+
+function sanitizeSystemConfig(input = {}) {
+  const raw = input && typeof input === "object" ? input : {};
+  return {
+    version: 1,
+    autoLaunchBrowser: parseBooleanLoose(raw.autoLaunchBrowser, SYSTEM_CONFIG_DEFAULT.autoLaunchBrowser),
+    browserLaunchDelayMs: clampSystemBrowserLaunchDelayMs(
+      raw.browserLaunchDelayMs,
+      SYSTEM_CONFIG_DEFAULT.browserLaunchDelayMs
+    )
+  };
+}
+
+function readSystemConfig() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(SYSTEM_CONFIG_PATH, "utf8"));
+    return sanitizeSystemConfig(parsed);
+  } catch {
+    return sanitizeSystemConfig(SYSTEM_CONFIG_DEFAULT);
+  }
+}
+
+function writeSystemConfig(config) {
+  const safe = sanitizeSystemConfig(config);
+  fs.mkdirSync(path.dirname(SYSTEM_CONFIG_PATH), { recursive: true });
+  fs.writeFileSync(SYSTEM_CONFIG_PATH, `${JSON.stringify(safe, null, 2)}\n`, "utf8");
+  return safe;
+}
+
+let systemConfigRuntime = readSystemConfig();
+console.log(
+  `[SYSTEM] config loaded (autoLaunchBrowser=${systemConfigRuntime.autoLaunchBrowser}, ` +
+  `delayMs=${systemConfigRuntime.browserLaunchDelayMs})`
+);
 
 function isHueLinkButtonPending(err) {
   const type = Number(err?.type);
@@ -4528,7 +4586,11 @@ app.get("/fixtures/config", (_, res) => {
 
 app.post("/fixtures/fixture", async (req, res) => {
   const payload = req.body && typeof req.body === "object" ? req.body : {};
-  const result = fixtureRegistry.upsertFixture(payload);
+  const replaceId = String(payload.replaceId ?? payload.originalId ?? "").trim();
+  const fixturePayload = { ...payload };
+  delete fixturePayload.replaceId;
+  delete fixturePayload.originalId;
+  const result = fixtureRegistry.upsertFixture(fixturePayload, { replaceId });
   if (!result.ok) {
     res.status(400).json(result);
     return;
@@ -4625,6 +4687,54 @@ app.post("/fixtures/reload", async (_, res) => {
   });
 });
 
+function getSystemConfigSnapshot() {
+  return {
+    version: Number(systemConfigRuntime?.version || 1),
+    autoLaunchBrowser: systemConfigRuntime?.autoLaunchBrowser !== false,
+    browserLaunchDelayMs: clampSystemBrowserLaunchDelayMs(systemConfigRuntime?.browserLaunchDelayMs)
+  };
+}
+
+function patchSystemConfig(patch = {}) {
+  const rawPatch = patch && typeof patch === "object" ? patch : {};
+  const merged = {
+    ...getSystemConfigSnapshot()
+  };
+  if (Object.prototype.hasOwnProperty.call(rawPatch, "autoLaunchBrowser")) {
+    merged.autoLaunchBrowser = rawPatch.autoLaunchBrowser;
+  }
+  if (Object.prototype.hasOwnProperty.call(rawPatch, "browserLaunchDelayMs")) {
+    merged.browserLaunchDelayMs = rawPatch.browserLaunchDelayMs;
+  }
+  systemConfigRuntime = writeSystemConfig(merged);
+  return getSystemConfigSnapshot();
+}
+
+app.get("/system/config", (_, res) => {
+  res.json({
+    ok: true,
+    config: getSystemConfigSnapshot()
+  });
+});
+
+app.post("/system/config", (req, res) => {
+  if (!isLoopbackRequest(req)) {
+    res.status(403).json({
+      ok: false,
+      error: "forbidden",
+      detail: "system config updates are allowed only from local loopback requests"
+    });
+    return;
+  }
+
+  const payload = req.body && typeof req.body === "object" ? req.body : {};
+  const config = patchSystemConfig(payload);
+  res.json({
+    ok: true,
+    config
+  });
+});
+
 app.post("/system/stop", (req, res) => {
   if (!isLoopbackRequest(req)) {
     res.status(403).json({
@@ -4651,6 +4761,100 @@ app.post("/system/stop", (req, res) => {
 let httpServer = null;
 let shutdownPromise = null;
 let shutdownTimer = null;
+let browserLaunchTimer = null;
+
+function getBridgeBaseUrl() {
+  return `http://${HOST}:${PORT}`;
+}
+
+function isBrowserAutoLaunchEnabled() {
+  if (String(process.env.RAVELINK_NO_BROWSER || "").trim() === "1") return false;
+  return getSystemConfigSnapshot().autoLaunchBrowser !== false;
+}
+
+async function waitForBridgeHttpReady(baseUrl, options = {}) {
+  const attempts = Math.max(1, Math.min(30, Number(options.attempts) || 12));
+  const intervalMs = Math.max(80, Math.min(1500, Number(options.intervalMs) || 220));
+  const target = `${String(baseUrl || "").replace(/\/+$/, "")}/`;
+
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const response = await axios.get(target, {
+        timeout: 900,
+        validateStatus: () => true
+      });
+      if (response && Number(response.status) >= 200 && Number(response.status) < 500) {
+        return true;
+      }
+    } catch {}
+
+    if (i < attempts - 1) {
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  return false;
+}
+
+function openUrlInDefaultBrowser(url) {
+  const target = String(url || "").trim();
+  if (!target) return false;
+
+  try {
+    let child = null;
+    if (process.platform === "win32") {
+      child = spawn("cmd.exe", ["/d", "/s", "/c", "start", "", target], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true
+      });
+    } else if (process.platform === "darwin") {
+      child = spawn("open", [target], {
+        detached: true,
+        stdio: "ignore"
+      });
+    } else {
+      child = spawn("xdg-open", [target], {
+        detached: true,
+        stdio: "ignore"
+      });
+    }
+    child.unref?.();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function scheduleBrowserAutoLaunch() {
+  if (!isBrowserAutoLaunchEnabled()) {
+    console.log("[SYS] browser auto-launch disabled");
+    return;
+  }
+
+  const { browserLaunchDelayMs } = getSystemConfigSnapshot();
+  const baseUrl = getBridgeBaseUrl();
+
+  if (browserLaunchTimer) {
+    clearTimeout(browserLaunchTimer);
+    browserLaunchTimer = null;
+  }
+
+  browserLaunchTimer = setTimeout(async () => {
+    const ready = await waitForBridgeHttpReady(baseUrl, { attempts: 14, intervalMs: 220 });
+    if (!ready) {
+      console.warn("[SYS] bridge readiness probe timed out; launching browser anyway");
+    }
+
+    const opened = openUrlInDefaultBrowser(baseUrl);
+    if (opened) {
+      console.log(`[SYS] browser launched: ${baseUrl}`);
+    } else {
+      console.warn(`[SYS] failed to launch browser automatically: ${baseUrl}`);
+    }
+  }, clampSystemBrowserLaunchDelayMs(browserLaunchDelayMs));
+  browserLaunchTimer.unref?.();
+}
 
 function writePidFile() {
   try {
@@ -4695,6 +4899,10 @@ async function shutdown(reason = "signal", exitCode = 0) {
 
   shutdownPromise = (async () => {
     console.log(`[SYS] shutdown requested (${reason})`);
+    if (browserLaunchTimer) {
+      clearTimeout(browserLaunchTimer);
+      browserLaunchTimer = null;
+    }
     shutdownTimer = setTimeout(() => {
       console.error("[SYS] forced shutdown timeout reached");
       removePidFile();
@@ -4790,5 +4998,6 @@ process.on("exit", () => {
 // ======================================================
 httpServer = app.listen(PORT, HOST, () => {
   writePidFile();
-  console.log(`Hue bridge running on http://${HOST}:${PORT}`);
+  console.log(`Hue bridge running on ${getBridgeBaseUrl()}`);
+  scheduleBrowserAutoLaunch();
 });

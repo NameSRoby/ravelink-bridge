@@ -903,6 +903,7 @@ textarea{
 }
 
 input[type="text"],
+input[type="password"],
 input[type="number"],
 select{
   width:100%;
@@ -930,6 +931,18 @@ input[type="range"]{
   opacity:.9;
   display:block;
   margin-bottom:4px;
+}
+
+.secretFieldRow{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+}
+
+.secretToggleBtn{
+  min-width:70px;
+  padding:8px 10px;
 }
 
 #scope{
@@ -1912,7 +1925,10 @@ tr:last-child td{
       </div>
       <div id="fxWizIpWrap" class="hidden">
         <label id="fxWizIpLabel" for="fxWizIp">WIZ IP <span class="infoTip" title="LAN IP of the WiZ fixture. One fixture per entry in this form.">?</span></label>
-        <input id="fxWizIp" type="password" placeholder="192.168.x.x" autocomplete="off">
+        <div class="secretFieldRow">
+          <input id="fxWizIp" type="password" placeholder="192.168.x.x" autocomplete="off">
+          <button id="fxWizIpShowBtn" type="button" class="warn secretToggleBtn" title="Reveal or hide this sensitive field.">SHOW</button>
+        </div>
       </div>
       <div class="grid2">
         <button id="fxSaveBtn" type="button" title="Save this fixture entry to fixtures.config.json.">SAVE FIXTURE</button>
@@ -1923,6 +1939,7 @@ tr:last-child td{
       <input id="fxTwitchEnabled" type="hidden" value="true">
       <input id="fxControlMode" type="hidden" value="engine">
       <input id="fxEngineBinding" type="hidden" value="hue">
+      <input id="fxOriginalId" type="hidden" value="">
       <div id="fxCompatHint" class="hidden"></div>
     </div>
 
@@ -1931,11 +1948,17 @@ tr:last-child td{
       <div class="fixtureGrid">
       <div id="fxHueBridgeWrap">
         <label for="fxBridgeIp">HUE BRIDGE IP <span class="infoTip" title="Bridge LAN IP. Discover fills this automatically on the current network.">?</span></label>
-        <input id="fxBridgeIp" type="password" placeholder="192.168.x.x" autocomplete="off">
+        <div class="secretFieldRow">
+          <input id="fxBridgeIp" type="password" placeholder="192.168.x.x" autocomplete="off">
+          <button id="fxBridgeIpShowBtn" type="button" class="warn secretToggleBtn" title="Reveal or hide this sensitive field.">SHOW</button>
+        </div>
       </div>
       <div id="fxHueUserWrap">
         <label for="fxUsername">HUE USERNAME <span class="infoTip" title="Hue application key used for REST and entertainment setup. Pairing generates this for you.">?</span></label>
-        <input id="fxUsername" type="password" class="mono" placeholder="app key" autocomplete="off">
+        <div class="secretFieldRow">
+          <input id="fxUsername" type="password" class="mono" placeholder="app key" autocomplete="off">
+          <button id="fxUsernameShowBtn" type="button" class="warn secretToggleBtn" title="Reveal or hide this sensitive field.">SHOW</button>
+        </div>
       </div>
       <div id="fxHueBridgeIdWrap">
         <label for="fxBridgeId">HUE BRIDGE ID <span class="infoTip" title="Unique bridge identifier required by Hue Entertainment transport.">?</span></label>
@@ -1943,7 +1966,10 @@ tr:last-child td{
       </div>
       <div id="fxHueClientKeyWrap">
         <label for="fxClientKey">HUE CLIENT KEY <span class="infoTip" title="DTLS client key used by Hue Entertainment for low-latency streaming. Generated during pairing.">?</span></label>
-        <input id="fxClientKey" type="password" class="mono" placeholder="for entertainment" autocomplete="off">
+        <div class="secretFieldRow">
+          <input id="fxClientKey" type="password" class="mono" placeholder="for entertainment" autocomplete="off">
+          <button id="fxClientKeyShowBtn" type="button" class="warn secretToggleBtn" title="Reveal or hide this sensitive field.">SHOW</button>
+        </div>
       </div>
       <div id="fxHueEntWrap">
         <label for="fxEntertainmentAreaId">ENT AREA (NAME/ID) <span class="infoTip" title="Entertainment Area to stream to. Use name or id from the paired bridge areas list.">?</span></label>
@@ -2455,6 +2481,13 @@ tr:last-child td{
             <option value="paused">paused</option>
           </select>
         </div>
+        <div>
+          <label for="systemAutoLaunchBrowser">SERVER BROWSER AUTO-LAUNCH</label>
+          <select id="systemAutoLaunchBrowser">
+            <option value="true">enabled</option>
+            <option value="false">disabled</option>
+          </select>
+        </div>
         <div class="grid2">
           <button id="systemSettingsSaveBtn" type="button">SAVE SYSTEM SETTINGS</button>
           <button id="systemSettingsResetBtn" type="button">RESET SYSTEM DEFAULTS</button>
@@ -2478,7 +2511,7 @@ tr:last-child td{
         <button id="apiBaseSaveBtn" type="button" title="Save a custom API endpoint when this UI and bridge are on different hosts.">SAVE API BASE</button>
         <button id="apiBaseResetBtn" type="button" title="Reset API BASE to this page origin.">USE DEFAULT</button>
       </div>
-      <p class="hint">System settings are browser-local and control startup tab, safety confirmations, and polling behavior.</p>
+      <p class="hint">System settings include browser-local controls plus server browser auto-launch behavior.</p>
       <p class="hint">Use API BASE if this UI runs on a different host than the bridge server.</p>
     </div>
   </div>
@@ -3017,6 +3050,7 @@ const ui = {
   startTabPreference: String(localStorage.getItem("ravelink_ui_start_tab_v1") || "live").trim().toLowerCase(),
   confirmDangerousActions: localStorage.getItem("ravelink_ui_confirm_danger_v1") !== "0",
   pollPaused: localStorage.getItem("ravelink_ui_poll_paused_v1") === "1",
+  serverAutoLaunchBrowser: true,
   themeName: DEFAULT_THEME_NAME,
   themeConfig: { ...THEME_PRESETS[DEFAULT_THEME_NAME] }
 };
@@ -3108,6 +3142,7 @@ const el = {
   systemStartTab: document.getElementById("systemStartTab"),
   systemConfirmActions: document.getElementById("systemConfirmActions"),
   systemPollingMode: document.getElementById("systemPollingMode"),
+  systemAutoLaunchBrowser: document.getElementById("systemAutoLaunchBrowser"),
   systemSettingsSaveBtn: document.getElementById("systemSettingsSaveBtn"),
   systemSettingsResetBtn: document.getElementById("systemSettingsResetBtn"),
   systemPollNowBtn: document.getElementById("systemPollNowBtn"),
@@ -3303,6 +3338,7 @@ const el = {
   fxControlMode: document.getElementById("fxControlMode"),
   fxEngineBinding: document.getElementById("fxEngineBinding"),
   fxTwitchEnabled: document.getElementById("fxTwitchEnabled"),
+  fxOriginalId: document.getElementById("fxOriginalId"),
   fxCompatHint: document.getElementById("fxCompatHint"),
   fxBridgeIp: document.getElementById("fxBridgeIp"),
   fxUsername: document.getElementById("fxUsername"),
@@ -3313,6 +3349,10 @@ const el = {
   fxHueDiscoverBtn: document.getElementById("fxHueDiscoverBtn"),
   fxHuePairBtn: document.getElementById("fxHuePairBtn"),
   fxWizIp: document.getElementById("fxWizIp"),
+  fxBridgeIpShowBtn: document.getElementById("fxBridgeIpShowBtn"),
+  fxUsernameShowBtn: document.getElementById("fxUsernameShowBtn"),
+  fxClientKeyShowBtn: document.getElementById("fxClientKeyShowBtn"),
+  fxWizIpShowBtn: document.getElementById("fxWizIpShowBtn"),
   fxSaveBtn: document.getElementById("fxSaveBtn"),
   fxResetBtn: document.getElementById("fxResetBtn"),
   fxHueBridgeBlock: document.getElementById("fxHueBridgeBlock"),
@@ -3562,11 +3602,16 @@ function applyUiTooltips() {
   setNodeTitle(el.systemStartTab, "Default tab to open when this UI loads.");
   setNodeTitle(el.systemConfirmActions, "Require confirms for panic/reload/stop actions.");
   setNodeTitle(el.systemPollingMode, "Pause or resume automatic telemetry polling.");
-  setNodeTitle(el.systemSettingsSaveBtn, "Persist system settings to browser local storage.");
+  setNodeTitle(el.systemAutoLaunchBrowser, "Enable/disable browser auto-launch when the server starts.");
+  setNodeTitle(el.systemSettingsSaveBtn, "Persist local settings and server browser-launch setting.");
   setNodeTitle(el.systemSettingsResetBtn, "Reset system settings back to defaults.");
   setNodeTitle(el.systemPollNowBtn, "Run one immediate telemetry/config poll.");
   setNodeTitle(el.systemClearCacheBtn, "Clear UI local cache and reload this page.");
   setNodeTitle(el.systemSettingsStatus, "Current saved system settings summary.");
+  setNodeTitle(el.fxBridgeIpShowBtn, "Reveal/hide Hue bridge IP after warning confirmation.");
+  setNodeTitle(el.fxUsernameShowBtn, "Reveal/hide Hue username/app key after warning confirmation.");
+  setNodeTitle(el.fxClientKeyShowBtn, "Reveal/hide Hue client key after warning confirmation.");
+  setNodeTitle(el.fxWizIpShowBtn, "Reveal/hide WiZ IP after warning confirmation.");
   setNodeTitle(el.midiModuleStatus, "Whether Node MIDI module is available.");
   setNodeTitle(el.midiRuntimeStatus, "MIDI runtime connection status.");
   setNodeTitle(el.midiActivePort, "Currently opened MIDI input port.");
@@ -4689,7 +4734,8 @@ function renderSystemSettingsStatus() {
   const startTab = normalizeStartTabPreference(ui.startTabPreference).toUpperCase();
   const confirms = ui.confirmDangerousActions ? "CONFIRM ON" : "CONFIRM OFF";
   const polling = ui.pollPaused ? "POLL PAUSED" : "POLL LIVE";
-  el.systemSettingsStatus.value = `${startTab} | ${confirms} | ${polling}`;
+  const browserLaunch = ui.serverAutoLaunchBrowser ? "BROWSER AUTO ON" : "BROWSER AUTO OFF";
+  el.systemSettingsStatus.value = `${startTab} | ${confirms} | ${polling} | ${browserLaunch}`;
 }
 
 function applySystemSettingsUi() {
@@ -4701,6 +4747,9 @@ function applySystemSettingsUi() {
   }
   if (el.systemPollingMode) {
     el.systemPollingMode.value = ui.pollPaused ? "paused" : "live";
+  }
+  if (el.systemAutoLaunchBrowser) {
+    el.systemAutoLaunchBrowser.value = ui.serverAutoLaunchBrowser ? "true" : "false";
   }
   updatePollIndicator();
   if (ui.pollPaused && el.netBadge) {
@@ -4714,22 +4763,49 @@ function saveSystemSettingsFromUi() {
   ui.startTabPreference = normalizeStartTabPreference(el.systemStartTab?.value || ui.startTabPreference);
   ui.confirmDangerousActions = String(el.systemConfirmActions?.value || "true").trim().toLowerCase() !== "false";
   ui.pollPaused = String(el.systemPollingMode?.value || "live").trim().toLowerCase() === "paused";
+  ui.serverAutoLaunchBrowser = String(el.systemAutoLaunchBrowser?.value || "true").trim().toLowerCase() !== "false";
 
   localStorage.setItem(UI_START_TAB_KEY, ui.startTabPreference);
   localStorage.setItem(UI_CONFIRM_DANGER_KEY, ui.confirmDangerousActions ? "1" : "0");
   localStorage.setItem(UI_POLL_PAUSED_KEY, ui.pollPaused ? "1" : "0");
   applySystemSettingsUi();
-  return previousPaused !== ui.pollPaused;
+  return { pollingChanged: previousPaused !== ui.pollPaused };
 }
 
 function resetSystemSettingsToDefaults() {
   ui.startTabPreference = "live";
   ui.confirmDangerousActions = true;
   ui.pollPaused = false;
+  ui.serverAutoLaunchBrowser = true;
   localStorage.removeItem(UI_START_TAB_KEY);
   localStorage.removeItem(UI_CONFIRM_DANGER_KEY);
   localStorage.removeItem(UI_POLL_PAUSED_KEY);
   applySystemSettingsUi();
+}
+
+async function loadSystemServerConfig() {
+  const response = await getJson("/system/config");
+  if (!response || response.ok !== true || !response.config) return false;
+  ui.serverAutoLaunchBrowser = response.config.autoLaunchBrowser !== false;
+  applySystemSettingsUi();
+  return true;
+}
+
+async function saveSystemServerSettingsFromUi() {
+  const payload = {
+    autoLaunchBrowser: ui.serverAutoLaunchBrowser
+  };
+  const response = await postJson("/system/config", payload);
+  if (!response.ok || response.data?.ok !== true) {
+    return {
+      ok: false,
+      error: response.data?.error || "server settings save failed"
+    };
+  }
+
+  ui.serverAutoLaunchBrowser = response.data?.config?.autoLaunchBrowser !== false;
+  applySystemSettingsUi();
+  return { ok: true };
 }
 
 function clearUiLocalCache() {
@@ -5779,6 +5855,18 @@ async function loadFixturesSnapshot(attempts = 1) {
       await new Promise(resolve => setTimeout(resolve, 140));
     }
   }
+
+  const configSnapshot = await getJson("/fixtures/config");
+  if (configSnapshot?.ok && Array.isArray(configSnapshot?.config?.fixtures)) {
+    return {
+      fixtures: configSnapshot.config.fixtures,
+      routes: configSnapshot.config.intentRoutes || {},
+      summary: {},
+      standalone: Array.isArray(ui.standaloneFixtures) ? ui.standaloneFixtures.slice() : [],
+      connectivity: [],
+      connectivitySummary: null
+    };
+  }
   return null;
 }
 
@@ -5809,6 +5897,7 @@ async function saveFixtureFromForm(options = {}) {
 
   const resetAfter = options.resetAfter !== false;
   const fixture = collectFixtureForm();
+  const replaceId = String(fixture?.replaceId || "").trim();
   fixture.zone = normalizeZoneKey(fixture.zone, getCanonicalZoneForBrand(fixture.brand, "custom"));
   const coupling = validateFixtureCoupling(fixture.brand, fixture);
   if (!coupling.ok) {
@@ -5831,7 +5920,13 @@ async function saveFixtureFromForm(options = {}) {
   }
 
   const savedFixture = r.data?.fixture || fixture;
-  let refreshOk = false;
+  const localCatalog = upsertFixtureCatalogEntry(savedFixture, { replaceId });
+  applyFixtureCatalogToUi(localCatalog);
+  let refreshOk = localCatalog.length > 0;
+  if (savedFixture?.id && el.fxOriginalId && !resetAfter) {
+    el.fxOriginalId.value = String(savedFixture.id).trim();
+  }
+
   let fixtureSnapshot = await loadFixturesSnapshot(3);
   if (!fixtureSnapshot) {
     await api("/fixtures/reload");
@@ -5842,24 +5937,8 @@ async function saveFixtureFromForm(options = {}) {
     refreshOk = true;
   }
 
-  if (!refreshOk) {
-    const nextCatalog = Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : [];
-    const savedId = String(savedFixture?.id || "").trim();
-    if (savedId) {
-      const idx = nextCatalog.findIndex(item => String(item?.id || "").trim() === savedId);
-      if (idx >= 0) {
-        nextCatalog[idx] = {
-          ...nextCatalog[idx],
-          ...savedFixture
-        };
-      } else {
-        nextCatalog.push(savedFixture);
-      }
-      refreshAutomationZoneOptions(nextCatalog);
-      renderRouteFixtureOptions(nextCatalog);
-      renderFixtureRows(nextCatalog);
-      refreshOk = true;
-    }
+  if (!refreshOk && localCatalog.length > 0) {
+    refreshOk = true;
   }
 
   if (resetAfter) resetFixtureForm();
@@ -5971,6 +6050,47 @@ function refreshAutomationZoneOptions(fixtures = []) {
     el.autoRulesTargetZone.appendChild(extra);
   }
   el.autoRulesTargetZone.value = current;
+}
+
+function applyFixtureCatalogToUi(fixtures = []) {
+  const catalog = Array.isArray(fixtures) ? fixtures.slice() : [];
+  refreshAutomationZoneOptions(catalog);
+  renderRouteFixtureOptions(catalog);
+  renderFixtureRows(catalog);
+}
+
+function upsertFixtureCatalogEntry(fixture, options = {}) {
+  if (!fixture || typeof fixture !== "object") {
+    return Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : [];
+  }
+
+  const replaceId = String(options?.replaceId || "").trim();
+  const nextId = String(fixture?.id || "").trim();
+  const catalog = Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : [];
+
+  if (replaceId && replaceId !== nextId) {
+    for (let i = catalog.length - 1; i >= 0; i -= 1) {
+      if (String(catalog[i]?.id || "").trim() === replaceId) {
+        catalog.splice(i, 1);
+      }
+    }
+  }
+
+  if (!nextId) {
+    catalog.push(fixture);
+    return catalog;
+  }
+
+  const idx = catalog.findIndex(item => String(item?.id || "").trim() === nextId);
+  if (idx >= 0) {
+    catalog[idx] = {
+      ...catalog[idx],
+      ...fixture
+    };
+  } else {
+    catalog.push(fixture);
+  }
+  return catalog;
 }
 
 function renderAutomationSummary(config = {}, meta = {}) {
@@ -6526,6 +6646,7 @@ function resetFixtureForm() {
   el.fxBrand.value = "hue";
   if (el.fxModBrandId) el.fxModBrandId.value = "";
   el.fxId.value = "";
+  if (el.fxOriginalId) el.fxOriginalId.value = "";
   el.fxZone.value = "";
   el.fxEnabled.value = "true";
   el.fxEngineEnabled.value = "true";
@@ -6540,14 +6661,45 @@ function resetFixtureForm() {
   el.fxClientKey.value = "";
   el.fxEntertainmentAreaId.value = "";
   el.fxWizIp.value = "";
+  setSensitiveFieldVisibility(el.fxBridgeIp, el.fxBridgeIpShowBtn, false, "HUE BRIDGE IP");
+  setSensitiveFieldVisibility(el.fxUsername, el.fxUsernameShowBtn, false, "HUE USERNAME");
+  setSensitiveFieldVisibility(el.fxClientKey, el.fxClientKeyShowBtn, false, "HUE CLIENT KEY");
+  setSensitiveFieldVisibility(el.fxWizIp, el.fxWizIpShowBtn, false, "WIZ IP / MOD TARGET");
   applyFixtureBrandVisibility();
+}
+
+function setSensitiveFieldVisibility(input, button, show, label = "sensitive field") {
+  if (!input || !button) return;
+  input.type = show ? "text" : "password";
+  button.textContent = show ? "HIDE" : "SHOW";
+  button.dataset.revealed = show ? "1" : "0";
+  button.title = show
+    ? `Hide ${label}.`
+    : `Reveal ${label}.`;
+}
+
+function bindSensitiveFieldToggle(input, button, label = "this sensitive field") {
+  if (!input || !button) return;
+  setSensitiveFieldVisibility(input, button, false, label);
+  button.onclick = () => {
+    const revealed = button.dataset.revealed === "1";
+    if (!revealed) {
+      const ok = window.confirm(
+        `Warning: revealing ${label} can expose sensitive data on stream/screen-share.\n\nShow now?`
+      );
+      if (!ok) return;
+    }
+    setSensitiveFieldVisibility(input, button, !revealed, label);
+  };
 }
 
 function collectFixtureForm() {
   const brand = resolveFixtureFormBrand("");
   const modeState = readFixtureModeFields();
+  const replaceId = String(el.fxOriginalId?.value || "").trim();
   const base = {
     id: el.fxId.value.trim() || undefined,
+    replaceId: replaceId || undefined,
     brand,
     zone: modeState.zone,
     enabled: el.fxEnabled.value === "true",
@@ -6602,6 +6754,7 @@ function fillFixtureForm(fixture) {
     el.fxModBrandId.value = "";
   }
   el.fxId.value = fixture.id || "";
+  if (el.fxOriginalId) el.fxOriginalId.value = fixture.id || "";
   el.fxZone.value = fixture.zone || getCanonicalZoneForBrand(brand, "custom");
   el.fxEnabled.value = fixture.enabled === false ? "false" : "true";
   el.fxEngineEnabled.value = engineEnabled ? "true" : "false";
@@ -6616,6 +6769,10 @@ function fillFixtureForm(fixture) {
   el.fxClientKey.value = fixture.clientKey || "";
   el.fxEntertainmentAreaId.value = fixture.entertainmentAreaId || "";
   el.fxWizIp.value = fixture.ip || "";
+  setSensitiveFieldVisibility(el.fxBridgeIp, el.fxBridgeIpShowBtn, false, "HUE BRIDGE IP");
+  setSensitiveFieldVisibility(el.fxUsername, el.fxUsernameShowBtn, false, "HUE USERNAME");
+  setSensitiveFieldVisibility(el.fxClientKey, el.fxClientKeyShowBtn, false, "HUE CLIENT KEY");
+  setSensitiveFieldVisibility(el.fxWizIp, el.fxWizIpShowBtn, false, "WIZ IP / MOD TARGET");
   applyFixtureBrandVisibility();
   showTab("fixtures");
 }
@@ -6624,7 +6781,10 @@ async function openFixtureEditor(id) {
   const fixtureId = String(id || "").trim();
   if (!fixtureId) return;
   const fx = await getJson("/fixtures");
-  const target = fx?.fixtures?.find(x => String(x.id) === fixtureId);
+  const catalog = Array.isArray(fx?.fixtures)
+    ? fx.fixtures
+    : (Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog : []);
+  const target = catalog.find(x => String(x.id) === fixtureId);
   if (target) fillFixtureForm(target);
 }
 
@@ -6659,7 +6819,15 @@ async function deleteFixtureFromUi(id) {
 
   setBadge(el.health, "ok", "FIXTURE DELETED");
   const f = await getJson("/fixtures");
-  if (f) updateFixtures(f);
+  if (f) {
+    updateFixtures(f);
+    return;
+  }
+
+  const nextCatalog = (Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog : []).filter(
+    item => String(item?.id || "").trim() !== fixtureId
+  );
+  applyFixtureCatalogToUi(nextCatalog);
 }
 
 function renderFixtureRows(fixtures = []) {
@@ -7611,10 +7779,17 @@ el.apiBaseResetBtn.onclick = async () => {
 
 if (el.systemSettingsSaveBtn) {
   el.systemSettingsSaveBtn.onclick = async () => {
-    saveSystemSettingsFromUi();
-    setBadge(el.health, "ok", "SYSTEM SETTINGS SAVED");
+    const { pollingChanged } = saveSystemSettingsFromUi();
+    const savedServer = await saveSystemServerSettingsFromUi();
+    if (!savedServer.ok) {
+      setBadge(el.health, "warn", `SYSTEM SETTINGS SAVED (SERVER CONFIG FAIL: ${savedServer.error || "request failed"})`);
+    } else {
+      setBadge(el.health, "ok", "SYSTEM SETTINGS SAVED");
+    }
     if (!ui.pollPaused) {
       await poll({ force: true });
+    } else if (pollingChanged) {
+      renderSystemSettingsStatus();
     }
   };
 }
@@ -7622,7 +7797,12 @@ if (el.systemSettingsSaveBtn) {
 if (el.systemSettingsResetBtn) {
   el.systemSettingsResetBtn.onclick = async () => {
     resetSystemSettingsToDefaults();
-    setBadge(el.health, "ok", "SYSTEM SETTINGS RESET");
+    const savedServer = await saveSystemServerSettingsFromUi();
+    setBadge(
+      el.health,
+      savedServer.ok ? "ok" : "warn",
+      savedServer.ok ? "SYSTEM SETTINGS RESET" : `SYSTEM RESET (SERVER CONFIG FAIL: ${savedServer.error || "request failed"})`
+    );
     await poll({ force: true });
   };
 }
@@ -7755,6 +7935,11 @@ el.fxResetBtn.onclick = () => {
   resetFixtureForm();
 };
 
+bindSensitiveFieldToggle(el.fxBridgeIp, el.fxBridgeIpShowBtn, "HUE BRIDGE IP");
+bindSensitiveFieldToggle(el.fxUsername, el.fxUsernameShowBtn, "HUE USERNAME");
+bindSensitiveFieldToggle(el.fxClientKey, el.fxClientKeyShowBtn, "HUE CLIENT KEY");
+bindSensitiveFieldToggle(el.fxWizIp, el.fxWizIpShowBtn, "WIZ IP / MOD TARGET");
+
 el.fxHueDiscoverBtn.onclick = async () => {
   if (el.fxBrand.value !== "hue") {
     el.fxBrand.value = "hue";
@@ -7855,6 +8040,7 @@ el.fxHuePairBtn.onclick = async () => {
   if (creds.username) el.fxUsername.value = String(creds.username).trim();
   if (creds.clientKey) el.fxClientKey.value = String(creds.clientKey).trim().toUpperCase();
   if (pairedFixture?.id) el.fxId.value = String(pairedFixture.id).trim();
+  if (pairedFixture?.id && el.fxOriginalId) el.fxOriginalId.value = String(pairedFixture.id).trim();
   if (pairedFixture?.zone && !el.fxZone.value.trim()) {
     el.fxZone.value = String(pairedFixture.zone).trim();
   }
@@ -7865,6 +8051,8 @@ el.fxHuePairBtn.onclick = async () => {
 
   let saved = null;
   if (fixtureSavedByPair) {
+    const localCatalog = upsertFixtureCatalogEntry(pairedFixture);
+    applyFixtureCatalogToUi(localCatalog);
     const refreshed = await refreshFixturesFromServer({ attempts: 3 });
     saved = {
       ok: true,
@@ -7872,19 +8060,6 @@ el.fxHuePairBtn.onclick = async () => {
       refreshOk: refreshed.ok,
       routeSync: { ok: true, changed: false }
     };
-    if (!refreshed.ok && pairedFixture?.id) {
-      const nextCatalog = Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : [];
-      const pairedId = String(pairedFixture.id || "").trim();
-      const idx = nextCatalog.findIndex(item => String(item?.id || "").trim() === pairedId);
-      if (idx >= 0) {
-        nextCatalog[idx] = { ...nextCatalog[idx], ...pairedFixture };
-      } else {
-        nextCatalog.push(pairedFixture);
-      }
-      refreshAutomationZoneOptions(nextCatalog);
-      renderRouteFixtureOptions(nextCatalog);
-      renderFixtureRows(nextCatalog);
-    }
   } else {
     saved = await saveFixtureFromForm({ resetAfter: false });
   }
@@ -7898,6 +8073,7 @@ el.fxHuePairBtn.onclick = async () => {
 
   if (saved.savedFixture?.id) {
     el.fxId.value = String(saved.savedFixture.id);
+    if (el.fxOriginalId) el.fxOriginalId.value = String(saved.savedFixture.id).trim();
   }
 
   const routeSync = saved.routeSync || { ok: true, changed: false };
@@ -9409,9 +9585,7 @@ function updateFixtures(f) {
     ? new Date(summary.loadedAt).toLocaleTimeString()
     : "-";
 
-  refreshAutomationZoneOptions(fixtures);
-  renderRouteFixtureOptions(fixtures);
-  renderFixtureRows(fixtures);
+  applyFixtureCatalogToUi(fixtures);
   renderStandaloneFixtures(standalone, { preserveDraft: true });
 }
 
@@ -9737,6 +9911,7 @@ document.addEventListener("visibilitychange", updateMonitorRenderingState);
 ui.startTabPreference = normalizeStartTabPreference(ui.startTabPreference);
 ui.activeTab = normalizeStartTabPreference(ui.startTabPreference);
 applySystemSettingsUi();
+loadSystemServerConfig();
 applyApiBaseUi();
 applyFlowIntensityUi();
 applyReactorSliderUi();

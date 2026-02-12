@@ -742,8 +742,9 @@ function sanitizeFixtureForConfig(input = {}, fallbackIndex = 0, options = {}) {
   };
 }
 
-function upsertFixture(fixtureInput) {
+function upsertFixture(fixtureInput, options = {}) {
   const raw = getConfig();
+  const replaceId = String(options?.replaceId || options?.originalId || "").trim();
   const normalized = sanitizeFixtureForConfig(
     fixtureInput,
     raw.fixtures.length + 1,
@@ -752,7 +753,25 @@ function upsertFixture(fixtureInput) {
   if (!normalized.ok) return { ok: false, error: normalized.error || "invalid fixture payload" };
   const next = normalized.fixture;
 
-  const idx = raw.fixtures.findIndex(f => String(f.id) === next.id);
+  const nextId = String(next.id || "").trim();
+  const replaceIdx = replaceId
+    ? raw.fixtures.findIndex(f => String(f.id) === replaceId)
+    : -1;
+
+  const hasIdConflict = Boolean(
+    replaceId &&
+    replaceId !== nextId &&
+    raw.fixtures.some((fixture, index) => String(fixture.id) === nextId && index !== replaceIdx)
+  );
+  if (hasIdConflict) {
+    return { ok: false, error: `fixture id already exists: ${nextId}` };
+  }
+
+  if (replaceIdx >= 0 && replaceId !== nextId) {
+    raw.fixtures.splice(replaceIdx, 1);
+  }
+
+  const idx = raw.fixtures.findIndex(f => String(f.id) === nextId);
   if (idx >= 0) {
     raw.fixtures[idx] = {
       ...raw.fixtures[idx],

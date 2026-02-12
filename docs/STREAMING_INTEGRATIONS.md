@@ -14,7 +14,7 @@ If the bot does not run on the same machine as the bridge:
 ## StreamElements Widget Path
 
 Template:
-- `integrations/START-HERE-STREAMELEMENTS-WIDGET-TEMPLATE/PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
+- `INTEGRATIONS_TWITCH/START-HERE-STREAMELEMENTS-WIDGET-TEMPLATE/PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
 
 Setup:
 1. Create Twitch rewards (for example `Color`, `Teach`, `Rave`).
