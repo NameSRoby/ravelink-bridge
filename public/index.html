@@ -1912,7 +1912,7 @@ tr:last-child td{
       </div>
       <div id="fxWizIpWrap" class="hidden">
         <label id="fxWizIpLabel" for="fxWizIp">WIZ IP <span class="infoTip" title="LAN IP of the WiZ fixture. One fixture per entry in this form.">?</span></label>
-        <input id="fxWizIp" type="text" placeholder="192.168.x.x">
+        <input id="fxWizIp" type="password" placeholder="192.168.x.x" autocomplete="off">
       </div>
       <div class="grid2">
         <button id="fxSaveBtn" type="button" title="Save this fixture entry to fixtures.config.json.">SAVE FIXTURE</button>
@@ -1931,11 +1931,11 @@ tr:last-child td{
       <div class="fixtureGrid">
       <div id="fxHueBridgeWrap">
         <label for="fxBridgeIp">HUE BRIDGE IP <span class="infoTip" title="Bridge LAN IP. Discover fills this automatically on the current network.">?</span></label>
-        <input id="fxBridgeIp" type="text" placeholder="192.168.x.x">
+        <input id="fxBridgeIp" type="password" placeholder="192.168.x.x" autocomplete="off">
       </div>
       <div id="fxHueUserWrap">
         <label for="fxUsername">HUE USERNAME <span class="infoTip" title="Hue application key used for REST and entertainment setup. Pairing generates this for you.">?</span></label>
-        <input id="fxUsername" type="text" class="mono" placeholder="app key">
+        <input id="fxUsername" type="password" class="mono" placeholder="app key" autocomplete="off">
       </div>
       <div id="fxHueBridgeIdWrap">
         <label for="fxBridgeId">HUE BRIDGE ID <span class="infoTip" title="Unique bridge identifier required by Hue Entertainment transport.">?</span></label>
@@ -1943,7 +1943,7 @@ tr:last-child td{
       </div>
       <div id="fxHueClientKeyWrap">
         <label for="fxClientKey">HUE CLIENT KEY <span class="infoTip" title="DTLS client key used by Hue Entertainment for low-latency streaming. Generated during pairing.">?</span></label>
-        <input id="fxClientKey" type="text" class="mono" placeholder="for entertainment">
+        <input id="fxClientKey" type="password" class="mono" placeholder="for entertainment" autocomplete="off">
       </div>
       <div id="fxHueEntWrap">
         <label for="fxEntertainmentAreaId">ENT AREA (NAME/ID) <span class="infoTip" title="Entertainment Area to stream to. Use name or id from the paired bridge areas list.">?</span></label>
@@ -3042,6 +3042,8 @@ const MOD_UI_SELECTED_KEY = "ravelink_mod_ui_selected_v1";
 const ONBOARD_ACK_KEY = "ravelink_onboard_ack_v1";
 const HUE_ENT_GUIDE_ACK_KEY = "ravelink_hue_ent_guide_ack_v1";
 const GUIDED_ONBOARDING_STATE_KEY = "ravelink_guided_onboarding_v1";
+const UI_STORAGE_MIGRATION_KEY = "ravelink_ui_storage_migration_v1";
+const UI_STORAGE_MIGRATION_TARGET = "2026-02-12-onboarding-reset-2";
 const UI_START_TAB_KEY = "ravelink_ui_start_tab_v1";
 const UI_CONFIRM_DANGER_KEY = "ravelink_ui_confirm_danger_v1";
 const UI_POLL_PAUSED_KEY = "ravelink_ui_poll_paused_v1";
@@ -3056,6 +3058,19 @@ let devOcAckKeydownHandler = null;
 
 ui.devDebugWarned = localStorage.getItem(DEV_DEBUG_WARN_ONCE_KEY) === "1";
 ui.devOverclockComicalAcked = localStorage.getItem(DEV_OVERCLOCK_COMICAL_ACK_KEY) === "1";
+
+function applyUiStorageMigration() {
+  const applied = String(localStorage.getItem(UI_STORAGE_MIGRATION_KEY) || "").trim();
+  if (applied === UI_STORAGE_MIGRATION_TARGET) return;
+
+  // Ensure distro/onboarding starts clean even when old browser storage exists.
+  localStorage.removeItem(ONBOARD_ACK_KEY);
+  localStorage.removeItem(HUE_ENT_GUIDE_ACK_KEY);
+  localStorage.removeItem(GUIDED_ONBOARDING_STATE_KEY);
+  localStorage.setItem(UI_STORAGE_MIGRATION_KEY, UI_STORAGE_MIGRATION_TARGET);
+}
+
+applyUiStorageMigration();
 
 const el = {
   onBtn: document.getElementById("onBtn"),
@@ -4728,6 +4743,7 @@ function clearUiLocalCache() {
     ONBOARD_ACK_KEY,
     HUE_ENT_GUIDE_ACK_KEY,
     GUIDED_ONBOARDING_STATE_KEY,
+    UI_STORAGE_MIGRATION_KEY,
     OBS_DOCK_COMPACT_KEY,
     UI_START_TAB_KEY,
     UI_CONFIRM_DANGER_KEY,
@@ -4742,7 +4758,7 @@ function clearUiLocalCache() {
   const collapseKeys = [];
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i);
-    if (String(key || "").startsWith("ravelink_collapse_")) {
+    if (String(key || "").startsWith("ravelink_ui_collapsed_")) {
       collapseKeys.push(key);
     }
   }
@@ -5752,7 +5768,45 @@ function syncFixtureCouplingDefaults(reason = "") {
   updateFixtureCompatibilityHint();
 }
 
+async function loadFixturesSnapshot(attempts = 1) {
+  const maxAttempts = Math.max(1, Math.min(5, Number(attempts) || 1));
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const snapshot = await getJson("/fixtures");
+    if (snapshot && Array.isArray(snapshot.fixtures)) {
+      return snapshot;
+    }
+    if (i < (maxAttempts - 1)) {
+      await new Promise(resolve => setTimeout(resolve, 140));
+    }
+  }
+  return null;
+}
+
+async function refreshFixturesFromServer(options = {}) {
+  const attempts = Math.max(1, Math.min(5, Number(options.attempts) || 1));
+  const clearOnFail = options.clearOnFail === true;
+  const snapshot = await loadFixturesSnapshot(attempts);
+  if (snapshot) {
+    updateFixtures(snapshot);
+    return { ok: true, snapshot };
+  }
+
+  if (clearOnFail) {
+    updateFixtures({
+      fixtures: [],
+      routes: {},
+      summary: {},
+      standalone: [],
+      connectivity: [],
+      connectivitySummary: null
+    });
+  }
+
+  return { ok: false, snapshot: null };
+}
+
 async function saveFixtureFromForm(options = {}) {
+
   const resetAfter = options.resetAfter !== false;
   const fixture = collectFixtureForm();
   fixture.zone = normalizeZoneKey(fixture.zone, getCanonicalZoneForBrand(fixture.brand, "custom"));
@@ -5777,13 +5831,44 @@ async function saveFixtureFromForm(options = {}) {
   }
 
   const savedFixture = r.data?.fixture || fixture;
-  const f = await getJson("/fixtures");
-  if (f) updateFixtures(f);
+  let refreshOk = false;
+  let fixtureSnapshot = await loadFixturesSnapshot(3);
+  if (!fixtureSnapshot) {
+    await api("/fixtures/reload");
+    fixtureSnapshot = await loadFixturesSnapshot(2);
+  }
+  if (fixtureSnapshot) {
+    updateFixtures(fixtureSnapshot);
+    refreshOk = true;
+  }
+
+  if (!refreshOk) {
+    const nextCatalog = Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : [];
+    const savedId = String(savedFixture?.id || "").trim();
+    if (savedId) {
+      const idx = nextCatalog.findIndex(item => String(item?.id || "").trim() === savedId);
+      if (idx >= 0) {
+        nextCatalog[idx] = {
+          ...nextCatalog[idx],
+          ...savedFixture
+        };
+      } else {
+        nextCatalog.push(savedFixture);
+      }
+      refreshAutomationZoneOptions(nextCatalog);
+      renderRouteFixtureOptions(nextCatalog);
+      renderFixtureRows(nextCatalog);
+      refreshOk = true;
+    }
+  }
+
   if (resetAfter) resetFixtureForm();
 
   return {
     ok: true,
-    savedFixture
+    savedFixture,
+    refreshOk,
+    routeSync: { ok: true, changed: false }
   };
 }
 
@@ -6591,9 +6676,12 @@ function renderFixtureRows(fixtures = []) {
 
   for (const f of fixtures) {
     const tr = document.createElement("tr");
-    const target = f.brand === "hue"
-      ? `${f.bridgeIp || "-"} / light ${f.lightId || "-"}`
-      : `${f.ip || "-"}`;
+    const brandKey = String(f?.brand || "").trim().toLowerCase();
+    const target = brandKey === "hue"
+      ? `hue light ${f.lightId || "-"}`
+      : brandKey === "wiz"
+        ? (isFixtureConfiguredForOutput(f) ? "wiz device configured" : "wiz device pending")
+        : `${String(f?.brand || "mod").toUpperCase()} target managed by adapter`;
 
     const rawId = f.id === undefined || f.id === null || f.id === "" ? null : String(f.id);
     const id = rawId || "-";
@@ -6737,6 +6825,45 @@ function getConnectivityStatusLabel(fixture, record) {
   return "TARGET UNKNOWN";
 }
 
+function maskHostForDisplay(hostValue) {
+  const raw = String(hostValue || "").trim();
+  if (!raw) return "-";
+
+  const bracketIpv6WithPort = raw.match(/^\[([^\]]+)\]:(\d{1,5})$/);
+  if (bracketIpv6WithPort) {
+    return `[${String(bracketIpv6WithPort[1] || "").slice(0, 2)}***]:${bracketIpv6WithPort[2]}`;
+  }
+
+  const ipv4WithPort = raw.match(/^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/);
+  if (ipv4WithPort) {
+    const parts = ipv4WithPort[1].split(".");
+    return `${parts[0]}.***.***.${parts[3]}:${ipv4WithPort[2]}`;
+  }
+
+  const ipv4Only = raw.match(/^(\d{1,3})(?:\.(\d{1,3})){3}$/);
+  if (ipv4Only) {
+    const parts = raw.split(".");
+    return `${parts[0]}.***.***.${parts[3]}`;
+  }
+
+  const hostWithPort = raw.match(/^([^:]+):(\d{1,5})$/);
+  if (hostWithPort) {
+    const host = String(hostWithPort[1] || "").trim();
+    const maskedHost = host.length <= 2
+      ? `${host.slice(0, 1)}*`
+      : `${host.slice(0, 2)}***${host.slice(-1)}`;
+    return `${maskedHost}:${hostWithPort[2]}`;
+  }
+
+  if (raw.startsWith("[") && raw.endsWith("]")) {
+    const core = raw.slice(1, -1);
+    return `[${core.slice(0, 2)}***]`;
+  }
+
+  if (raw.length <= 2) return `${raw.slice(0, 1)}*`;
+  return `${raw.slice(0, 2)}***${raw.slice(-1)}`;
+}
+
 function renderSelectedFixtureConnectivityStatus(fixture) {
   if (!fixture) {
     el.standConnectivityStatus.value = "No fixture selected.";
@@ -6747,12 +6874,13 @@ function renderSelectedFixtureConnectivityStatus(fixture) {
   const host = String(record?.host || "").trim() || (fixture.brand === "hue"
     ? String(fixture.bridgeIp || "").trim()
     : String(fixture.ip || "").trim()) || "-";
+  const maskedHost = maskHostForDisplay(host);
   const label = getConnectivityStatusLabel(fixture, record);
   const detail = String(record?.detail || "").trim();
   const checkedAt = Number(record?.checkedAt || 0) > 0
     ? new Date(Number(record.checkedAt)).toLocaleTimeString()
     : "-";
-  el.standConnectivityStatus.value = `${fixture.id} | ${label} | host ${host} | ${detail || "no detail"} | checked ${checkedAt}`;
+  el.standConnectivityStatus.value = `${fixture.id} | ${label} | host ${maskedHost} | ${detail || "no detail"} | checked ${checkedAt}`;
 }
 
 function updateConnectivityCache(entries, options = {}) {
@@ -7644,7 +7772,9 @@ el.fxHueDiscoverBtn.onclick = async () => {
   setBadge(
     el.health,
     "ok",
-    `HUE FOUND ${found.bridge.ip}${found.bridge.id ? ` (${found.bridge.id})` : ""}`
+    found.bridge.id
+      ? `HUE BRIDGE FOUND (${found.bridge.id})`
+      : "HUE BRIDGE FOUND"
   );
 };
 
@@ -7674,12 +7804,28 @@ el.fxHuePairBtn.onclick = async () => {
   el.fxHuePairBtn.disabled = true;
   setBadge(el.health, "warn", "PAIRING HUE: PRESS LINK BUTTON");
 
+  const modeState = readFixtureModeFields();
+  const fixtureHint = {
+    id: el.fxId.value.trim(),
+    zone: modeState.zone,
+    enabled: el.fxEnabled.value === "true",
+    engineEnabled: modeState.engineEnabled,
+    twitchEnabled: modeState.twitchEnabled,
+    customEnabled: modeState.customEnabled,
+    lightId: Number(el.fxLightId.value || 1),
+    entertainmentAreaId: el.fxEntertainmentAreaId.value.trim()
+  };
+
   const pair = await postJson("/hue/pair", {
     bridgeIp,
     bridgeId: el.fxBridgeId.value.trim(),
     appName: "hue-bridge-final",
     timeoutMs: 30000,
-    pollMs: 1200
+    pollMs: 1200,
+    lightId: fixtureHint.lightId,
+    entertainmentAreaId: fixtureHint.entertainmentAreaId,
+    saveFixture: true,
+    fixture: fixtureHint
   });
 
   el.fxHueDiscoverBtn.disabled = false;
@@ -7698,19 +7844,54 @@ el.fxHuePairBtn.onclick = async () => {
   const bridge = pair.data.bridge || {};
   const creds = pair.data.credentials || {};
   const areas = Array.isArray(pair.data.entertainmentAreas) ? pair.data.entertainmentAreas : [];
+  const pairedFixture = pair.data.fixture && typeof pair.data.fixture === "object"
+    ? pair.data.fixture
+    : null;
+  const fixtureSavedByPair = pair.data.fixtureSaved === true && Boolean(pairedFixture);
+  const fixtureSaveError = String(pair.data.fixtureSaveError || "").trim();
 
   if (bridge.ip) el.fxBridgeIp.value = String(bridge.ip).trim();
   if (bridge.id) el.fxBridgeId.value = String(bridge.id).trim().toUpperCase();
   if (creds.username) el.fxUsername.value = String(creds.username).trim();
   if (creds.clientKey) el.fxClientKey.value = String(creds.clientKey).trim().toUpperCase();
+  if (pairedFixture?.id) el.fxId.value = String(pairedFixture.id).trim();
+  if (pairedFixture?.zone && !el.fxZone.value.trim()) {
+    el.fxZone.value = String(pairedFixture.zone).trim();
+  }
   if (!el.fxEntertainmentAreaId.value.trim() && areas.length) {
     const first = areas[0] || {};
     el.fxEntertainmentAreaId.value = String(first.name || first.id || "").trim();
   }
 
-  const saved = await saveFixtureFromForm({ resetAfter: false });
+  let saved = null;
+  if (fixtureSavedByPair) {
+    const refreshed = await refreshFixturesFromServer({ attempts: 3 });
+    saved = {
+      ok: true,
+      savedFixture: pairedFixture,
+      refreshOk: refreshed.ok,
+      routeSync: { ok: true, changed: false }
+    };
+    if (!refreshed.ok && pairedFixture?.id) {
+      const nextCatalog = Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : [];
+      const pairedId = String(pairedFixture.id || "").trim();
+      const idx = nextCatalog.findIndex(item => String(item?.id || "").trim() === pairedId);
+      if (idx >= 0) {
+        nextCatalog[idx] = { ...nextCatalog[idx], ...pairedFixture };
+      } else {
+        nextCatalog.push(pairedFixture);
+      }
+      refreshAutomationZoneOptions(nextCatalog);
+      renderRouteFixtureOptions(nextCatalog);
+      renderFixtureRows(nextCatalog);
+    }
+  } else {
+    saved = await saveFixtureFromForm({ resetAfter: false });
+  }
+
   if (!saved.ok) {
-    const msg = saved.error ? `HUE PAIRED (SAVE FAIL: ${saved.error})` : "HUE PAIRED (SAVE FAIL)";
+    const detail = saved.error || fixtureSaveError || "fixture save failed";
+    const msg = `HUE PAIRED (SAVE FAIL: ${detail})`;
     setBadge(el.health, pair.data.warning ? "warn" : "bad", msg);
     return;
   }
@@ -9583,6 +9764,7 @@ loadAudioConfig();
 loadAudioDevices();
 loadMidiStatus();
 refreshStandaloneFixtures();
+refreshFixturesFromServer({ attempts: 2, clearOnFail: true });
 loadMods();
 loadColorPrefixConfig();
 syncAutomationPercentLabels();

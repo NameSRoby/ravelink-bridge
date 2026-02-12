@@ -3963,6 +3963,7 @@ app.post("/hue/pair", async (req, res) => {
   const appName = String(payload.appName || HUE_PAIR_APP_NAME).trim() || HUE_PAIR_APP_NAME;
   const timeoutMs = Math.min(120000, Math.max(5000, Number(payload.timeoutMs || 30000)));
   const pollMs = Math.min(3000, Math.max(500, Number(payload.pollMs || 1200)));
+  const saveFixture = payload.saveFixture !== false;
 
   try {
     const HueSync = getHueSyncCtor();
@@ -4014,6 +4015,8 @@ app.post("/hue/pair", async (req, res) => {
           throw new Error("Bridge registration did not return username/clientkey");
         }
 
+        let savedFixture = null;
+        let fixtureSaveError = "";
         let entertainmentAreas = [];
         let warning = null;
 
@@ -4038,6 +4041,119 @@ app.post("/hue/pair", async (req, res) => {
           }
         }
 
+        if (saveFixture) {
+          try {
+            const fixtureHint = payload.fixture && typeof payload.fixture === "object"
+              ? payload.fixture
+              : {};
+
+            const allFixtures = typeof fixtureRegistry.getFixtures === "function"
+              ? fixtureRegistry.getFixtures()
+              : [];
+            const hueFixtures = allFixtures.filter(
+              fixture => String(fixture?.brand || "").trim().toLowerCase() === "hue"
+            );
+
+            const requestedId = String(
+              payload.fixtureId ?? fixtureHint.id ?? payload.id ?? ""
+            ).trim();
+            const requestedZoneRaw = String(
+              payload.zone ?? fixtureHint.zone ?? ""
+            ).trim();
+            const requestedZone = normalizeRouteZoneToken(
+              requestedZoneRaw,
+              getCanonicalZoneFallback("hue", "hue")
+            );
+            const requestedLightId = Math.max(
+              1,
+              Number(payload.lightId ?? fixtureHint.lightId ?? 1) || 1
+            );
+
+            const engineEnabled = parseBoolean(
+              payload.engineEnabled ?? fixtureHint.engineEnabled,
+              true
+            );
+            const twitchEnabled = parseBoolean(
+              payload.twitchEnabled ?? fixtureHint.twitchEnabled,
+              true
+            );
+            let customEnabled = parseBoolean(
+              payload.customEnabled ?? fixtureHint.customEnabled,
+              false
+            );
+            if (engineEnabled && customEnabled) {
+              customEnabled = false;
+            }
+
+            let nextFixtureId = requestedId;
+            if (!nextFixtureId) {
+              const byBridge = hueFixtures.find(fixture => {
+                const fixtureBridgeId = String(fixture?.bridgeId || "").trim().toUpperCase();
+                const fixtureBridgeIp = String(fixture?.bridgeIp || "").trim();
+                return (
+                  (bridgeId && fixtureBridgeId && fixtureBridgeId === bridgeId) ||
+                  (bridgeIp && fixtureBridgeIp && fixtureBridgeIp === bridgeIp)
+                );
+              });
+              if (byBridge) {
+                nextFixtureId = String(byBridge.id || "").trim();
+              }
+            }
+            if (!nextFixtureId) {
+              const baseId = bridgeId
+                ? `hue-${bridgeId.toLowerCase().slice(-6)}`
+                : "hue-main";
+              const existingIds = new Set(
+                allFixtures.map(fixture => String(fixture?.id || "").trim()).filter(Boolean)
+              );
+              let suffix = 1;
+              let candidate = `${baseId}-${suffix}`;
+              while (existingIds.has(candidate)) {
+                suffix += 1;
+                candidate = `${baseId}-${suffix}`;
+              }
+              nextFixtureId = candidate;
+            }
+
+            const entertainmentAreaId = String(
+              payload.entertainmentAreaId ??
+              fixtureHint.entertainmentAreaId ??
+              ""
+            ).trim() || String(entertainmentAreas?.[0]?.name || entertainmentAreas?.[0]?.id || "").trim();
+
+            const fixturePayload = {
+              id: nextFixtureId,
+              brand: "hue",
+              zone: requestedZone,
+              enabled: parseBoolean(payload.enabled ?? fixtureHint.enabled, true),
+              controlMode: engineEnabled ? "engine" : "standalone",
+              engineBinding: engineEnabled ? "hue" : "standalone",
+              engineEnabled,
+              twitchEnabled,
+              customEnabled,
+              bridgeIp,
+              username,
+              bridgeId: bridgeId || "",
+              clientKey,
+              entertainmentAreaId,
+              lightId: requestedLightId
+            };
+
+            const upsertResult = fixtureRegistry.upsertFixture(fixturePayload);
+            if (!upsertResult.ok) {
+              fixtureSaveError = String(upsertResult.error || "fixture upsert failed");
+            } else {
+              savedFixture = upsertResult.fixture || fixturePayload;
+              refreshWizAdapters();
+              syncStandaloneRuntime();
+              queueFixtureConnectivityProbe(savedFixture, { force: true, logChanges: true }).catch(() => {});
+              await setHueTransportMode(hueTransport.desired);
+            }
+          } catch (err) {
+            fixtureSaveError = err?.message || String(err);
+          }
+        }
+
         res.json({
           ok: true,
           paired: true,
@@ -4050,6 +4166,9 @@ app.post("/hue/pair", async (req, res) => {
             username,
             clientKey
           },
+          fixture: savedFixture,
+          fixtureSaved: Boolean(savedFixture),
+          fixtureSaveError: fixtureSaveError || "",
           entertainmentAreas,
           warning,
           elapsedMs: Date.now() - startedAt

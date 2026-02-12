@@ -72,12 +72,19 @@ function wipeFolderKeepReadme(folderPath) {
   }
 }
 
+function wipeFolder(folderPath) {
+  if (!fs.existsSync(folderPath)) return;
+  fs.rmSync(folderPath, { recursive: true, force: true });
+}
+
 function sanitizeRelease(rootDir = DEFAULT_ROOT) {
   const root = path.resolve(String(rootDir || DEFAULT_ROOT));
   const backupsRoot = path.join(root, "backups");
   const coreBackupsRoot = path.join(root, "core", "backups");
+  const runtimeRoot = path.join(root, ".runtime");
   wipeFolderKeepReadme(backupsRoot);
   wipeFolderKeepReadme(coreBackupsRoot);
+  wipeFolder(runtimeRoot);
 
   const fixturesPath = path.join(root, "core", "fixtures.config.json");
   writeJson(fixturesPath, FIXTURES_TEMPLATE);
