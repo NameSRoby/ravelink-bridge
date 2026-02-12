@@ -358,11 +358,13 @@ Output:
 - Streaming integrations: `docs/STREAMING_INTEGRATIONS.md`
 - Launch checklist: `docs/LAUNCH_CHECKLIST.md`
 - Third-party notices: `THIRD_PARTY_NOTICES.md`
-
-## License
-
-ISC (`LICENSE`)
+- 
 <img alt="UI_GREEN" src="https://github.com/user-attachments/assets/34c965f8-5262-466d-b217-d87084f568ec" height="702" />
 <img alt="UI_RED" src="https://github.com/user-attachments/assets/10122b60-abf7-4538-ae80-b84a3a55b5ae" height="702" />
 <img alt="UI_ORANGE" src="https://github.com/user-attachments/assets/152771b7-d5aa-44ca-b483-94155f306523" height="702" />
 <img alt="UI_BLUE" src="https://github.com/user-attachments/assets/fbf283fc-a1c1-4dc0-ace5-b1f4ff96f7a6" height="702" />
+
+## License
+
+ISC (`LICENSE`)
+
