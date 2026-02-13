@@ -22,6 +22,7 @@ const axios = require("axios");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const net = require("net");
 const { execFile, spawn } = require("child_process");
 
 // ======================================================
@@ -204,9 +205,38 @@ function isHueLinkButtonPending(err) {
   );
 }
 
+function isPrivateIpv4(ip) {
+  const parts = String(ip || "").split(".").map(n => Number(n));
+  if (parts.length !== 4 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  if (parts[0] === 10 || parts[0] === 127) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 169 && parts[1] === 254) return true;
+  return false;
+}
+
+function isAllowedHueBridgeTarget(ip) {
+  const target = String(ip || "").trim();
+  const family = net.isIP(target);
+  if (!family) return false;
+  if (family === 4) return isPrivateIpv4(target);
+  const normalized = target.toLowerCase();
+  return normalized === "::1" || normalized.startsWith("fe80:") || normalized.startsWith("fd") || normalized.startsWith("fc");
+}
+
+function sanitizeLogDetail(value, fallback = "operation failed") {
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+  return raw
+    .replace(/(client[_-]?key|username|token|authorization|password|secret)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]")
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+\/-]+/gi, "$1[redacted]")
+    .slice(0, 220);
+}
+
 async function fetchHueBridgeConfigByIp(ip) {
   const target = String(ip || "").trim();
   if (!target) return null;
+  if (!isAllowedHueBridgeTarget(target)) return null;
   try {
     const { data } = await axios.get(`http://${target}/api/0/config`, {
       timeout: 1800
@@ -221,6 +251,54 @@ async function fetchHueBridgeConfigByIp(ip) {
 // EXPRESS
 // ======================================================
 const app = express();
+const routeRateBuckets = new Map();
+
+function createRouteRateLimit({ windowMs = 60000, max = 30 } = {}) {
+  const safeWindowMs = Math.max(1000, Math.min(300000, Number(windowMs) || 60000));
+  const safeMax = Math.max(1, Math.min(500, Number(max) || 30));
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = `${req.path}|${req.ip || req.socket?.remoteAddress || "unknown"}`;
+    let bucket = routeRateBuckets.get(key);
+    if (!bucket || now >= bucket.resetAt) {
+      bucket = { count: 0, resetAt: now + safeWindowMs };
+      routeRateBuckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (bucket.count > safeMax) {
+      const retryAfterSec = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+      res.set("Retry-After", String(retryAfterSec));
+      res.status(429).json({ ok: false, error: "rate limit exceeded" });
+      return;
+    }
+    next();
+  };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of routeRateBuckets.entries()) {
+    if (!bucket || now >= bucket.resetAt) routeRateBuckets.delete(key);
+  }
+}, 30000).unref?.();
+
+const strictRateLimit = createRouteRateLimit({ windowMs: 60000, max: 24 });
+const modUiRateLimit = createRouteRateLimit({ windowMs: 60000, max: 90 });
+
+let modsReadmeCache = { text: "", loadedAt: 0, mtimeMs: 0 };
+
+function readModsReadmeCached() {
+  const stat = fs.statSync(MODS_README_PATH);
+  if (!stat.isFile()) throw new Error("mods readme missing");
+  if (stat.size > 1024 * 1024) throw new Error("mods readme too large");
+  if (modsReadmeCache.text && modsReadmeCache.mtimeMs === stat.mtimeMs) {
+    return modsReadmeCache.text;
+  }
+  const markdown = fs.readFileSync(MODS_README_PATH, "utf8");
+  modsReadmeCache = { text: markdown, loadedAt: Date.now(), mtimeMs: stat.mtimeMs };
+  return markdown;
+}
+
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,PUT,OPTIONS");
@@ -236,9 +314,9 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "25mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/docs/mods/readme", (_, res) => {
+app.get("/docs/mods/readme", strictRateLimit, (_, res) => {
   try {
-    const markdown = fs.readFileSync(MODS_README_PATH, "utf8");
+    const markdown = readModsReadmeCached();
     res.set("Cache-Control", "no-store");
     res.type("text/markdown; charset=utf-8");
     res.send(markdown);
@@ -511,11 +589,11 @@ function enqueueHue(state, zone = "hue", options = {}) {
       hueTelemetry.lastDurationMs = Date.now() - start;
     } catch (err) {
       hueTransport.errors++;
-      hueTransport.fallbackReason = err.message || String(err);
+      hueTransport.fallbackReason = sanitizeLogDetail(err.message || String(err));
       console.warn(`[HUE][ENT] send fallback to REST: ${hueTransport.fallbackReason}`);
       hueTransport.active = HUE_TRANSPORT.REST;
       hueEntertainment.stop().catch(stopErr => {
-        console.warn("[HUE][ENT] cleanup stop failed:", stopErr.message || stopErr);
+        console.warn("[HUE][ENT] cleanup stop failed:", sanitizeLogDetail(stopErr.message || stopErr));
       });
       scheduleHueEntertainmentRecovery("send_fallback");
       pendingHueStateByZone.set(zone, state);
@@ -585,7 +663,7 @@ async function setHueTransportMode(nextMode) {
       }
     } catch (err) {
       hueTransport.active = HUE_TRANSPORT.REST;
-      hueTransport.fallbackReason = err.message || String(err);
+      hueTransport.fallbackReason = sanitizeLogDetail(err.message || String(err));
       hueTransport.errors++;
       console.warn("[HUE][ENT] mode switch failed:", hueTransport.fallbackReason);
     }
@@ -643,9 +721,7 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
         if (shouldLogPending) {
           hueRecoveryLastPendingReason = pendingKey;
           hueRecoveryLastPendingLogAt = Date.now();
-          console.warn(
-            `[HUE][ENT] auto-recover pending (${reason}): ${pendingReason} | retry in ${cooldown}ms`
-          );
+          console.warn(`[HUE][ENT] auto-recover pending (${reason}): ${sanitizeLogDetail(pendingReason)} | retry in ${cooldown}ms`);
         }
       }
     } catch (err) {
@@ -655,7 +731,7 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
         HUE_RECOVERY_COOLDOWN_MS * Math.pow(2, Math.min(4, hueRecoveryFailStreak - 1))
       );
       hueRecoveryNextAt = Date.now() + cooldown;
-      console.warn(`[HUE][ENT] auto-recover failed (${reason}):`, err.message || err);
+      console.warn(`[HUE][ENT] auto-recover failed (${reason}):`, sanitizeLogDetail(err.message || err));
     } finally {
       hueRecoveryInFlight = false;
     }
@@ -675,7 +751,7 @@ function nextAutomationEventSeq() {
 }
 
 function sleep(ms) {
-  const waitMs = Math.max(0, Number(ms) || 0);
+  const waitMs = Math.max(0, Math.min(60000, Number(ms) || 0));
   if (!waitMs) return Promise.resolve();
   return new Promise(resolve => setTimeout(resolve, waitMs));
 }
@@ -3542,15 +3618,15 @@ function sendResolvedModUiAsset(req, res, requestPath = "") {
   });
 }
 
-app.get("/mods-ui/:modId", (req, res) => {
+app.get("/mods-ui/:modId", modUiRateLimit, (req, res) => {
   sendResolvedModUiAsset(req, res, "");
 });
 
-app.get("/mods-ui/:modId/", (req, res) => {
+app.get("/mods-ui/:modId/", modUiRateLimit, (req, res) => {
   sendResolvedModUiAsset(req, res, "");
 });
 
-app.get("/mods-ui/:modId/*assetPath", (req, res) => {
+app.get("/mods-ui/:modId/*assetPath", modUiRateLimit, (req, res) => {
   const rawTail = req.params?.assetPath;
   const tail = Array.isArray(rawTail) ? rawTail.join("/") : String(rawTail || "");
   sendResolvedModUiAsset(req, res, tail);
@@ -3689,7 +3765,7 @@ function writeImportedModFiles(targetDir, records = []) {
   }
 }
 
-app.post("/mods/import", async (req, res) => {
+app.post("/mods/import", strictRateLimit, async (req, res) => {
   const payload = req.body && typeof req.body === "object" ? req.body : {};
   const rawFiles = Array.isArray(payload.files) ? payload.files : [];
   const overwrite = payload.overwrite === true;
@@ -3845,7 +3921,7 @@ function normalizeModIdList(value) {
   return out;
 }
 
-app.post("/mods/config", async (req, res) => {
+app.post("/mods/config", strictRateLimit, async (req, res) => {
   const current = modLoader.list();
   const currentConfig = current?.config && typeof current.config === "object"
     ? current.config
