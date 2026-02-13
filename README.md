@@ -30,32 +30,33 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
 
 1. Install Node.js LTS from `https://nodejs.org`.
-2. Start the bridge by double-clicking:
-   - `RaveLink-Bridge.bat`
-3. Wait for this message in the launcher window:
+2. Double-click `RaveLink-Bridge.bat`.
+3. Wait for the launcher window to show:
    - `Bridge URL: http://127.0.0.1:5050`
-4. Open `http://127.0.0.1:5050` in your browser.
-5. Go to `FIXTURE LIST`:
+4. The browser should open automatically.
+5. If the browser does not open automatically, open:
+   - `http://127.0.0.1:5050`
+6. Go to `FIXTURE LIST`:
    - Delete placeholder fixtures (`hue-main-1`, `wiz-background-1`, `wiz-custom-1`) if they are still there.
-6. Add your real fixtures in `FIXTURE PAIRING / DEVICE SETUP`:
+7. Add your real fixtures in `FIXTURE PAIRING / DEVICE SETUP`:
    - Hue: set `bridgeIp`, `username`, `lightId` (plus `bridgeId` + `clientKey` for Entertainment).
    - WiZ: set `ip`.
-7. Go to `DEVICE ROUTING` and pick each fixture, then set modes:
+8. Go to `DEVICE ROUTING` and pick each fixture, then set modes:
    - `ENGINE` = audio reactive engine
    - `TWITCH` = chat/reward `/color` control
    - `CUSTOM` = manual/custom fixture behavior
-8. Click `APPLY ROUTING` for each fixture you changed.
-9. Click `TEST CONNECTIVITY` and confirm fixture target status is ready.
-10. Start the show with `RAVE ON`.
-11. Optional: open `MIDI` tab and map your controller buttons/knobs.
-12. Stop with `RAVE OFF` when done.
+9. Click `APPLY ROUTING` for each fixture you changed.
+10. Click `TEST CONNECTIVITY` and confirm fixture target status is ready.
+11. Start the show with `RAVE ON`.
+12. Optional: open `MIDI` tab and map your controller buttons/knobs.
+13. Stop with `RAVE OFF` when done.
 
-Stop options:
+**Stop options**
 - `RaveLink-Bridge-Stop.bat`
 - `Ctrl+C` in the launcher window
 - `npm run stop` (terminal method)
 
-Terminal fallback (if needed):
+**Terminal fallback (if needed)**
 
 ```powershell
 npm install
