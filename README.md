@@ -182,6 +182,19 @@ Admin-only (do not expose to public chat):
 - Route values shown in UI (`AUTO_HUE_STATE`, `AUTO_WIZ_PULSE`, `AUTO_TWITCH_*`) are derived from fixture mode toggles.
 - Canonical built-in zones are `hue`, `wiz`, and `custom`.
 
+## Troubleshooting
+
+If audio is moving but bulbs are static:
+- Verify fixture credentials/IP are valid.
+- Confirm fixture mode toggles are enabled and route was applied.
+- Check connectivity with `TEST CONNECTIVITY`.
+- Confirm command target/zone actually maps to routed fixtures.
+
+Log hints:
+- `[HUE][ENT] ... missing bridgeIp/username/bridgeId/clientKey` means Hue fixture or env config is incomplete.
+- `[WIZ] no engine targets ... fixtures routed but not configured` means WiZ fixtures exist but have missing/invalid IP.
+- `no routed fixtures matched` from `/color` means Twitch route + target filters found zero fixtures.
+
 ## MIDI Quick Start
 
 1. Open the `MIDI` tab (auto-shows when a MIDI input device is detected).
@@ -207,19 +220,6 @@ Optional expanded layout URL:
 Notes:
 - The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
 - Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
-
-## Troubleshooting
-
-If audio is moving but bulbs are static:
-- Verify fixture credentials/IP are valid.
-- Confirm fixture mode toggles are enabled and route was applied.
-- Check connectivity with `TEST CONNECTIVITY`.
-- Confirm command target/zone actually maps to routed fixtures.
-
-Log hints:
-- `[HUE][ENT] ... missing bridgeIp/username/bridgeId/clientKey` means Hue fixture or env config is incomplete.
-- `[WIZ] no engine targets ... fixtures routed but not configured` means WiZ fixtures exist but have missing/invalid IP.
-- `no routed fixtures matched` from `/color` means Twitch route + target filters found zero fixtures.
 
 ## Version 1.3.1 Patch Notes
 
