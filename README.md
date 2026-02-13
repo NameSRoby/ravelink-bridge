@@ -11,7 +11,7 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.3.0): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.3.0
+- Current Windows release (v1.3.1): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.3.1
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
 ## What This Is
@@ -24,41 +24,6 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 - OBS dock URL built in (`/obs/dock`)
 - MIDI controller mapping tab (learn + bindings + trigger tests)
 - Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
-
-## Version 1.3.0 Changes
-
-- Standalone custom device controls expanded for fixtures routed as `CUSTOM`:
-  - Per-device selection from routed custom fixtures
-  - Scene controls + RGB/CCT range controls + speed controls (including min/max auto-speed bands)
-  - `STATIC` toggle support so selected fixtures can hold output after an initial effect
-  - WiZ/Hue CCT controls retained with brightness-safe handling
-- Mod Center now supports hotswap queue/apply/discard workflows:
-  - Queue mod enable/disable changes without immediate reload
-  - Pending change indicators and explicit `APPLY HOTSWAP`
-  - Safe discard path to revert queued edits before runtime reload
-- Meta Auto upgraded to a self-derived mode:
-  - Stops using decade/auto-genre tuning as a control input while enabled
-  - Infers its own genre from live audio metrics
-  - Decisively drives profile, reactivity, and output Hz/overclock from audio behavior
-  - Telemetry now exposes inferred Meta genre and target Hz
-- Live UI fix: FLOW INTENSITY moved under advanced scene controls and now includes a dedicated reset button.
-- Added full MIDI control surface and runtime API:
-  - Dedicated `MIDI` tab with device scan/config, learn mode, action binding editor, and trigger testing
-  - Runtime routes for status/config/learn/bindings/trigger (`/midi/*`)
-  - Backward-compatible learn alias for legacy overclock mapping (`overclock -> overclock_toggle`)
-- Mod developer docs expanded in `docs/MODS.md` with lifecycle details, hotswap behavior, and endpoint contracts.
-- Added DEV/DEBUG-gated unsafe overclock controls (20-60Hz) with explicit confirmation gates and manual-only routes.
-- Settings cog DEV tools are now hidden unless `DEV DEBUG` is enabled.
-- Added expanded mod-support APIs (`/mods/config`, `/mods/runtime`, `/mods/hooks`, `/mods/hooks/:hook`, `/rave/overclock/tiers`).
-- Added mod-packaged UI hosting:
-  - New dedicated `MODS` tab for mod lifecycle + UI hosting.
-  - Auto-generated top tabs for loaded mods that ship UI packages.
-  - New routes: `/mods/ui/catalog` and `/mods-ui/:modId/*` for mod UI assets.
-- Added dedicated `CUSTOM` tab for standalone/custom fixture control (Hue + WiZ) with direct custom fixture selection.
-- Device routing selector no longer uses the old "custom-only" checkbox flow.
-- Twitch prefix controls are now fully editable (`hue`, `wiz`, `mod-brand`) and include configurable unprefixed default target (`hue|wiz|both`).
-- Added drag/drop mod import in `Mods -> Mod Center` (folder drop or folder picker), backed by `POST /mods/import`.
-- Added built-in `dev-feature-probe-mod` with packaged Mod UI panel for testing standalone custom state, prefix APIs, and overclock routes.
 
 ## Streamer Quick Start
 
@@ -216,6 +181,28 @@ Log hints:
 - `[WIZ] no engine targets ... fixtures routed but not configured` means WiZ fixtures exist but have missing/invalid IP.
 - `no routed fixtures matched` from `/color` means Twitch route + target filters found zero fixtures.
 
+## Version 1.3.1 Patch Notes
+
+- Fixture list reliability improved:
+  - `FIXTURE LIST` now stays populated from the canonical fixture catalog.
+  - Paired/saved fixtures no longer disappear until route selection is re-opened.
+  - Poll fallback keeps fixture updates flowing even when some telemetry endpoints fail.
+- Audio Control improvements:
+  - Added `RESET AUDIO DEFAULTS` button to restore default audio config and apply immediately.
+- Adaptive Meta tuning expanded across genres (not only metal):
+  - Better high-intensity response under aggressive material.
+  - Reduced tendency to sit at low Hz during strong passages.
+  - 16Hz remains rare and only during extreme intensity/drop moments.
+- Custom Fixture Control:
+  - Added `RAVE-START UPDATE` alongside `RAVE-END UPDATE`.
+  - Status now clearly shows start/stop hook states.
+  - Added clearer disabled styling for non-interactive controls.
+- Legacy automation UX:
+  - `NO-CODE AUTOMATION RULES` is now clearly marked deprecated and replaced by `CUSTOM FIXTURE CONTROL`.
+  - Legacy controls are greyed/locked by default and require explicit unlock.
+
+For older major feature lists, see tag history under Releases.
+
 ## Developer Quick Start
 
 1. Install dependencies and run:
@@ -339,11 +326,11 @@ npm run export:redistributable
 3. Zip:
 
 ```powershell
-Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.3.0\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.3.0.zip -Force
+Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.3.1\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.3.1.zip -Force
 ```
 
 Output:
-- `release/RaveLink-Bridge-Windows-v1.3.0`
+- `release/RaveLink-Bridge-Windows-v1.3.1`
 
 ## Security And Data Hygiene
 
