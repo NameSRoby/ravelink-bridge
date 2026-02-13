@@ -444,7 +444,7 @@ Output:
  - **Moving forwards I will be going through the code and apply those so this code can be safely used as an external server, or making it less dangerous for userers to download mods from other devs that have bad intentions**
  - **Otherwise as long as the machine is yours, this server only recieves one type of command externally and that values input from a twitch chat**
     - **Which it filters to only allow colors, like for example *blue* *hot pink* *#960018* or commands that teach colors to a library limited to hex codes**
-      - **The software after checks if the recieved value matches it's defined library and relays it as an r,g,b value to the smart fixtures*
+      - **The software after checks if the recieved value matches it's defined library and relays it as an r,g,b value to the smart fixtures**
  - **NEVER is it possible to make the server run anything malicious code (unless your machine is already compromised), as the server only serves as a messenger**
 
  ## The UI
