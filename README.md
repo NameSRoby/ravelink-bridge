@@ -56,6 +56,11 @@ If your stream setup gremlin appears at 2AM, this checklist is built for that ex
 - `Ctrl+C` in the launcher window
 - `npm run stop` (terminal method)
 
+Why this matters:
+- Use one of the stop methods above so Node shuts down cleanly.
+- If you just close windows/tabs the wrong way, the Node process can keep running in the background.
+- That is not malware, just an unclean shutdown where the local bridge server did not exit properly.
+
 **Terminal fallback (if needed)**
 
 ```powershell
