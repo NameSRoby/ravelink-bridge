@@ -126,26 +126,30 @@ function createReleaseZip(outDir) {
     fs.rmSync(zipPath, { force: true });
   }
 
-  if (process.platform !== "win32") {
-    throw new Error("zip creation currently requires Windows (powershell.exe)");
-  }
-
-  const source = String(outDir).replace(/'/g, "''");
-  const destination = String(zipPath).replace(/'/g, "''");
-  const psScript = [
-    "$ErrorActionPreference = 'Stop'",
-    "Add-Type -AssemblyName 'System.IO.Compression.FileSystem'",
-    `$source = '${source}'`,
-    `$destination = '${destination}'`,
-    "if (Test-Path $destination) { Remove-Item -Force $destination }",
-    "[System.IO.Compression.ZipFile]::CreateFromDirectory($source, $destination, [System.IO.Compression.CompressionLevel]::Optimal, $false)"
-  ].join("; ");
-
-  const result = spawnSync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", psScript],
-    { encoding: "utf8" }
-  );
+  const result = process.platform === "win32"
+    ? spawnSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        [
+          "$ErrorActionPreference = 'Stop'",
+          "Add-Type -AssemblyName 'System.IO.Compression.FileSystem'",
+          `$source = '${String(outDir).replace(/'/g, "''")}'`,
+          `$destination = '${String(zipPath).replace(/'/g, "''")}'`,
+          "if (Test-Path $destination) { Remove-Item -Force $destination }",
+          "[System.IO.Compression.ZipFile]::CreateFromDirectory($source, $destination, [System.IO.Compression.CompressionLevel]::Optimal, $false)"
+        ].join("; ")
+      ],
+      { encoding: "utf8" }
+    )
+    : spawnSync("zip", ["-r", "-q", zipPath, "."], {
+      cwd: outDir,
+      encoding: "utf8"
+    });
 
   if (result.status !== 0) {
     const stderr = String(result.stderr || "").trim();

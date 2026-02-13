@@ -258,7 +258,9 @@ function createRouteRateLimit({ windowMs = 60000, max = 30 } = {}) {
   const safeMax = Math.max(1, Math.min(500, Number(max) || 30));
   return (req, res, next) => {
     const now = Date.now();
-    const key = `${req.path}|${req.ip || req.socket?.remoteAddress || "unknown"}`;
+    const routeKey = String(req.route?.path || req.baseUrl || req.path || "unknown");
+    const clientIp = String(req.ip || req.socket?.remoteAddress || "unknown");
+    const key = `${req.method}|${routeKey}|${clientIp}`;
     let bucket = routeRateBuckets.get(key);
     if (!bucket || now >= bucket.resetAt) {
       bucket = { count: 0, resetAt: now + safeWindowMs };
@@ -721,7 +723,7 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
         if (shouldLogPending) {
           hueRecoveryLastPendingReason = pendingKey;
           hueRecoveryLastPendingLogAt = Date.now();
-          console.warn(`[HUE][ENT] auto-recover pending (${reason}): ${sanitizeLogDetail(pendingReason)} | retry in ${cooldown}ms`);
+          console.warn(`[HUE][ENT] auto-recover pending (${reason}) | retry in ${cooldown}ms`);
         }
       }
     } catch (err) {
