@@ -26,6 +26,8 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 - Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
 
 ## Streamer Quick Start
+Developer tip:
+- Most setup categories in this README have their own quick-start directly under the category heading (Streamer, Twitch, MIDI, OBS, Developer).
 
 If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
 
@@ -280,9 +282,6 @@ Notes:
 For older major feature lists, see tag history under Releases.
 
 ## Developer Quick Start
-
-Developer tip:
-- Most setup categories in this README have their own quick-start directly under the category heading (Streamer, Twitch, MIDI, OBS, Developer).
 
 1. Install dependencies and run:
 
