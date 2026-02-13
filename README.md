@@ -36,7 +36,7 @@ Developer tip:
 
 - *As long as you respect these warnings this software is competely safe and isolated to your pc*
 
-- *This tool only recieves simple instructions (limited to smart bulb commands, which the tool itself has to recognize, only defined commands are **RELAYED** and **NEVER RUN** on this server) and does not communicate whith anything besides the smart bulbs in your local network!*
+- *This tool only recieves simple instructions (limited to smart bulb commands, which the tool itself has to recognize, only defined commands are **RELAYED** to the smart bulbs and **NEVER RUN** on this server) and does not communicate whith anything besides the smart bulbs in your local network!*
 
 If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
 
