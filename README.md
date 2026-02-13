@@ -430,7 +430,6 @@ Output:
  - This server was built to run localy and hence could have a lot of secuirty vulnerabilities
  - As long as you run it local this shouldn't be an issue
  - I will be going through the code and over time make sure those get fixed
- - 
 <img alt="UI_GREEN" src="https://github.com/user-attachments/assets/34c965f8-5262-466d-b217-d87084f568ec" height="702" />
 <img alt="UI_RED" src="https://github.com/user-attachments/assets/10122b60-abf7-4538-ae80-b84a3a55b5ae" height="702" />
 <img alt="UI_ORANGE" src="https://github.com/user-attachments/assets/152771b7-d5aa-44ca-b483-94155f306523" height="702" />
