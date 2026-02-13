@@ -438,7 +438,7 @@ Output:
  - **I'm new to programing and this first started as a small project to have an independent tool for myself for my usecase (letting chat change the color of my smart bulbs)**
  - **Only as the code started getting expanded on did I realise that this could be a cool tool for more people to use**
  - **This caused me to have to completely rewrite full sections of the code to make it modular to accomodate as many fixtures as the user seems fit (this started with 3 bulbs and a hue bridge that I own)**
- - **This Project would never have reached this stage if it wasn't for AI tools that helped me a lot on solving problems debugging and doing math for me, structure the project, even teaching me how concepts I want to impliment could be implimented**
+ - **This Project would never have reached this stage if it wasn't for AI tools that helped me a lot on solving problems debugging, doing math for me, structure the project, even teaching me how concepts I want to impliment could be implimented**
 
  - **Hence why it wasn't built with security vulnerabilities in mind as it was always meant to be ran on a local machine**
  - **Moving forwards I will be going through the code and apply those so this code can be safely used as an external server, or making it less dangerous for userers to download mods from other devs that have bad intentions**
