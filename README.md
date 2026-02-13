@@ -11,7 +11,7 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.3.1): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.3.4
+- Current Windows release (v1.3.4): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.3.4
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
 ## What This Is
