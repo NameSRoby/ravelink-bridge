@@ -1814,7 +1814,7 @@ module.exports = function createRaveEngine(controls) {
   const META_AUTO_GENRE_STYLE = {
     edm: { aggression: 0.42, maxHz: 14, floorHz: 4, baseProfile: "reactive", baseReactivity: "aggressive" },
     hiphop: { aggression: 0.18, maxHz: 10, floorHz: 4, baseProfile: "reactive", baseReactivity: "balanced" },
-    metal: { aggression: 0.62, maxHz: 14, floorHz: 4, baseProfile: "reactive", baseReactivity: "aggressive" },
+    metal: { aggression: 0.74, maxHz: 16, floorHz: 4, baseProfile: "reactive", baseReactivity: "aggressive" },
     ambient: { aggression: -0.6, maxHz: 6, floorHz: 2, baseProfile: "cinematic", baseReactivity: "precision" },
     house: { aggression: 0.22, maxHz: 10, floorHz: 4, baseProfile: "reactive", baseReactivity: "balanced" },
     trance: { aggression: 0.3, maxHz: 12, floorHz: 4, baseProfile: "reactive", baseReactivity: "balanced" },
@@ -1911,7 +1911,7 @@ module.exports = function createRaveEngine(controls) {
     scores.trance += groove * 0.72 + highWeight * 0.54 + (bpm >= 128 && bpm <= 146 ? 0.5 : 0) + (1 - percussive) * 0.24;
     scores.techno += percussive * 0.84 + motion * 0.62 + (bpm >= 124 && bpm <= 152 ? 0.54 : 0) + highWeight * 0.28;
     scores.dnb += percussive * 0.9 + motion * 0.82 + beat * 0.42 + ((bpm >= 160 || (bpm >= 78 && bpm <= 95 && beat > 0.58)) ? 0.68 : 0);
-    scores.metal += percussive * 0.84 + highWeight * 0.6 + drive * 0.46 + (bpm >= 116 ? 0.3 : 0);
+    scores.metal += percussive * 0.94 + highWeight * 0.74 + drive * 0.64 + motion * 0.26 + (bpm >= 108 ? 0.38 : 0);
     scores.rock += percussive * 0.62 + mid * 0.46 + drive * 0.36 + (bpm >= 96 && bpm <= 150 ? 0.3 : 0);
     scores.pop += harmonic * 0.56 + groove * 0.52 + mid * 0.34 + (bpm >= 96 && bpm <= 132 ? 0.34 : 0);
     scores.edm += groove * 0.74 + percussive * 0.64 + drive * 0.54 + (bpm >= 122 && bpm <= 148 ? 0.46 : 0);
@@ -1932,6 +1932,12 @@ module.exports = function createRaveEngine(controls) {
       scores.techno += 0.22;
       scores.edm += 0.2;
       scores.metal += 0.18;
+    }
+    if (highWeight > 0.58 && percussive > 0.52 && drive > 0.46) {
+      scores.metal += 0.2;
+    }
+    if (drive > 0.72 && motion > 0.66) {
+      scores.metal += 0.16;
     }
     if (build) {
       scores.trance += 0.18;
@@ -2039,12 +2045,34 @@ module.exports = function createRaveEngine(controls) {
       0,
       1.25
     );
+    const intensity = clamp(
+      drive * 0.34 +
+      motion * 0.3 +
+      beat * 0.16 +
+      audioTransient * 0.1 +
+      audioFlux * 0.1 +
+      (drop ? 0.18 : 0) +
+      (build ? 0.08 : 0),
+      0,
+      1.4
+    );
 
     let tier = 0;
     if (drop || power >= 0.86 || (motion > 0.82 && drive > 0.7)) tier = 4;
     else if (build || power >= 0.66 || (drive > 0.58 && motion > 0.54)) tier = 3;
     else if (recover || power >= 0.46) tier = 2;
     else if (power >= 0.28) tier = 1;
+
+    if (metaGenre === "metal") {
+      if (drive > 0.42 && motion > 0.36) tier = Math.max(tier, 2);
+      if (drive > 0.6 && (motion > 0.56 || (audioTransient > 0.48 && audioFlux > 0.4))) tier = Math.max(tier, 3);
+      if (drop || (drive > 0.82 && motion > 0.78 && beat > 0.52)) tier = Math.max(tier, 4);
+    }
+    if (intensity > 0.56) tier = Math.max(tier, 2);
+    if (intensity > 0.74 && (motion > 0.52 || beat > 0.44)) tier = Math.max(tier, 3);
+    if ((drop && intensity > 0.88) || (intensity > 1.0 && motion > 0.74 && drive > 0.72)) {
+      tier = Math.max(tier, 4);
+    }
 
     let nextProfile = style.baseProfile;
     let nextReactivity = style.baseReactivity;
@@ -2104,6 +2132,13 @@ module.exports = function createRaveEngine(controls) {
     if (recover && !drop && targetHz > 6) targetHz -= 1;
     if (decadeVariationBias >= 0.08 && tier >= 2 && motion > 0.44) targetHz += 1;
     if (decadeVariationBias <= -0.07 && !drop && tier <= 2) targetHz -= 1;
+    if (metaGenre === "metal") {
+      if (tier >= 2) targetHz += 1;
+      if (tier >= 3 && (motion > 0.62 || audioTransient > 0.5)) targetHz += 1;
+    }
+    if (intensity > 0.6) targetHz += 1;
+    if (intensity > 0.82 && tier >= 3) targetHz += 1;
+    if (!drop && intensity < 0.22 && tier <= 1) targetHz -= 1;
     targetHz += decadeOverclockBias;
 
     const maxHz = clamp(style.maxHz + Math.max(0, decadeOverclockBias), 4, 16);
@@ -2111,6 +2146,16 @@ module.exports = function createRaveEngine(controls) {
     targetHz = clamp(targetHz, floorHz, maxHz);
     if (drop) {
       targetHz = Math.max(targetHz, Math.min(maxHz, 10 + Math.round(Math.max(0, aggression) * 4)));
+    }
+    if (
+      drop &&
+      intensity > 0.96 &&
+      drive > 0.82 &&
+      motion > 0.82 &&
+      (audioTransient > 0.56 || audioFlux > 0.52) &&
+      bpm >= 118
+    ) {
+      targetHz = Math.max(targetHz, 16);
     }
 
     const nextOverclock = clamp(overclockLevelFromHz(targetHz), 0, MAX_OVERCLOCK_LEVEL);

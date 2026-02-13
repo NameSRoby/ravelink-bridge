@@ -1343,6 +1343,7 @@ function normalizeStandaloneState(input, previous, brand = "hue") {
     scene: "sweep",
     animate: false,
     static: false,
+    updateOnRaveStart: false,
     updateOnRaveStop: false,
     speedMode: "fixed",
     speedHz: 1.2,
@@ -1401,6 +1402,9 @@ function normalizeStandaloneState(input, previous, brand = "hue") {
     static: has("static")
       ? parseBoolean(source.static, base.static)
       : base.static,
+    updateOnRaveStart: has("updateOnRaveStart")
+      ? parseBoolean(source.updateOnRaveStart, base.updateOnRaveStart)
+      : base.updateOnRaveStart,
     updateOnRaveStop: has("updateOnRaveStop")
       ? parseBoolean(source.updateOnRaveStop, base.updateOnRaveStop)
       : base.updateOnRaveStop,
@@ -1454,6 +1458,7 @@ function normalizeStandaloneState(input, previous, brand = "hue") {
     transitionMs: Math.round(next.transitionMs),
     animate: Boolean(next.animate),
     static: Boolean(next.static),
+    updateOnRaveStart: Boolean(next.updateOnRaveStart),
     updateOnRaveStop: Boolean(next.updateOnRaveStop),
     speedMode: next.speedMode,
     speedHz: Number(next.speedHz.toFixed(2)),
@@ -2205,6 +2210,9 @@ async function handleRaveOn(_, res) {
       source: "api",
       runtime: getModsRuntimeSnapshot()
     });
+    applyStandaloneRaveStartUpdates().catch(err => {
+      console.warn("[STANDALONE] rave-start update failed:", err.message || err);
+    });
     runAutomationEvent("start", automationSeq).catch(err => {
       console.warn("[AUTOMATION] start action failed:", err.message || err);
     });
@@ -2565,6 +2573,20 @@ async function sendHueStateToFixtures(fixtures = [], state = {}) {
     if (result.status === "rejected") {
       console.warn("[COLOR][HUE] send failed:", result.reason?.message || result.reason);
     }
+  }
+}
+
+async function applyStandaloneRaveStartUpdates() {
+  syncStandaloneRuntime();
+  const fixtures = listStandaloneFixtures().filter(f => f && f.enabled !== false);
+  for (const fixture of fixtures) {
+    const fixtureId = String(fixture.id || "").trim();
+    if (!fixtureId) continue;
+    const current = standaloneStates.get(fixtureId);
+    if (!current || !current.updateOnRaveStart) continue;
+    try {
+      await sendStandaloneState(fixture, current);
+    } catch {}
   }
 }
 

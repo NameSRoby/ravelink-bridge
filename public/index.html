@@ -430,6 +430,11 @@ button.bad{
   background:#2d0b0b;
   color:var(--bad);
 }
+button:disabled{
+  opacity:.45;
+  filter:saturate(.6);
+  cursor:not-allowed;
+}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -837,6 +842,40 @@ textarea{
   border-radius:12px;
   border:1px solid #1c2746;
   background:linear-gradient(180deg,#0d1323,#090d17);
+}
+.legacyNoticePanel{
+  border:1px solid #6a5a2a;
+  border-radius:10px;
+  background:linear-gradient(180deg,#231b08,#171105);
+  padding:10px;
+}
+.legacyNoticeTitle{
+  font-size:11px;
+  letter-spacing:1.1px;
+  color:#ffd98a;
+  margin:0 0 6px;
+}
+.legacyNoticeText{
+  margin:0;
+  font-size:12px;
+  color:#e8dcc0;
+  line-height:1.35;
+}
+.legacyNoticeActions{
+  margin-top:8px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.legacyAutomationWrap{
+  margin-top:10px;
+}
+.legacyAutomationWrap.legacyLocked{
+  opacity:.42;
+  filter:saturate(.55) grayscale(.2);
+}
+.legacyAutomationWrap.legacyLocked *{
+  pointer-events:none;
 }
 
 .liveMainCluster .subcluster{
@@ -2200,9 +2239,10 @@ tr:last-child td{
         <button id="aRefreshBtn" type="button" title="Reload current audio config from server.">REFRESH CFG</button>
         <button id="aScanBtn" type="button" title="Rescan input devices from the audio backend.">SCAN DEVICES</button>
       </div>
-      <div class="grid2">
+      <div class="grid3">
         <button id="aApplyBtn" type="button" class="warn" title="Save these audio settings to server and apply immediately.">APPLY AUDIO CFG</button>
         <button id="aRestartBtn" type="button" title="Restart audio capture pipeline with current settings.">RESTART AUDIO</button>
+        <button id="aResetDefaultsBtn" type="button" class="warn" title="Restore audio settings to defaults and apply immediately.">RESET AUDIO DEFAULTS</button>
       </div>
     </div>
 
@@ -2578,8 +2618,9 @@ tr:last-child td{
           <option value="cct">CCT (WiZ + HUE CT)</option>
         </select>
       </div>
-      <div class="grid2">
+      <div class="grid3">
         <button id="standStaticBtn" type="button" data-on="false" aria-pressed="false">STATIC OFF</button>
+        <button id="standRaveStartBtn" type="button" data-on="false" aria-pressed="false">RAVE-START UPDATE OFF</button>
         <button id="standRaveStopBtn" type="button" data-on="false" aria-pressed="false">RAVE-END UPDATE OFF</button>
       </div>
       <div class="grid2">
@@ -2681,6 +2722,16 @@ tr:last-child td{
       <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide automation rule editor.">COLLAPSE</button>
     </div>
     <div class="clusterBody">
+    <div class="legacyNoticePanel">
+      <p class="legacyNoticeTitle">LEGACY / DEPRECATED</p>
+      <p class="legacyNoticeText">This section is legacy and replaced by <b>CUSTOM FIXTURE CONTROL</b>. Keep disabled unless you explicitly need old automation behavior.</p>
+      <div class="legacyNoticeActions">
+        <button id="legacyAutomationUnlockBtn" type="button" class="warn">OPEN LEGACY CONTROLS</button>
+        <button id="legacyAutomationLockBtn" type="button" class="hidden">HIDE LEGACY CONTROLS</button>
+        <button id="legacyAutomationJumpCustomBtn" type="button">GO TO CUSTOM FIXTURE CONTROL</button>
+      </div>
+    </div>
+    <div id="legacyAutomationWrap" class="legacyAutomationWrap legacyLocked">
     <div class="controlRow">
       <div>
         <label for="autoRulesEnabled">AUTOMATION</label>
@@ -2758,6 +2809,7 @@ tr:last-child td{
       <div>CFG VER<br><span id="autoRulesVersion">0</span></div>
       <div>LOADED<br><span id="autoRulesLoadedAt">-</span></div>
       <div>LAST BACKUP<br><span id="autoRulesBackup">-</span></div>
+    </div>
     </div>
     </div>
   </div>
@@ -2920,6 +2972,7 @@ tr:last-child td{
 <script>
 const THEME_STORAGE_KEY = "ravelink_ui_theme_v1";
 const OBS_DOCK_COMPACT_KEY = "ravelink_obs_dock_compact_v1";
+const LEGACY_AUTOMATION_UNLOCK_KEY = "ravelink_legacy_automation_unlocked_v1";
 const DEFAULT_THEME_NAME = "midnight";
 
 const THEME_PRESETS = {
@@ -3010,6 +3063,7 @@ const ui = {
   midiSnapshot: null,
   midiTabForced: localStorage.getItem("ravelink_midi_tab_forced_v1") === "1",
   automationConfigLoaded: false,
+  legacyAutomationUnlocked: localStorage.getItem(LEGACY_AUTOMATION_UNLOCK_KEY) === "1",
   modsLoadedAt: 0,
   modsTotal: 0,
   modsActive: 0,
@@ -3139,6 +3193,10 @@ const el = {
   autoRulesVersion: document.getElementById("autoRulesVersion"),
   autoRulesLoadedAt: document.getElementById("autoRulesLoadedAt"),
   autoRulesBackup: document.getElementById("autoRulesBackup"),
+  legacyAutomationWrap: document.getElementById("legacyAutomationWrap"),
+  legacyAutomationUnlockBtn: document.getElementById("legacyAutomationUnlockBtn"),
+  legacyAutomationLockBtn: document.getElementById("legacyAutomationLockBtn"),
+  legacyAutomationJumpCustomBtn: document.getElementById("legacyAutomationJumpCustomBtn"),
   systemStartTab: document.getElementById("systemStartTab"),
   systemConfirmActions: document.getElementById("systemConfirmActions"),
   systemPollingMode: document.getElementById("systemPollingMode"),
@@ -3153,6 +3211,7 @@ const el = {
   aScanBtn: document.getElementById("aScanBtn"),
   aApplyBtn: document.getElementById("aApplyBtn"),
   aRestartBtn: document.getElementById("aRestartBtn"),
+  aResetDefaultsBtn: document.getElementById("aResetDefaultsBtn"),
   gameBtn: document.getElementById("gameBtn"),
   bpmBtn: document.getElementById("bpmBtn"),
   metaAutoOnBtn: document.getElementById("metaAutoOnBtn"),
@@ -3392,6 +3451,7 @@ const el = {
   standBrightnessVal: document.getElementById("standBrightnessVal"),
   standColorMode: document.getElementById("standColorMode"),
   standStaticBtn: document.getElementById("standStaticBtn"),
+  standRaveStartBtn: document.getElementById("standRaveStartBtn"),
   standRaveStopBtn: document.getElementById("standRaveStopBtn"),
   standHsvSingleWrap: document.getElementById("standHsvSingleWrap"),
   standHsvRangeRow: document.getElementById("standHsvRangeRow"),
@@ -3485,6 +3545,22 @@ const AUDIO_QUICK_PROFILES = Object.freeze({
   fast: { sampleRate: 48000, framesPerBuffer: 128 },
   hires: { sampleRate: 96000, framesPerBuffer: 256 }
 });
+const AUDIO_CONFIG_DEFAULTS = Object.freeze({
+  deviceMatch: "",
+  deviceId: null,
+  sampleRate: 96000,
+  framesPerBuffer: 256,
+  channels: 2,
+  outputGain: 1,
+  noiseFloorMin: 0.00045,
+  peakDecay: 0.93,
+  bandLowHz: 180,
+  bandMidHz: 2200,
+  limiterThreshold: 0.82,
+  limiterKnee: 0.16,
+  restartMs: 1500,
+  logEveryTicks: 60
+});
 const DEV_OVERCLOCK_LEVEL_BY_HZ = Object.freeze({
   20: 8,
   30: 9,
@@ -3559,6 +3635,7 @@ function applyUiTooltips() {
     el.metaAutoOffBtn,
     "Disable Meta Auto and return to manual controls. Manual profile/reactivity/genre/decade/overclock selections also disable Meta Auto."
   );
+  setNodeTitle(el.aResetDefaultsBtn, "Restore audio controls to defaults and apply immediately.");
   setNodeTitle(el.ocDev20Btn, "Unsafe manual overclock 20Hz.");
   setNodeTitle(el.ocDev30Btn, "Unsafe manual overclock 30Hz.");
   setNodeTitle(el.ocDev40Btn, "Unsafe manual overclock 40Hz.");
@@ -3592,6 +3669,9 @@ function applyUiTooltips() {
   setNodeTitle(el.modUiFrame, "Sandboxed mod UI frame.");
   setNodeTitle(el.customFixtureSelect, "Custom-routed fixtures from both Hue and WiZ brands.");
   setNodeTitle(el.customFixtureSyncBtn, "Use selected custom fixture as active device control target.");
+  setNodeTitle(el.legacyAutomationUnlockBtn, "Open deprecated automation controls.");
+  setNodeTitle(el.legacyAutomationLockBtn, "Hide deprecated automation controls.");
+  setNodeTitle(el.legacyAutomationJumpCustomBtn, "Jump to Custom Fixture Control (recommended replacement).");
   setNodeTitle(el.modDropZone, "Drop a mod folder here to import directly.");
   setNodeTitle(el.modImportStatus, "Current drag/drop import status.");
   setNodeTitle(el.modImportBrowseBtn, "Pick a mod folder from disk and import it.");
@@ -5893,6 +5973,17 @@ async function refreshFixturesFromServer(options = {}) {
   return { ok: false, snapshot: null };
 }
 
+async function getKnownFixtureCatalog() {
+  const localCatalog = Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : [];
+  if (localCatalog.length) return localCatalog;
+
+  const snapshot = await loadFixturesSnapshot(2);
+  if (snapshot && Array.isArray(snapshot.fixtures)) {
+    return snapshot.fixtures.slice();
+  }
+  return localCatalog;
+}
+
 async function saveFixtureFromForm(options = {}) {
 
   const resetAfter = options.resetAfter !== false;
@@ -5920,7 +6011,8 @@ async function saveFixtureFromForm(options = {}) {
   }
 
   const savedFixture = r.data?.fixture || fixture;
-  const localCatalog = upsertFixtureCatalogEntry(savedFixture, { replaceId });
+  const catalogSeed = await getKnownFixtureCatalog();
+  const localCatalog = upsertFixtureCatalogEntry(savedFixture, { replaceId, catalogSeed });
   applyFixtureCatalogToUi(localCatalog);
   let refreshOk = localCatalog.length > 0;
   if (savedFixture?.id && el.fxOriginalId && !resetAfter) {
@@ -6008,8 +6100,10 @@ function syncAutomationPercentLabels() {
 }
 
 function syncAutomationControlAccessibility() {
-  const enabled = boolFromSelect(el.autoRulesEnabled.value);
+  const legacyLocked = !ui.legacyAutomationUnlocked;
+  const enabled = boolFromSelect(el.autoRulesEnabled.value) && !legacyLocked;
   [
+    el.autoRulesEnabled,
     el.autoRulesTargetZone,
     el.autoRulesTransitionMs,
     el.autoStartEnabled,
@@ -6018,11 +6112,53 @@ function syncAutomationControlAccessibility() {
     el.autoStopEnabled,
     el.autoStopPercent,
     el.autoStopDelayMs,
+    el.autoRulesSaveBtn,
+    el.autoRulesReloadBtn,
     el.autoRulesTestStartBtn,
     el.autoRulesTestStopBtn
   ].forEach(node => {
-    if (node) node.disabled = !enabled;
+    if (!node) return;
+    if (legacyLocked) {
+      node.disabled = true;
+    } else {
+      const requiresAutomationOn =
+        node === el.autoRulesTargetZone ||
+        node === el.autoRulesTransitionMs ||
+        node === el.autoStartEnabled ||
+        node === el.autoStartPercent ||
+        node === el.autoStartDelayMs ||
+        node === el.autoStopEnabled ||
+        node === el.autoStopPercent ||
+        node === el.autoStopDelayMs ||
+        node === el.autoRulesTestStartBtn ||
+        node === el.autoRulesTestStopBtn;
+      node.disabled = requiresAutomationOn ? !enabled : false;
+    }
   });
+}
+
+function syncLegacyAutomationUi() {
+  const unlocked = ui.legacyAutomationUnlocked === true;
+  if (el.legacyAutomationWrap) {
+    el.legacyAutomationWrap.classList.toggle("legacyLocked", !unlocked);
+  }
+  if (el.legacyAutomationUnlockBtn) {
+    el.legacyAutomationUnlockBtn.classList.toggle("hidden", unlocked);
+  }
+  if (el.legacyAutomationLockBtn) {
+    el.legacyAutomationLockBtn.classList.toggle("hidden", !unlocked);
+  }
+}
+
+function setLegacyAutomationUnlocked(enabled, options = {}) {
+  const unlocked = Boolean(enabled);
+  ui.legacyAutomationUnlocked = unlocked;
+  if (options.persist !== false) {
+    if (unlocked) localStorage.setItem(LEGACY_AUTOMATION_UNLOCK_KEY, "1");
+    else localStorage.removeItem(LEGACY_AUTOMATION_UNLOCK_KEY);
+  }
+  syncLegacyAutomationUi();
+  syncAutomationControlAccessibility();
 }
 
 function refreshAutomationZoneOptions(fixtures = []) {
@@ -6054,6 +6190,7 @@ function refreshAutomationZoneOptions(fixtures = []) {
 
 function applyFixtureCatalogToUi(fixtures = []) {
   const catalog = Array.isArray(fixtures) ? fixtures.slice() : [];
+  ui.fixturesCatalog = catalog;
   refreshAutomationZoneOptions(catalog);
   renderRouteFixtureOptions(catalog);
   renderFixtureRows(catalog);
@@ -6066,7 +6203,10 @@ function upsertFixtureCatalogEntry(fixture, options = {}) {
 
   const replaceId = String(options?.replaceId || "").trim();
   const nextId = String(fixture?.id || "").trim();
-  const catalog = Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : [];
+  const seedCatalog = Array.isArray(options?.catalogSeed)
+    ? options.catalogSeed
+    : ui.fixturesCatalog;
+  const catalog = Array.isArray(seedCatalog) ? seedCatalog.slice() : [];
 
   if (replaceId && replaceId !== nextId) {
     for (let i = catalog.length - 1; i >= 0; i -= 1) {
@@ -7147,6 +7287,7 @@ function syncStandaloneModeUi(options = {}) {
   el.standSpeedMaxHz.disabled = !enabled || !useAudioSpeed;
   el.standColorMode.disabled = !enabled;
   el.standStaticBtn.disabled = !enabled || isRgb;
+  el.standRaveStartBtn.disabled = !enabled;
   el.standRaveStopBtn.disabled = !enabled;
   el.standSpeedHz.title = isRgb
     ? "RGB STATIC mode does not animate."
@@ -7302,6 +7443,7 @@ function setStandaloneControlEnabled(enabled) {
     el.standSpeedMaxHz,
     el.standColorMode,
     el.standStaticBtn,
+    el.standRaveStartBtn,
     el.standRaveStopBtn,
     el.standTransitionMs,
     el.standApplyBtn
@@ -7384,9 +7526,8 @@ function applyCustomFixtureSelectionFromTab(options = {}) {
 }
 
 function renderRouteFixtureOptions(fixtures = []) {
-  ui.fixturesCatalog = Array.isArray(fixtures) ? fixtures.slice() : [];
   const previous = String(ui.standaloneSelectedId || el.standFixtureSelect.value || "").trim();
-  const optionsCatalog = ui.fixturesCatalog.slice();
+  const optionsCatalog = Array.isArray(fixtures) ? fixtures.slice() : [];
 
   el.standFixtureSelect.innerHTML = "";
   const placeholder = document.createElement("option");
@@ -7471,6 +7612,7 @@ function applyStandaloneEntryToControls(entry) {
     el.standCctMinKelvin.value = "2700";
     el.standCctMaxKelvin.value = "6500";
     setStandaloneToggleState(el.standStaticBtn, false, { on: "STATIC ON", off: "STATIC OFF" });
+    setStandaloneToggleState(el.standRaveStartBtn, false, { on: "RAVE-START UPDATE ON", off: "RAVE-START UPDATE OFF" });
     setStandaloneToggleState(el.standRaveStopBtn, false, { on: "RAVE-END UPDATE ON", off: "RAVE-END UPDATE OFF" });
     el.standTransitionMs.value = "350";
     syncStandaloneValueLabels();
@@ -7501,6 +7643,7 @@ function applyStandaloneEntryToControls(entry) {
   el.standCctMinKelvin.value = String(clampInt(state.cctMinKelvin, 2200, 6500, 2700));
   el.standCctMaxKelvin.value = String(clampInt(state.cctMaxKelvin, 2200, 6500, 6500));
   setStandaloneToggleState(el.standStaticBtn, state.static === true, { on: "STATIC ON", off: "STATIC OFF" });
+  setStandaloneToggleState(el.standRaveStartBtn, state.updateOnRaveStart === true, { on: "RAVE-START UPDATE ON", off: "RAVE-START UPDATE OFF" });
   setStandaloneToggleState(el.standRaveStopBtn, state.updateOnRaveStop === true, { on: "RAVE-END UPDATE ON", off: "RAVE-END UPDATE OFF" });
   el.standTransitionMs.value = String(clampInt(state.transitionMs, 0, 10000, 350));
   syncStandaloneValueLabels();
@@ -7514,7 +7657,9 @@ function applyStandaloneEntryToControls(entry) {
   const sceneWord = normalizeStandaloneScene(state.scene).toUpperCase();
   const colorWord = normalizeStandaloneColorMode(state.colorMode).toUpperCase();
   const staticWord = state.static ? "static" : (entry.animating ? "animating" : "ready");
-  const stateWord = entry.enabled === false ? "disabled" : `${staticWord} | scene ${sceneWord} | ${colorWord}`;
+  const startWord = state.updateOnRaveStart ? "start:on" : "start:off";
+  const stopWord = state.updateOnRaveStop ? "stop:on" : "stop:off";
+  const stateWord = entry.enabled === false ? "disabled" : `${staticWord} | scene ${sceneWord} | ${colorWord} | ${startWord} | ${stopWord}`;
   if (!supportsStandaloneUi) {
     el.standStatus.value = `${entry.id} | ${brand} | zone ${zone} | mode ${mode.toUpperCase()} | standalone UI unsupported for this brand (use mod actions)`;
     return;
@@ -7595,6 +7740,7 @@ function collectStandaloneStateFromControls() {
   const speedMode = normalizeStandaloneSpeedMode(el.standSpeedMode.value);
   const colorMode = normalizeStandaloneColorMode(el.standColorMode.value);
   const staticOn = getStandaloneToggleState(el.standStaticBtn);
+  const updateOnRaveStart = getStandaloneToggleState(el.standRaveStartBtn);
   const updateOnRaveStop = getStandaloneToggleState(el.standRaveStopBtn);
   if (fixtureId) {
     ui.standaloneModeByFixture[fixtureId] = mode;
@@ -7608,6 +7754,7 @@ function collectStandaloneStateFromControls() {
     on: el.standPower.value === "true",
     animate,
     static: staticOn,
+    updateOnRaveStart,
     updateOnRaveStop,
     speedHz,
     speedMode,
@@ -8051,9 +8198,10 @@ el.fxHuePairBtn.onclick = async () => {
 
   let saved = null;
   if (fixtureSavedByPair) {
-    const localCatalog = upsertFixtureCatalogEntry(pairedFixture);
+    const catalogSeed = await getKnownFixtureCatalog();
+    const localCatalog = upsertFixtureCatalogEntry(pairedFixture, { catalogSeed });
     applyFixtureCatalogToUi(localCatalog);
-    const refreshed = await refreshFixturesFromServer({ attempts: 3 });
+    const refreshed = await refreshFixturesFromServer({ attempts: 5 });
     saved = {
       ok: true,
       savedFixture: pairedFixture,
@@ -8162,6 +8310,8 @@ const refreshStandaloneDraftStatus = () => {
   const scene = normalizeStandaloneScene(el.standScene.value).toUpperCase();
   const speedSource = normalizeStandaloneSpeedMode(el.standSpeedMode.value).toUpperCase();
   const staticWord = getStandaloneToggleState(el.standStaticBtn) ? "STATIC" : "LIVE";
+  const startWord = getStandaloneToggleState(el.standRaveStartBtn) ? "START_EVT_ON" : "START_EVT_OFF";
+  const stopWord = getStandaloneToggleState(el.standRaveStopBtn) ? "STOP_EVT_ON" : "STOP_EVT_OFF";
   const colorWord = normalizeStandaloneColorMode(el.standColorMode.value).toUpperCase();
   const brandKey = String(fixture.brand || "").trim().toLowerCase();
   const zone = String(
@@ -8170,7 +8320,7 @@ const refreshStandaloneDraftStatus = () => {
   );
   el.standStatus.value =
     `${fixtureId} | ${String(fixture.brand || "").toUpperCase()} | zone ${zone} | ` +
-    `mode ${mode} | scene ${scene} | ${speedSource} | ${colorWord} | ${staticWord} | draft (press APPLY TO DEVICE)`;
+    `mode ${mode} | scene ${scene} | ${speedSource} | ${colorWord} | ${staticWord} | ${startWord} | ${stopWord} | draft (press APPLY TO DEVICE)`;
 };
 
 el.standBrightness.oninput = syncStandaloneValueLabels;
@@ -8226,6 +8376,11 @@ el.standStaticBtn.onclick = () => {
   const nextOn = !getStandaloneToggleState(el.standStaticBtn);
   setStandaloneToggleState(el.standStaticBtn, nextOn, { on: "STATIC ON", off: "STATIC OFF" });
   syncStandaloneModeUi({ enabled: !el.standMode.disabled });
+  refreshStandaloneDraftStatus();
+};
+el.standRaveStartBtn.onclick = () => {
+  const nextOn = !getStandaloneToggleState(el.standRaveStartBtn);
+  setStandaloneToggleState(el.standRaveStartBtn, nextOn, { on: "RAVE-START UPDATE ON", off: "RAVE-START UPDATE OFF" });
   refreshStandaloneDraftStatus();
 };
 el.standRaveStopBtn.onclick = () => {
@@ -8406,6 +8561,24 @@ el.colorPrefixResetBtn.onclick = async () => {
   await saveColorPrefixConfigFromUi({ reset: true });
 };
 
+if (el.legacyAutomationUnlockBtn) {
+  el.legacyAutomationUnlockBtn.onclick = () => {
+    setLegacyAutomationUnlocked(true);
+    setBadge(el.health, "warn", "LEGACY AUTOMATION OPENED");
+  };
+}
+if (el.legacyAutomationLockBtn) {
+  el.legacyAutomationLockBtn.onclick = () => {
+    setLegacyAutomationUnlocked(false);
+    setBadge(el.health, "ok", "LEGACY AUTOMATION HIDDEN");
+  };
+}
+if (el.legacyAutomationJumpCustomBtn) {
+  el.legacyAutomationJumpCustomBtn.onclick = () => {
+    activateTabAndScroll("custom", "standCustomCluster");
+  };
+}
+
 el.autoStartPercent.oninput = syncAutomationPercentLabels;
 el.autoStopPercent.oninput = syncAutomationPercentLabels;
 el.autoRulesEnabled.onchange = () => {
@@ -8514,6 +8687,24 @@ el.aApplyBtn.onclick = async () => {
 el.aRestartBtn.onclick = async () => {
   const r = await api("/audio/restart");
   setBadge(el.health, r ? "ok" : "bad", r ? "AUDIO RESTART" : "AUDIO RESTART FAIL");
+};
+
+el.aResetDefaultsBtn.onclick = async () => {
+  if (!window.confirm("Reset audio settings to defaults and apply now?")) return;
+
+  const r = await postJson("/audio/config", AUDIO_CONFIG_DEFAULTS);
+  if (!r.ok) {
+    setBadge(el.health, "bad", "AUDIO RESET FAIL");
+    return;
+  }
+
+  applyAudioConfigToInputs(r.data?.config || AUDIO_CONFIG_DEFAULTS);
+  setBadge(
+    el.health,
+    "ok",
+    r.data && r.data.restarted ? "AUDIO DEFAULTS APPLIED + RESTART" : "AUDIO DEFAULTS APPLIED"
+  );
+  sync();
 };
 
 limiterPresetButtons.forEach(btn => {
@@ -9558,8 +9749,12 @@ function sync() {
 function updateFixtures(f) {
   const summary = f && f.summary ? f.summary : {};
   const routes = f?.routes || summary.routes || {};
-  const fixtures = Array.isArray(f?.fixtures) ? f.fixtures : [];
-  const standalone = Array.isArray(f?.standalone) ? f.standalone : [];
+  const fixtures = Array.isArray(f?.fixtures)
+    ? f.fixtures
+    : (Array.isArray(ui.fixturesCatalog) ? ui.fixturesCatalog.slice() : []);
+  const standalone = Array.isArray(f?.standalone)
+    ? f.standalone
+    : (Array.isArray(ui.standaloneFixtures) ? ui.standaloneFixtures.slice() : []);
   ui.fixtureModBrands = collectFixtureModBrandsFromSnapshot(summary, fixtures);
   syncFixtureBrandOptions();
   updateConnectivityCache(f?.connectivity || []);
@@ -9743,6 +9938,26 @@ async function poll(options = {}) {
   ]);
 
   if (!t || !h) {
+    if (f) updateFixtures(f);
+    if (automationSnapshot?.ok && automationSnapshot.config) {
+      if (!ui.automationConfigLoaded) {
+        applyAutomationConfigToInputs(automationSnapshot.config, automationSnapshot.meta || {});
+        ui.automationConfigLoaded = true;
+      } else {
+        renderAutomationSummary(automationSnapshot.config, automationSnapshot.meta || {});
+      }
+    }
+    if (modsSnapshot?.ok) {
+      renderMods(modsSnapshot);
+    }
+    if (colorPrefixSnapshot?.ok) {
+      applyColorPrefixSnapshot(colorPrefixSnapshot);
+      ui.colorPrefixConfigLoaded = true;
+    }
+    if (midiSnapshot?.ok !== false && midiSnapshot) {
+      applyMidiSnapshot(midiSnapshot);
+    }
+
     ui.pollErrors += 1;
     setBadge(el.netBadge, "bad", "NET DOWN");
     if (ui.pollErrors > 2) {
@@ -9939,9 +10154,10 @@ loadAudioConfig();
 loadAudioDevices();
 loadMidiStatus();
 refreshStandaloneFixtures();
-refreshFixturesFromServer({ attempts: 2, clearOnFail: true });
+refreshFixturesFromServer({ attempts: 3 });
 loadMods();
 loadColorPrefixConfig();
+setLegacyAutomationUnlocked(ui.legacyAutomationUnlocked, { persist: false });
 syncAutomationPercentLabels();
 loadAutomationConfig();
 updateMainScopeInput(
