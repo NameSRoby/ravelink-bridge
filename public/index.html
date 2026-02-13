@@ -3123,6 +3123,14 @@ const inferredApiBase = (() => {
 
 let apiBase = localStorage.getItem("rave_api_base") || inferredApiBase;
 const withBase = path => (apiBase ? `${apiBase}${path}` : path);
+
+function sanitizeFrameUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  const lowered = value.toLowerCase();
+  if (lowered.startsWith("javascript:") || lowered.startsWith("data:")) return "";
+  return value;
+}
 const DEV_DEBUG_KEY = "ravelink_dev_debug_v1";
 const DEV_DEBUG_WARN_ONCE_KEY = "ravelink_dev_debug_warn_once_v1";
 const DEV_OVERCLOCK_COMICAL_ACK_KEY = "ravelink_dev_overclock_comical_ack_v1";
@@ -4464,7 +4472,7 @@ function renderModUiFrame(options = {}) {
     ui.modUiLastId !== normalizeModUiId(descriptor.id) ||
     ui.modUiLastUrl !== nextUrl
   )) {
-    frame.src = withBase(nextUrl);
+    frame.src = withBase(sanitizeFrameUrl(nextUrl) || "about:blank");
     ui.modUiLastId = normalizeModUiId(descriptor.id);
     ui.modUiLastUrl = nextUrl;
     ui.modUiLoadedAt = Date.now();

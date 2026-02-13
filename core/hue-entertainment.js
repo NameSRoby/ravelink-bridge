@@ -118,12 +118,15 @@ function getHueHttpsAgent(bridgeId = "") {
   const cached = hueHttpsAgentByBridge.get(key);
   if (cached) return cached;
 
+  const normalizedBridgeId = String(bridgeId || "").trim().toLowerCase();
+  const allowInsecureTls = String(process.env.RAVE_HUE_ALLOW_INSECURE_TLS || "").trim().toLowerCase() === "true";
+
   const agent = new https.Agent({
     keepAlive: true,
     maxSockets: 8,
-    // Hue bridge certificates are bridge-id host scoped.
-    // We connect via IP for reliability and relax verification here.
-    rejectUnauthorized: false
+    rejectUnauthorized: !allowInsecureTls,
+    servername: normalizedBridgeId || undefined,
+    minVersion: "TLSv1.2"
   });
   hueHttpsAgentByBridge.set(key, agent);
   return agent;
@@ -271,6 +274,15 @@ function parsePemCertificates(pemBundle = "") {
   return Array.isArray(matches) ? matches.map(s => s.trim()).filter(Boolean) : [];
 }
 
+function sanitizeLogDetail(value, fallback = "operation failed") {
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+  return raw
+    .replace(/(client[_-]?key|username|token|authorization|password|secret)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]")
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+\/-]+/gi, "$1[redacted]")
+    .slice(0, 220);
+}
+
 function wait(ms) {
   const delay = Math.max(0, Number(ms) || 0);
   if (!delay) return Promise.resolve();
@@ -308,7 +320,7 @@ function ensureHueTrustStore({ bundledHueCaPath, log = console }) {
 
     tls.setDefaultCACertificates(merged);
     hueCaInstalled = true;
-    log.log?.(`[HUE][ENT] installed Hue CA trust (${path.basename(caPath)})`);
+    log.log?.("[HUE][ENT] installed Hue CA trust bundle");
     return true;
   } catch (err) {
     log.warn?.(`[HUE][ENT] failed to install Hue CA trust: ${err.message || err}`);
@@ -761,7 +773,7 @@ module.exports = function createHueEntertainmentTransport({ fixtureRegistry, log
       areaRef = null;
       streamChannelCount = 1;
       unavailableReason = await diagnoseStartFailure(err, cfg);
-      log.warn?.(`[HUE][ENT] start failed: ${unavailableReason}`);
+      log.warn?.(`[HUE][ENT] start failed: ${sanitizeLogDetail(unavailableReason)}`);
       return { ok: false, reason: unavailableReason };
     }
   }
