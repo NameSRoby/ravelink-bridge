@@ -30,7 +30,7 @@ Developer tip:
 
 ## Streamer Quick Start
 **!! NEVER SHOW SERVER LOGS ON STREAM !!**
-- *This tool has been conceptualised recently and is still missing security measures (future versons will have them patched in to make this tool more versatile)*
+- *This tool has been conceptualised recently and is still missing security measures (future versions will have them patched in to make this tool more versatile)*
 
 - *This should not be an issue as long as you run it only localy on your machine and make sure you don't expose your server logs on stream!*
 
