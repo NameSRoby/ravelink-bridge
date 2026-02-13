@@ -28,16 +28,6 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 Developer tip:
 - Most setup categories in this README have their own quick-start directly under the category heading (Streamer, Twitch, MIDI, OBS, Developer).
 
-## Streamer Quick Start
-**!! NEVER SHOW SERVER LOGS ON STREAM !!**
-- *This tool has been conceptualised recently and is still missing security measures (future versions will have them patched in to make this tool more versatile)*
-
-- *This should not be an issue as long as you run it only on your local machine and make sure you don't expose your server logs on stream!*
-
-- *As long as you respect these warnings this software is competely safe and isolated to your pc*
-
-- *This tool only recieves simple instructions (limited to smart bulb commands, which the tool itself has to recognize, only defined commands are **RELAYED** to the smart bulbs and **NEVER RUN** on this server) and does not communicate whith anything besides the smart bulbs in your local network!*
-
 If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
 
 1. Install Node.js LTS from `https://nodejs.org`.
@@ -435,17 +425,6 @@ Output:
 - Third-party notices: `THIRD_PARTY_NOTICES.md`
 ## Notes
 
- - **I'm new to programing and this first started as a small project to have an independent tool for myself for my usecase (letting chat change the color of my smart bulbs)**
- - **Only as the code started getting expanded on did I realise that this could be a cool tool for more people to use**
- - **This caused me to have to completely rewrite full sections of the code to make it modular to accomodate as many fixtures as the user seems fit (this started with 3 bulbs and a hue bridge that I own)**
- - **This Project would never have reached this stage if it wasn't for AI tools that helped me a lot on solving problems debugging, doing math for me, structure the project, even teaching me how concepts I want to impliment could be implimented**
-
- - **Hence why it wasn't built with security vulnerabilities in mind as it was always meant to be ran on a local machine**
- - **Moving forwards I will be going through the code and apply those so this code can be safely used as an external server, or making it less dangerous for userers to download mods from other devs that have bad intentions**
- - **Otherwise as long as the machine is yours, this server only recieves one type of command externally and that values input from a twitch chat**
-    - **Which it filters to only allow colors, like for example *blue* *hot pink* *#960018* or commands that teach colors to a library limited to hex codes**
-      - **The software after checks if the recieved value matches it's defined library and relays it as an r,g,b value to the smart fixtures**
- - **NEVER is it possible to make the server run anything malicious code (unless your machine is already compromised), as the server only serves as a messenger**
 
  ## The UI
 <img alt="UI_GREEN" src="https://github.com/user-attachments/assets/34c965f8-5262-466d-b217-d87084f568ec" height="702" />
