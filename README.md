@@ -91,27 +91,45 @@ Notes:
 
 ## Twitch + Channel Points Setup
 
+How this integration is meant to work:
+- RaveLink Bridge runs locally on your stream PC (`http://127.0.0.1:5050`).
+- Twitch reward listener code runs inside a StreamElements Custom Widget (overlay code).
+- OBS loads that StreamElements overlay URL as a Browser Source.
+
+If "where does this code go?" is ever the question, the answer is: inside the StreamElements widget JS panel, not in `server.js`.
+
 ### Option A: StreamElements Widget (overlay logic)
 
-Use this exact file:
+Use this exact template file:
 - `INTEGRATIONS_TWITCH/START-HERE-STREAMELEMENTS-WIDGET-TEMPLATE/PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
+
+Equivalent legacy copy:
+- `INTEGRATIONS_TWITCH/streamelements/reward-listener.template.js`
 
 Step-by-step:
 1. Start `RaveLink-Bridge.bat` first, so the local bridge is already live.
-2. In Twitch Creator Dashboard, create your Channel Point rewards (for example `Rave On`, `Rave Off`, `Drop`, `Color`).
-3. Copy each reward ID.
+2. In Twitch Creator Dashboard, create your Channel Point rewards (for example `Rave`, `Teach`, `Color`).
+3. Open Twitch Creator Dashboard -> Viewer Rewards -> Channel Points, then copy each reward ID.
 4. Open the template file above in a code editor.
-5. Paste your reward IDs into the constants at the top of that file.
-6. Leave `BASE_URL = "http://127.0.0.1:5050"` when bridge + OBS run on the same stream PC.
+5. Edit these constants in that file:
+   - `COLOR_REWARD_ID`
+   - `TEACH_REWARD_ID`
+   - `RAVE_REWARD_ID`
+6. Leave `BASE_URL = "http://127.0.0.1:5050"` when OBS + bridge run on the same PC.
 7. Open StreamElements -> `My Overlays` -> your overlay -> `+` -> `Static/Custom` -> `Custom Widget`.
-8. In the widget editor, replace the JS panel content with the full template file content.
+8. In widget editor:
+   - Paste full template code into the `JS` tab.
+   - `HTML`/`CSS` can stay empty for this listener-only widget.
 9. Save the overlay.
-10. In OBS, add/update a `Browser Source` pointing to that StreamElements overlay URL.
-11. Trigger one reward in Twitch chat and confirm lights respond.
+10. Copy the overlay URL from StreamElements.
+11. In OBS, add or update a `Browser Source` that points to that overlay URL.
+12. Keep that Browser Source active during stream.
+13. Trigger one reward in Twitch chat and confirm lights respond.
 
 If rewards trigger in StreamElements but lights do not move, re-check:
 - `BASE_URL` value
 - reward IDs in the template
+- widget code is in the StreamElements `JS` tab (not in bridge files)
 - bridge is running (`http://127.0.0.1:5050` opens)
 
 ### Option B: Streamer.bot / Mix It Up / SAMMI / any bot with HTTP actions
