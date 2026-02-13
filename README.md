@@ -32,7 +32,7 @@ Developer tip:
 **!! NEVER SHOW SERVER LOGS ON STREAM !!**
 - *This tool has been conceptualised recently and is still missing security measures (future versions will have them patched in to make this tool more versatile)*
 
-- *This should not be an issue as long as you run it only localy on your machine and make sure you don't expose your server logs on stream!*
+- *This should not be an issue as long as you run it only on your local machine and make sure you don't expose your server logs on stream!*
 
 - *As long as you respect these warnings this software is competely safe and isolated to your pc*
 
