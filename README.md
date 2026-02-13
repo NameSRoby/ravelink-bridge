@@ -134,38 +134,39 @@ Any overlay or bot can work if it can send HTTP requests to the bridge host.
 - Bot on another machine: use the stream PC LAN IP (for example `http://192.168.1.x:5050`) and allow LAN access.
 - Cloud bot service: cannot reach your localhost directly without a relay/tunnel. If you expose the bridge, secure it and limit commands.
 
-## Stream Chat Command Matrix
+## Stream Command Matrix (Channel Points First)
 
 Plain-English flow:
-1. Viewer types a chat command or redeems a reward.
+1. Viewer redeems a channel point reward (optionally with text input).
 2. Your bot/overlay reads that text and sends one HTTP request to the bridge.
 3. The bridge applies the action to fixtures that are routed for `TWITCH`.
 
-Concrete mapping examples (rename commands/reward titles however you want):
+Concrete channel point examples (rename reward titles however you want):
 
 | Viewer input or reward text | Bot HTTP request | What happens |
 |---|---|---|
-| `!raveon` | `POST http://127.0.0.1:5050/rave/on` | Starts rave engine. |
-| `!raveoff` | `POST http://127.0.0.1:5050/rave/off` | Stops rave engine. |
-| `!drop` | `POST http://127.0.0.1:5050/rave/drop` | Triggers a drop pulse now. |
-| `!color hot pink` | `GET http://127.0.0.1:5050/color?value1=hot+pink` | Applies color phrase using Twitch color routing. |
-| `!colorhue cyan` | `GET http://127.0.0.1:5050/color?value1=cyan&target=hue` | Forces color command to Hue route only. |
+| Reward title `RAVE ON` | `POST http://127.0.0.1:5050/rave/on` | Starts rave engine. |
+| Reward title `RAVE OFF` | `POST http://127.0.0.1:5050/rave/off` | Stops rave engine. |
+| Reward title `DROP NOW` | `POST http://127.0.0.1:5050/rave/drop` | Triggers a drop pulse now. |
+| Reward text `blue` | `GET http://127.0.0.1:5050/color?value1=blue` | Applies blue using Twitch color routing. |
+| Reward text `wiz blue` | `GET http://127.0.0.1:5050/color?value1=wiz+blue` | Applies blue to WiZ-routed fixtures only. |
+| Reward text `hue blue` | `GET http://127.0.0.1:5050/color?value1=hue+blue` | Applies blue to Hue-routed fixtures only. |
 | Reward text `toxic_green #39ff14` (Teach reward) | `GET http://127.0.0.1:5050/teach?value1=toxic_green+%2339ff14` | Learns a new color alias named `toxic_green`. |
-| `!genre techno` | `POST http://127.0.0.1:5050/rave/genre?name=techno` | Switches genre profile. |
-| `!scene flow` | `POST http://127.0.0.1:5050/rave/scene?name=flow` | Locks scene to `flow` until changed or set to auto. |
-| `!intensity 1.35` | `POST http://127.0.0.1:5050/rave/flow/intensity?value=1.35` | Sets flow intensity multiplier. |
-| `!meta on` | `POST http://127.0.0.1:5050/rave/meta/auto/on` | Enables meta auto mode. |
+| Reward text `techno` (Genre reward) | `POST http://127.0.0.1:5050/rave/genre?name=techno` | Switches genre profile. |
+| Reward text `flow` (Scene reward) | `POST http://127.0.0.1:5050/rave/scene?name=flow` | Locks scene to `flow` until changed or set to auto. |
+| Reward text `1.35` (Intensity reward) | `POST http://127.0.0.1:5050/rave/flow/intensity?value=1.35` | Sets flow intensity multiplier. |
+| Reward title `META ON` | `POST http://127.0.0.1:5050/rave/meta/auto/on` | Enables meta auto mode. |
 
 How much can you customize:
-- You can name chat commands anything (`!pink`, `!dropit`, reward-only, etc.).
+- You can name rewards anything (`Blue`, `Wiz Blue`, `Rave Start`, etc.).
 - You can map one action to chat, channel points, deck buttons, or all of them.
 - You can hardcode values in your bot (`techno`, `flow`) or parse viewer-provided text.
-- You can restrict commands by role in your bot (mods/subs only).
+- You can control who can trigger actions using reward/bot permission settings.
 - Keep admin endpoints private (`/rave/panic`, `/system/stop`, `/rave/reload`).
 
 Full endpoint reference:
 
-| Chat action idea | Endpoint | Example |
+| Stream action idea | Endpoint | Example |
 |---|---|---|
 | Start show | `POST /rave/on` | `http://127.0.0.1:5050/rave/on` |
 | Stop show | `POST /rave/off` | `http://127.0.0.1:5050/rave/off` |
