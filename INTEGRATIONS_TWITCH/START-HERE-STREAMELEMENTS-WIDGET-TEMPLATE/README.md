@@ -12,6 +12,7 @@ Quick steps:
 4. Keep `BASE_URL` as `http://127.0.0.1:5050` when bridge and OBS run on the same PC.
 5. Paste the script into a StreamElements Custom Widget.
 6. Add that widget in OBS as a Browser Source.
+7. Keep OBS running with that Browser Source active while testing rewards.
 
 Legacy copy also exists at:
 - `INTEGRATIONS_TWITCH/streamelements/reward-listener.template.js`
