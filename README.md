@@ -141,30 +141,30 @@ Plain-English flow:
 2. Your bot/overlay reads that text and sends one HTTP request to the bridge.
 3. The bridge applies the action to fixtures that are routed for `TWITCH`.
 
-Concrete channel point examples (rename reward titles however you want):
+What the included StreamElements widget supports out of the box:
+- `RAVE_REWARD_ID` -> calls `/rave/on` (then auto `/rave/off` after timeout).
+- `COLOR_REWARD_ID` -> sends reward text to `/color?value1=...`.
+- `TEACH_REWARD_ID` -> sends reward text to `/teach?value1=...`.
+
+Concrete channel point examples (default widget behavior):
 
 | Viewer input or reward text | Bot HTTP request | What happens |
 |---|---|---|
-| Reward title `RAVE ON` | `POST http://127.0.0.1:5050/rave/on` | Starts rave engine. |
-| Reward title `RAVE OFF` | `POST http://127.0.0.1:5050/rave/off` | Stops rave engine. |
-| Reward title `DROP NOW` | `POST http://127.0.0.1:5050/rave/drop` | Triggers a drop pulse now. |
-| Reward text `blue` | `GET http://127.0.0.1:5050/color?value1=blue` | Applies blue using Twitch color routing. |
+| Reward title `RAVE` | `POST http://127.0.0.1:5050/rave/on` | Starts rave engine (default widget then auto-calls `/rave/off` after timeout). |
+| Reward text `blue` | `GET http://127.0.0.1:5050/color?value1=blue` | Applies blue using current Twitch color config (default target is `hue`). |
 | Reward text `wiz blue` | `GET http://127.0.0.1:5050/color?value1=wiz+blue` | Applies blue to WiZ-routed fixtures only. |
 | Reward text `hue blue` | `GET http://127.0.0.1:5050/color?value1=hue+blue` | Applies blue to Hue-routed fixtures only. |
 | Reward text `toxic_green #39ff14` (Teach reward) | `GET http://127.0.0.1:5050/teach?value1=toxic_green+%2339ff14` | Learns a new color alias named `toxic_green`. |
-| Reward text `techno` (Genre reward) | `POST http://127.0.0.1:5050/rave/genre?name=techno` | Switches genre profile. |
-| Reward text `flow` (Scene reward) | `POST http://127.0.0.1:5050/rave/scene?name=flow` | Locks scene to `flow` until changed or set to auto. |
-| Reward text `1.35` (Intensity reward) | `POST http://127.0.0.1:5050/rave/flow/intensity?value=1.35` | Sets flow intensity multiplier. |
-| Reward title `META ON` | `POST http://127.0.0.1:5050/rave/meta/auto/on` | Enables meta auto mode. |
 
 How much can you customize:
 - You can name rewards anything (`Blue`, `Wiz Blue`, `Rave Start`, etc.).
-- You can map one action to chat, channel points, deck buttons, or all of them.
-- You can hardcode values in your bot (`techno`, `flow`) or parse viewer-provided text.
+- You can map one action to channel points, chat, deck buttons, or all of them.
+- You can hardcode values in your bot or parse viewer-provided text.
 - You can control who can trigger actions using reward/bot permission settings.
 - Keep admin endpoints private (`/rave/panic`, `/system/stop`, `/rave/reload`).
 
 Full endpoint reference:
+The routes below are available in the bridge API, but anything beyond the 3 default widget reward IDs requires your own bot/automation mapping.
 
 | Stream action idea | Endpoint | Example |
 |---|---|---|
