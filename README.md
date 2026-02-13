@@ -27,35 +27,40 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 
 ## Streamer Quick Start
 
+If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
+
 1. Install Node.js LTS from `https://nodejs.org`.
-2. Start the bridge:
+2. Start the bridge by double-clicking:
+   - `RaveLink-Bridge.bat`
+3. Wait for this message in the launcher window:
+   - `Bridge URL: http://127.0.0.1:5050`
+4. Open `http://127.0.0.1:5050` in your browser.
+5. Go to `FIXTURE LIST`:
+   - Delete placeholder fixtures (`hue-main-1`, `wiz-background-1`, `wiz-custom-1`) if they are still there.
+6. Add your real fixtures in `FIXTURE PAIRING / DEVICE SETUP`:
+   - Hue: set `bridgeIp`, `username`, `lightId` (plus `bridgeId` + `clientKey` for Entertainment).
+   - WiZ: set `ip`.
+7. Go to `DEVICE ROUTING` and pick each fixture, then set modes:
+   - `ENGINE` = audio reactive engine
+   - `TWITCH` = chat/reward `/color` control
+   - `CUSTOM` = manual/custom fixture behavior
+8. Click `APPLY ROUTING` for each fixture you changed.
+9. Click `TEST CONNECTIVITY` and confirm fixture target status is ready.
+10. Start the show with `RAVE ON`.
+11. Optional: open `MIDI` tab and map your controller buttons/knobs.
+12. Stop with `RAVE OFF` when done.
+
+Stop options:
+- `RaveLink-Bridge-Stop.bat`
+- `Ctrl+C` in the launcher window
+- `npm run stop` (terminal method)
+
+Terminal fallback (if needed):
 
 ```powershell
 npm install
 npm start
 ```
-
-3. Open `http://127.0.0.1:5050`.
-4. In `FIXTURE LIST`, remove placeholders and add your real fixtures.
-5. For Hue fixtures, set `bridgeIp`, `username`, and `lightId` (and `bridgeId` + `clientKey` if using Entertainment transport).
-6. For WiZ fixtures, set `ip`.
-7. In `DEVICE ROUTING`, enable per-fixture toggles:
-- `ENGINE` for audio engine control
-- `TWITCH` for chat/reward control
-- `CUSTOM` for standalone custom control
-8. Click `APPLY ROUTING`, then `TEST CONNECTIVITY`.
-9. Start reactive output with `RAVE ON`.
-10. Optional: in `MIDI`, map controller inputs to engine actions without editing code.
-
-Stop with `RAVE OFF`, `Ctrl+C`, or:
-
-```powershell
-npm run stop
-```
-
-Windows launchers:
-- `RaveLink-Bridge.bat`
-- `RaveLink-Bridge-Stop.bat`
 
 ## MIDI Quick Start
 
@@ -87,15 +92,26 @@ Notes:
 
 ### Option A: StreamElements Widget (overlay logic)
 
-Template file:
+Use this exact file:
 - `INTEGRATIONS_TWITCH/START-HERE-STREAMELEMENTS-WIDGET-TEMPLATE/PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
 
-Steps:
-1. Create Twitch rewards for your actions (for example `Color`, `Teach`, `Rave`).
-2. Copy each reward id into the template constants.
-3. Keep `BASE_URL = "http://127.0.0.1:5050"` when OBS and bridge run on the same machine.
-4. Paste template JS into a StreamElements Custom Widget.
-5. Add that widget to OBS as a Browser Source.
+Step-by-step:
+1. Start `RaveLink-Bridge.bat` first, so the local bridge is already live.
+2. In Twitch Creator Dashboard, create your Channel Point rewards (for example `Rave On`, `Rave Off`, `Drop`, `Color`).
+3. Copy each reward ID.
+4. Open the template file above in a code editor.
+5. Paste your reward IDs into the constants at the top of that file.
+6. Leave `BASE_URL = "http://127.0.0.1:5050"` when bridge + OBS run on the same stream PC.
+7. Open StreamElements -> `My Overlays` -> your overlay -> `+` -> `Static/Custom` -> `Custom Widget`.
+8. In the widget editor, replace the JS panel content with the full template file content.
+9. Save the overlay.
+10. In OBS, add/update a `Browser Source` pointing to that StreamElements overlay URL.
+11. Trigger one reward in Twitch chat and confirm lights respond.
+
+If rewards trigger in StreamElements but lights do not move, re-check:
+- `BASE_URL` value
+- reward IDs in the template
+- bridge is running (`http://127.0.0.1:5050` opens)
 
 ### Option B: Streamer.bot / Mix It Up / SAMMI / any bot with HTTP actions
 
