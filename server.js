@@ -233,9 +233,34 @@ function sanitizeLogDetail(value, fallback = "operation failed") {
     .slice(0, 220);
 }
 
+// Strictly validate that the provided Hue bridge "IP" is a safe LAN IPv4 address.
+function isSafeHueBridgeIp(ip) {
+  const str = String(ip || "").trim();
+  // Must be a bare IPv4 address, no port, no hostname, no scheme, no path.
+  const ipv4Regex = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+  if (!ipv4Regex.test(str)) return false;
+
+  const [a, b, c, d] = str.split(".").map(n => parseInt(n, 10));
+  // Reject 0.0.0.0 and 255.255.255.255 and other obviously invalid/special cases.
+  if (a === 0 || a === 255) return false;
+  // Reject loopback 127.0.0.0/8
+  if (a === 127) return false;
+  // Reject link-local 169.254.0.0/16
+  if (a === 169 && b === 254) return false;
+  // Restrict to common private LAN ranges where Hue bridges usually live.
+  const is10 = (a === 10);
+  const is192_168 = (a === 192 && b === 168);
+  const is172_16_31 = (a === 172 && b >= 16 && b <= 31);
+  if (!is10 && !is192_168 && !is172_16_31) return false;
+
+  return true;
+}
+
 async function fetchHueBridgeConfigByIp(ip) {
   const target = String(ip || "").trim();
   if (!target) return null;
+  // Extra SSRF guard: only allow safe LAN IPv4 addresses here.
+  if (!isSafeHueBridgeIp(target)) return null;
   if (!isAllowedHueBridgeTarget(target)) return null;
   try {
     const { data } = await axios.get(`http://${target}/api/0/config`, {
