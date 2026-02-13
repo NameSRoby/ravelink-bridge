@@ -74,6 +74,7 @@ How this integration is meant to work:
 - RaveLink Bridge runs locally on your stream PC (`http://127.0.0.1:5050`).
 - Twitch reward listener code runs inside a StreamElements Custom Widget (overlay code).
 - OBS loads that StreamElements overlay URL as a Browser Source.
+- The integration bot must be connected to your channel chat (StreamElements bot, Streamer.bot account, Mix It Up, etc.), otherwise channel-point/chat activations are not seen.
 
 If "where does this code go?" is ever the question, the answer is: inside the StreamElements widget JS panel, not in `server.js`.
 
@@ -87,29 +88,33 @@ Equivalent legacy copy:
 
 Step-by-step:
 1. Start `RaveLink-Bridge.bat` first, so the local bridge is already live.
-2. In Twitch Creator Dashboard, create your Channel Point rewards (for example `Rave`, `Teach`, `Color`).
-3. Open Twitch Creator Dashboard -> Viewer Rewards -> Channel Points, then copy each reward ID.
-4. Open the template file above in a code editor.
-5. Edit these constants in that file:
+2. Make sure your integration bot is in your Twitch chat before testing rewards.
+3. In Twitch Creator Dashboard, create your Channel Point rewards (for example `Rave`, `Teach`, `Color`).
+4. Open Twitch Creator Dashboard -> Viewer Rewards -> Channel Points, then copy each reward ID.
+5. Open the template file above in a code editor.
+6. Edit these constants in that file:
    - `COLOR_REWARD_ID`
    - `TEACH_REWARD_ID`
    - `RAVE_REWARD_ID`
-6. Leave `BASE_URL = "http://127.0.0.1:5050"` when OBS + bridge run on the same PC.
-7. Open StreamElements -> `My Overlays` -> your overlay -> `+` -> `Static/Custom` -> `Custom Widget`.
-8. In widget editor:
+   - `TEACH_REWARD_ID` input format: `<name> <#RRGGBB>` (example `toxic_green #39ff14`).
+   - Use underscores/hyphens in `<name>` (spaces are not supported in teach names).
+7. Leave `BASE_URL = "http://127.0.0.1:5050"` when OBS + bridge run on the same PC.
+8. Open StreamElements -> `My Overlays` -> your overlay -> `+` -> `Static/Custom` -> `Custom Widget`.
+9. In widget editor:
    - Paste full template code into the `JS` tab.
    - `HTML`/`CSS` can stay empty for this listener-only widget.
-9. Save the overlay.
-10. Copy the overlay URL from StreamElements.
-11. In OBS, add or update a `Browser Source` that points to that overlay URL.
-12. Keep that Browser Source active during stream.
-13. Trigger one reward in Twitch chat and confirm lights respond.
+10. Save the overlay.
+11. Copy the overlay URL from StreamElements.
+12. In OBS, add or update a `Browser Source` that points to that overlay URL.
+13. Keep that Browser Source active during stream.
+14. Trigger one reward in Twitch chat and confirm lights respond.
 
 If rewards trigger in StreamElements but lights do not move, re-check:
 - `BASE_URL` value
 - reward IDs in the template
 - widget code is in the StreamElements `JS` tab (not in bridge files)
 - bridge is running (`http://127.0.0.1:5050` opens)
+- integration bot is connected to chat
 
 ### Option B: Streamer.bot / Mix It Up / SAMMI / any bot with HTTP actions
 
@@ -117,7 +122,7 @@ Use reward triggers or chat command actions to call bridge endpoints, for exampl
 - `POST http://127.0.0.1:5050/rave/on`
 - `POST http://127.0.0.1:5050/rave/off`
 - `GET http://127.0.0.1:5050/color?value1=purple`
-- `GET http://127.0.0.1:5050/teach?value1=toxic+green`
+- `GET http://127.0.0.1:5050/teach?value1=toxic_green+%2339ff14`
 
 ### Overlay/Chat Bot Compatibility
 
@@ -136,7 +141,7 @@ Examples below assume your bot maps chat commands/channel-point rewards to HTTP 
 | Start show | `POST /rave/on` | `http://127.0.0.1:5050/rave/on` |
 | Stop show | `POST /rave/off` | `http://127.0.0.1:5050/rave/off` |
 | Force drop pulse | `POST /rave/drop` | `http://127.0.0.1:5050/rave/drop` |
-| Teach color phrase | `GET or POST /teach` | `/teach?value1=deep+ocean+blue` |
+| Teach color alias (`<name> <#RRGGBB>`) | `GET or POST /teach` | `/teach?value1=toxic_green+%2339ff14` |
 | Apply named color | `GET or POST /color` | `/color?value1=hot+pink` |
 | Color only Hue | `GET or POST /color` | `/color?value1=cyan&target=hue` |
 | Color only WiZ | `GET or POST /color` | `/color?value1=orange&target=wiz` |
@@ -166,6 +171,7 @@ Common values:
 - Scene names: `auto`, `idle_soft`, `flow`, `pulse_strobe`
 - Auto profiles: `reactive`, `balanced`, `cinematic`
 - Audio reactivity presets: `balanced`, `aggressive`, `precision`
+- Teach payload format: `<name> <#RRGGBB>` (example `laser_blue #00aaff`, query-string encoded as `laser_blue+%2300aaff`)
 
 Admin-only (do not expose to public chat):
 - `POST /rave/panic`
@@ -179,7 +185,7 @@ Admin-only (do not expose to public chat):
 - Hue fixtures stay on Hue paths, WiZ fixtures stay on WiZ paths.
 - `engineEnabled` and `customEnabled` cannot both be active on the same fixture.
 - `TWITCH` commands only affect fixtures with `twitchEnabled: true`.
-- Route values shown in UI (`AUTO_HUE_STATE`, `AUTO_WIZ_PULSE`, `AUTO_TWITCH_*`) are derived from fixture mode toggles.
+- Route values shown in UI (`HUE_STATE`, `WIZ_PULSE`, `TWITCH_HUE`, `TWITCH_WIZ`) are derived from fixture mode toggles.
 - Canonical built-in zones are `hue`, `wiz`, and `custom`.
 
 ## Troubleshooting
@@ -245,6 +251,9 @@ For older major feature lists, see tag history under Releases.
 
 ## Developer Quick Start
 
+Developer tip:
+- Most setup categories in this README have their own quick-start directly under the category heading (Streamer, Twitch, MIDI, OBS, Developer).
+
 1. Install dependencies and run:
 
 ```powershell
@@ -257,6 +266,7 @@ npm start
 
 ```powershell
 node --check server.js
+node --check core\rave-engine.js
 node --check core\fixtures.js
 node --check core\mods\mod-loader.js
 node --check core\midi\midi-manager.js

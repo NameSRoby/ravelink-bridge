@@ -11,6 +11,8 @@
 const COLOR_REWARD_ID = "replace_color_reward_id";
 const TEACH_REWARD_ID = "replace_teach_reward_id";
 const RAVE_REWARD_ID = "replace_rave_reward_id";
+// TEACH reward text format must be: <name> <#RRGGBB>
+// Example reward text: toxic_green #39ff14
 
 // ===== SERVER =====
 const BASE_URL = "http://127.0.0.1:5050";
@@ -58,6 +60,7 @@ window.addEventListener("onEventReceived", obj => {
   // TEACH
   // =========================
   if (rewardID === TEACH_REWARD_ID) {
+    // Sends raw reward text to /teach (expects "<name> <#RRGGBB>").
     fetch(
       `${BASE_URL}/teach?value1=${encodeURIComponent(rawText)}`,
       { mode: "no-cors" }
