@@ -3125,11 +3125,24 @@ let apiBase = localStorage.getItem("rave_api_base") || inferredApiBase;
 const withBase = path => (apiBase ? `${apiBase}${path}` : path);
 
 function sanitizeFrameUrl(url) {
-  const value = String(url || "").trim();
-  if (!value) return "";
-  const lowered = value.toLowerCase();
-  if (lowered.startsWith("javascript:") || lowered.startsWith("data:")) return "";
-  return value;
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("/")) {
+    if (!raw.startsWith("/mods-ui/")) return "";
+    return raw;
+  }
+
+  let parsed = null;
+  try {
+    parsed = new URL(raw, window.location.origin);
+  } catch {
+    return "";
+  }
+
+  const protocol = String(parsed.protocol || "").toLowerCase();
+  if (protocol !== "http:" && protocol !== "https:") return "";
+  if (!String(parsed.pathname || "").startsWith("/mods-ui/")) return "";
+  return parsed.toString();
 }
 const DEV_DEBUG_KEY = "ravelink_dev_debug_v1";
 const DEV_DEBUG_WARN_ONCE_KEY = "ravelink_dev_debug_warn_once_v1";
@@ -4472,7 +4485,8 @@ function renderModUiFrame(options = {}) {
     ui.modUiLastId !== normalizeModUiId(descriptor.id) ||
     ui.modUiLastUrl !== nextUrl
   )) {
-    frame.src = withBase(sanitizeFrameUrl(nextUrl) || "about:blank");
+    const safeFrameUrl = sanitizeFrameUrl(withBase(nextUrl));
+    frame.src = safeFrameUrl || "about:blank";
     ui.modUiLastId = normalizeModUiId(descriptor.id);
     ui.modUiLastUrl = nextUrl;
     ui.modUiLoadedAt = Date.now();

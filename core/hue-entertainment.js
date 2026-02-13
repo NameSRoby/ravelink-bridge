@@ -773,7 +773,7 @@ module.exports = function createHueEntertainmentTransport({ fixtureRegistry, log
       areaRef = null;
       streamChannelCount = 1;
       unavailableReason = await diagnoseStartFailure(err, cfg);
-      log.warn?.(`[HUE][ENT] start failed: ${sanitizeLogDetail(unavailableReason)}`);
+      log.warn?.("[HUE][ENT] start failed (details redacted)");
       return { ok: false, reason: unavailableReason };
     }
   }
