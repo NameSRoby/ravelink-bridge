@@ -31,9 +31,12 @@ Developer tip:
 ## Streamer Quick Start
 **!! NEVER SHOW SERVER LOGS ON STREAM !!**
 - *This tool has been conceptualised recently and is still missing security measures*
+
 - *This should not be an issue as long as you run it only localy on your machine and make sure you don't expose your server logs on stream!*
+
 - *As long as you respect these warnings this software is competely safe and isolated to your pc*
-- *This tool only recieves simple instructions (limited to smart bulb commands, which the tool itself has to recognize, only defined commands are RELAYED and NEVER RUN on this server) and does not communicate whith anything besides the smart bulbs in your local network!*
+
+- *This tool only recieves simple instructions (limited to smart bulb commands, which the tool itself has to recognize, only defined commands are **RELAYED** and **NEVER RUN** on this server) and does not communicate whith anything besides the smart bulbs in your local network!*
 
 If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
 
