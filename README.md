@@ -68,32 +68,6 @@ npm install
 npm start
 ```
 
-## MIDI Quick Start
-
-1. Open the `MIDI` tab (auto-shows when a MIDI input device is detected).
-2. Select `MIDI INPUT PORT` and click `SAVE MIDI CFG`.
-3. Choose a `LEARN ACTION`, click `ARM LEARN`, then press your controller key/knob.
-4. Verify with `TRIGGER ACTION` and watch `LAST ACTION`.
-5. Fine-tune or manually edit bindings in `LEARN + BINDINGS`.
-
-Notes:
-- If no MIDI device is detected, you can force-show the MIDI tab from the settings cog (`MIDI TAB` toggle).
-- `DEV TOOLS` in the settings cog only appear when `DEV DEBUG` is enabled.
-
-## OBS Dock
-
-Add this URL to OBS custom docks:
-
-- `http://127.0.0.1:5050/obs/dock`
-
-Optional expanded layout URL:
-
-- `http://127.0.0.1:5050/obs/dock?compact=0`
-
-Notes:
-- The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
-- Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
-
 ## Twitch + Channel Points Setup
 
 How this integration is meant to work:
@@ -207,6 +181,32 @@ Admin-only (do not expose to public chat):
 - `TWITCH` commands only affect fixtures with `twitchEnabled: true`.
 - Route values shown in UI (`AUTO_HUE_STATE`, `AUTO_WIZ_PULSE`, `AUTO_TWITCH_*`) are derived from fixture mode toggles.
 - Canonical built-in zones are `hue`, `wiz`, and `custom`.
+
+## MIDI Quick Start
+
+1. Open the `MIDI` tab (auto-shows when a MIDI input device is detected).
+2. Select `MIDI INPUT PORT` and click `SAVE MIDI CFG`.
+3. Choose a `LEARN ACTION`, click `ARM LEARN`, then press your controller key/knob.
+4. Verify with `TRIGGER ACTION` and watch `LAST ACTION`.
+5. Fine-tune or manually edit bindings in `LEARN + BINDINGS`.
+
+Notes:
+- If no MIDI device is detected, you can force-show the MIDI tab from the settings cog (`MIDI TAB` toggle).
+- `DEV TOOLS` in the settings cog only appear when `DEV DEBUG` is enabled.
+
+## OBS Dock
+
+Add this URL to OBS custom docks:
+
+- `http://127.0.0.1:5050/obs/dock`
+
+Optional expanded layout URL:
+
+- `http://127.0.0.1:5050/obs/dock?compact=0`
+
+Notes:
+- The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
+- Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
 
 ## Troubleshooting
 
