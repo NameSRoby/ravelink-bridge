@@ -1948,8 +1948,8 @@ module.exports = function createRaveEngine(controls) {
     fastConfirmMs: 180,
     fastHoldMs: 550
   };
-  const META_AUTO_CHAOS_RECENT_MS = 4200;
-  const META_AUTO_CHAOS_PEAK_MS = 1400;
+  const META_AUTO_CHAOS_RECENT_MS = 3200;
+  const META_AUTO_CHAOS_PEAK_MS = 1000;
   const META_AUTO_LEARN_PEAK_DECAY = 0.987;
   const META_AUTO_LEARN_HOLD_MS = 1800;
   const META_AUTO_LEARN_SURGE_MS = 4200;
@@ -2053,18 +2053,25 @@ module.exports = function createRaveEngine(controls) {
     metaAutoMotionPeak = Math.max(motion, metaAutoMotionPeak * META_AUTO_LEARN_PEAK_DECAY);
     metaAutoIntensityPeak = Math.max(intensity, metaAutoIntensityPeak * META_AUTO_LEARN_PEAK_DECAY);
 
+    const drivePeakCarry = clamp(drive * 0.64 + motion * 0.36, 0, 1);
+    const motionPeakCarry = clamp(motion * 0.68 + drive * 0.32, 0, 1);
+    const intensityPeakCarry = clamp((intensity / 1.4) * 0.72 + motion * 0.28, 0, 1);
+    const drivePeakWeight = lerp(0.32, 0.76, drivePeakCarry);
+    const motionPeakWeight = lerp(0.32, 0.78, motionPeakCarry);
+    const intensityPeakWeight = lerp(0.34, 0.8, intensityPeakCarry);
+
     const learnedDrive = clamp(
-      Math.max(drive, metaAutoDriveEma * 0.94, metaAutoDrivePeak * 0.72),
+      Math.max(drive, metaAutoDriveEma * 0.9, metaAutoDrivePeak * drivePeakWeight),
       0,
       1
     );
     const learnedMotion = clamp(
-      Math.max(motion, metaAutoMotionEma * 0.94, metaAutoMotionPeak * 0.72),
+      Math.max(motion, metaAutoMotionEma * 0.9, metaAutoMotionPeak * motionPeakWeight),
       0,
       1
     );
     const learnedIntensity = clamp(
-      Math.max(intensity, metaAutoIntensityEma * 0.92, metaAutoIntensityPeak * 0.72),
+      Math.max(intensity, metaAutoIntensityEma * 0.88, metaAutoIntensityPeak * intensityPeakWeight),
       0,
       1.4
     );
@@ -2218,6 +2225,7 @@ module.exports = function createRaveEngine(controls) {
   }
 
   function computeMetaPlan(now = Date.now()) {
+    const genreRef = effectiveGenreReference || GENRE_REFERENCE_TRACKS.auto;
     const drive = getEnergyDrive();
     const beat = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
     const motion = clamp(Math.max(audioTransient, audioFlux, beat), 0, 1);
@@ -2233,6 +2241,14 @@ module.exports = function createRaveEngine(controls) {
     const drop = dropSignal || (now - metaAutoLastDropAt) < 680;
     const build = !drop && trend > 0.016 && drive > 0.33 && motion > 0.26;
     const recover = !drop && (now - metaAutoLastDropAt) < 1800 && trend > 0.004;
+    const quietRmsGate = clamp(Number(genreRef.quietRmsGate ?? 0.12), 0.06, 0.24);
+    const quietTransientGate = clamp(Number(genreRef.quietTransientGate ?? 0.16), 0.08, 0.28);
+    const quietFluxGate = clamp(Number(genreRef.quietFluxGate ?? 0.14), 0.08, 0.26);
+    const calmAudio = audio < quietRmsGate && audioTransient < quietTransientGate && audioFlux < quietFluxGate;
+    const calmMotion = motion < Math.max(0.22, quietTransientGate * 1.06) && beat < 0.34;
+    const calmDrive = drive < Math.max(0.2, quietRmsGate * 1.7);
+    const sustainedCalm = !drop && !build && calmAudio && calmMotion && calmDrive;
+
     const chaosScore = clamp(
       audioTransient * 0.42 +
       audioFlux * 0.36 +
@@ -2293,9 +2309,14 @@ module.exports = function createRaveEngine(controls) {
       motion,
       intensity: intensityRaw
     });
-    const driveSignal = learnedSongState.drive;
-    const motionSignal = learnedSongState.motion;
-    const intensity = learnedSongState.intensity;
+    let driveSignal = learnedSongState.drive;
+    let motionSignal = learnedSongState.motion;
+    let intensity = learnedSongState.intensity;
+    if (sustainedCalm) {
+      driveSignal = Math.min(driveSignal, clamp(drive * 1.08 + audio * 0.24, 0, 1));
+      motionSignal = Math.min(motionSignal, clamp(motion * 1.04, 0, 1));
+      intensity = Math.min(intensity, clamp(intensityRaw * 1.04, 0, 1.4));
+    }
     const heavyHoldMs = learnedSongState.heavyHoldMs;
 
     const power = clamp(
@@ -2312,9 +2333,9 @@ module.exports = function createRaveEngine(controls) {
     );
 
     let tier = 0;
-    if (drop || power >= 0.78 || (motionSignal > 0.74 && driveSignal > 0.56)) tier = 4;
-    else if (build || power >= 0.58 || (driveSignal > 0.46 && motionSignal > 0.4)) tier = 3;
-    else if (recover || power >= 0.38) tier = 2;
+    if (drop || power >= 0.74 || (motionSignal > 0.72 && driveSignal > 0.54)) tier = 4;
+    else if (build || power >= 0.56 || (driveSignal > 0.44 && motionSignal > 0.39)) tier = 3;
+    else if (recover || power >= 0.42) tier = 2;
     else if (power >= 0.22) tier = 1;
     if (bpm >= 150 && (motionSignal > 0.3 || beat > 0.34)) tier = Math.max(tier, 2);
     if (bpm >= 164 && (motionSignal > 0.44 || beat > 0.4)) tier = Math.max(tier, 3);
@@ -2344,6 +2365,12 @@ module.exports = function createRaveEngine(controls) {
     if (intensity > 0.72 && (motionSignal > 0.48 || beat > 0.42)) tier = Math.max(tier, 3);
     if ((drop && intensity > 0.84) || (intensity > 0.96 && motionSignal > 0.68 && driveSignal > 0.64)) {
       tier = Math.max(tier, 4);
+    }
+    if (aggressiveGenre && intensity > 0.82 && motionSignal > 0.56 && (audioTransient > 0.48 || audioFlux > 0.44)) {
+      tier = Math.max(tier, 4);
+    }
+    if (sustainedCalm) {
+      tier = Math.min(tier, motionSignal > 0.26 ? 1 : 0);
     }
 
     let nextProfile = style.baseProfile;
@@ -2412,6 +2439,12 @@ module.exports = function createRaveEngine(controls) {
     if (aggressiveGenre && heavyHoldMs >= META_AUTO_LEARN_HOLD_MS && tier >= 2) targetHz += 1;
     if (intensity > 0.6) targetHz += 1;
     if (intensity > 0.82 && tier >= 3) targetHz += 1;
+    if ((drop || build || chaotic) && intensity > 0.88 && motionSignal > 0.58 && (audioTransient > 0.48 || audioFlux > 0.44)) {
+      targetHz += 1;
+    }
+    if ((drop || chaotic) && intensity > 1.02 && motionSignal > 0.66 && driveSignal > 0.58) {
+      targetHz += 1;
+    }
     if (!drop && intensity < 0.22 && tier <= 1) targetHz -= 1;
     if (chaotic && tier >= 2) targetHz += 1;
     if (chaotic && tier >= 3 && (motionSignal > 0.56 || beat > 0.5 || driveSignal > 0.54)) targetHz += 1;
@@ -2448,17 +2481,20 @@ module.exports = function createRaveEngine(controls) {
       2,
       maxHz
     );
-    if (chaosHot && !drop) {
+    if (chaosHot && !drop && !sustainedCalm && (motionSignal > 0.36 || intensity > 0.48)) {
       const chaosFloor = chaosPeak
-        ? (tier >= 3 ? 10 : 8)
-        : (tier >= 3 ? 9 : 6);
+        ? (tier >= 3 ? 8 : 6)
+        : (tier >= 3 ? 7 : 5);
       targetHz = Math.max(targetHz, chaosFloor);
     }
-    if (chaosHot && targetHz < metaAutoLastTargetHz) {
-      const maxDropPerEval = chaosPeak ? 1.2 : 2.2;
+    if (chaosHot && !sustainedCalm && targetHz < metaAutoLastTargetHz) {
+      const maxDropPerEval = chaosPeak ? 1.8 : 3.2;
       targetHz = Math.max(targetHz, metaAutoLastTargetHz - maxDropPerEval);
     }
     targetHz = clamp(targetHz, floorHz, maxHz);
+    if (sustainedCalm) {
+      targetHz = Math.min(targetHz, clamp(2.8 + (beat > 0.3 ? 0.6 : 0), 2, 6));
+    }
     if (drop) {
       targetHz = Math.max(targetHz, Math.min(maxHz, 10 + Math.round(Math.max(0, aggression) * 4)));
     }
