@@ -1950,6 +1950,9 @@ module.exports = function createRaveEngine(controls) {
   };
   const META_AUTO_CHAOS_RECENT_MS = 4200;
   const META_AUTO_CHAOS_PEAK_MS = 1400;
+  const META_AUTO_LEARN_PEAK_DECAY = 0.987;
+  const META_AUTO_LEARN_HOLD_MS = 1800;
+  const META_AUTO_LEARN_SURGE_MS = 4200;
 
   let metaAutoEnabled = process.env.RAVE_META_AUTO_DEFAULT === "1";
   let metaAutoLastEvalAt = 0;
@@ -1962,6 +1965,13 @@ module.exports = function createRaveEngine(controls) {
   let metaAutoLastDropAt = 0;
   let metaAutoLastChaosAt = 0;
   let metaAutoLastTargetHz = 2;
+  let metaAutoDriveEma = 0;
+  let metaAutoMotionEma = 0;
+  let metaAutoIntensityEma = 0;
+  let metaAutoDrivePeak = 0;
+  let metaAutoMotionPeak = 0;
+  let metaAutoIntensityPeak = 0;
+  let metaAutoHeavySince = 0;
 
   const META_AUTO_HZ_BY_LEVEL = [2, 4, 6, 8, 10, 12, 14, 16, 20, 30, 40, 50, 60];
   const META_AUTO_GENRE_STYLE = {
@@ -2028,6 +2038,58 @@ module.exports = function createRaveEngine(controls) {
       }
     }
     return bestLevel;
+  }
+
+  function learnMetaAutoFromSong(now, sample = {}) {
+    const drive = clamp(Number(sample.drive) || 0, 0, 1);
+    const motion = clamp(Number(sample.motion) || 0, 0, 1);
+    const intensity = clamp(Number(sample.intensity) || 0, 0, 1.4);
+
+    metaAutoDriveEma = lerp(metaAutoDriveEma, drive, 0.24);
+    metaAutoMotionEma = lerp(metaAutoMotionEma, motion, 0.24);
+    metaAutoIntensityEma = lerp(metaAutoIntensityEma, intensity, 0.2);
+
+    metaAutoDrivePeak = Math.max(drive, metaAutoDrivePeak * META_AUTO_LEARN_PEAK_DECAY);
+    metaAutoMotionPeak = Math.max(motion, metaAutoMotionPeak * META_AUTO_LEARN_PEAK_DECAY);
+    metaAutoIntensityPeak = Math.max(intensity, metaAutoIntensityPeak * META_AUTO_LEARN_PEAK_DECAY);
+
+    const learnedDrive = clamp(
+      Math.max(drive, metaAutoDriveEma * 0.94, metaAutoDrivePeak * 0.72),
+      0,
+      1
+    );
+    const learnedMotion = clamp(
+      Math.max(motion, metaAutoMotionEma * 0.94, metaAutoMotionPeak * 0.72),
+      0,
+      1
+    );
+    const learnedIntensity = clamp(
+      Math.max(intensity, metaAutoIntensityEma * 0.92, metaAutoIntensityPeak * 0.72),
+      0,
+      1.4
+    );
+
+    const heavyMomentum = clamp(
+      learnedDrive * 0.5 +
+      learnedMotion * 0.4 +
+      Math.max(0, learnedIntensity - 0.2) * 0.34,
+      0,
+      1.4
+    );
+    if (heavyMomentum >= 0.44) {
+      if (metaAutoHeavySince <= 0) metaAutoHeavySince = now;
+    } else if (heavyMomentum <= 0.3) {
+      metaAutoHeavySince = 0;
+    }
+    const heavyHoldMs = metaAutoHeavySince > 0 ? Math.max(0, now - metaAutoHeavySince) : 0;
+
+    return {
+      drive: learnedDrive,
+      motion: learnedMotion,
+      intensity: learnedIntensity,
+      heavyMomentum,
+      heavyHoldMs
+    };
   }
 
   function classifyMetaAutoGenre(metrics = {}) {
@@ -2215,18 +2277,7 @@ module.exports = function createRaveEngine(controls) {
     const decadeVariationBias = clamp(Number(decadeStyle.metaVariationBias || 0), -0.2, 0.2);
     const aggression = clamp(style.aggression + decadeAggressionBias, -0.9, 0.95);
 
-    const power = clamp(
-      drive * 0.46 +
-      motion * 0.32 +
-      beat * 0.14 +
-      clamp((bpm - 94) / 96, 0, 1) * 0.08 +
-      (drop ? 0.24 : 0) +
-      (build ? 0.1 : 0) +
-      aggression * 0.12,
-      0,
-      1.25
-    );
-    const intensity = clamp(
+    const intensityRaw = clamp(
       drive * 0.34 +
       motion * 0.3 +
       beat * 0.16 +
@@ -2237,28 +2288,61 @@ module.exports = function createRaveEngine(controls) {
       0,
       1.4
     );
+    const learnedSongState = learnMetaAutoFromSong(now, {
+      drive,
+      motion,
+      intensity: intensityRaw
+    });
+    const driveSignal = learnedSongState.drive;
+    const motionSignal = learnedSongState.motion;
+    const intensity = learnedSongState.intensity;
+    const heavyHoldMs = learnedSongState.heavyHoldMs;
+
+    const power = clamp(
+      driveSignal * 0.44 +
+      motionSignal * 0.34 +
+      beat * 0.12 +
+      clamp((bpm - 94) / 96, 0, 1) * 0.08 +
+      intensity * 0.08 +
+      (drop ? 0.24 : 0) +
+      (build ? 0.12 : 0) +
+      aggression * 0.14,
+      0,
+      1.35
+    );
 
     let tier = 0;
-    if (drop || power >= 0.86 || (motion > 0.82 && drive > 0.7)) tier = 4;
-    else if (build || power >= 0.66 || (drive > 0.58 && motion > 0.54)) tier = 3;
-    else if (recover || power >= 0.46) tier = 2;
-    else if (power >= 0.28) tier = 1;
-    if (bpm >= 150 && (motion > 0.34 || beat > 0.36)) tier = Math.max(tier, 2);
-    if (bpm >= 164 && (motion > 0.48 || beat > 0.44)) tier = Math.max(tier, 3);
+    if (drop || power >= 0.78 || (motionSignal > 0.74 && driveSignal > 0.56)) tier = 4;
+    else if (build || power >= 0.58 || (driveSignal > 0.46 && motionSignal > 0.4)) tier = 3;
+    else if (recover || power >= 0.38) tier = 2;
+    else if (power >= 0.22) tier = 1;
+    if (bpm >= 150 && (motionSignal > 0.3 || beat > 0.34)) tier = Math.max(tier, 2);
+    if (bpm >= 164 && (motionSignal > 0.44 || beat > 0.4)) tier = Math.max(tier, 3);
+
+    const aggressiveGenre = metaGenre === "metal" || metaGenre === "dnb" || metaGenre === "techno";
+    if (aggressiveGenre && heavyHoldMs >= META_AUTO_LEARN_HOLD_MS) {
+      tier = Math.max(tier, 2);
+    }
+    if (aggressiveGenre && heavyHoldMs >= META_AUTO_LEARN_SURGE_MS && (motionSignal > 0.4 || intensity > 0.48)) {
+      tier = Math.max(tier, 3);
+    }
 
     if (metaGenre === "metal") {
-      if (drive > 0.42 && motion > 0.36) tier = Math.max(tier, 2);
-      if (drive > 0.6 && (motion > 0.56 || (audioTransient > 0.48 && audioFlux > 0.4))) tier = Math.max(tier, 3);
-      if (drop || (drive > 0.82 && motion > 0.78 && beat > 0.52)) tier = Math.max(tier, 4);
+      if (driveSignal > 0.3 && motionSignal > 0.28) tier = Math.max(tier, 2);
+      if (driveSignal > 0.46 && (motionSignal > 0.46 || (audioTransient > 0.38 && audioFlux > 0.34))) {
+        tier = Math.max(tier, 3);
+      }
+      if (drop || (driveSignal > 0.66 && motionSignal > 0.62 && beat > 0.4)) tier = Math.max(tier, 4);
+      if (heavyHoldMs >= META_AUTO_LEARN_SURGE_MS && intensity > 0.7) tier = Math.max(tier, 4);
     }
-    if (chaotic && motion > 0.4) tier = Math.max(tier, 2);
-    if (chaotic && (motion > 0.58 || beat > 0.42 || intensity > 0.58)) tier = Math.max(tier, 3);
-    if ((drop && chaotic) || (chaotic && intensity > 0.96 && motion > 0.76 && drive > 0.58)) {
+    if (chaotic && motionSignal > 0.38) tier = Math.max(tier, 2);
+    if (chaotic && (motionSignal > 0.54 || beat > 0.4 || intensity > 0.56)) tier = Math.max(tier, 3);
+    if ((drop && chaotic) || (chaotic && intensity > 0.9 && motionSignal > 0.7 && driveSignal > 0.5)) {
       tier = Math.max(tier, 4);
     }
     if (intensity > 0.56) tier = Math.max(tier, 2);
-    if (intensity > 0.74 && (motion > 0.52 || beat > 0.44)) tier = Math.max(tier, 3);
-    if ((drop && intensity > 0.88) || (intensity > 1.0 && motion > 0.74 && drive > 0.72)) {
+    if (intensity > 0.72 && (motionSignal > 0.48 || beat > 0.42)) tier = Math.max(tier, 3);
+    if ((drop && intensity > 0.84) || (intensity > 0.96 && motionSignal > 0.68 && driveSignal > 0.64)) {
       tier = Math.max(tier, 4);
     }
 
@@ -2290,7 +2374,7 @@ module.exports = function createRaveEngine(controls) {
       reason = "calm";
     }
 
-    if (drive < 0.14 && motion < 0.14 && beat < 0.2 && !drop) {
+    if (driveSignal < 0.11 && motionSignal < 0.12 && beat < 0.2 && !drop) {
       tier = 0;
       nextProfile = "cinematic";
       nextReactivity = "precision";
@@ -2318,17 +2402,19 @@ module.exports = function createRaveEngine(controls) {
     if (bpm <= 90 && tier <= 2) targetHz -= 1;
     if (build && tier >= 2) targetHz += 1;
     if (recover && !drop && targetHz > 6) targetHz -= 1;
-    if (decadeVariationBias >= 0.08 && tier >= 2 && motion > 0.44) targetHz += 1;
+    if (decadeVariationBias >= 0.08 && tier >= 2 && motionSignal > 0.44) targetHz += 1;
     if (decadeVariationBias <= -0.07 && !drop && tier <= 2) targetHz -= 1;
     if (metaGenre === "metal") {
       if (tier >= 2) targetHz += 1;
-      if (tier >= 3 && (motion > 0.62 || audioTransient > 0.5)) targetHz += 1;
+      if (tier >= 3 && (motionSignal > 0.54 || audioTransient > 0.42)) targetHz += 1;
+      if (heavyHoldMs >= META_AUTO_LEARN_SURGE_MS && tier >= 2) targetHz += 1;
     }
+    if (aggressiveGenre && heavyHoldMs >= META_AUTO_LEARN_HOLD_MS && tier >= 2) targetHz += 1;
     if (intensity > 0.6) targetHz += 1;
     if (intensity > 0.82 && tier >= 3) targetHz += 1;
     if (!drop && intensity < 0.22 && tier <= 1) targetHz -= 1;
     if (chaotic && tier >= 2) targetHz += 1;
-    if (chaotic && tier >= 3 && (motion > 0.64 || beat > 0.5 || drive > 0.62)) targetHz += 1;
+    if (chaotic && tier >= 3 && (motionSignal > 0.56 || beat > 0.5 || driveSignal > 0.54)) targetHz += 1;
 
     // Pace lock: blend dynamic intensity with song tempo so Meta Auto follows track speed.
     const beatHz = clamp(bpm / 60, 1, 3.6);
@@ -2344,7 +2430,7 @@ module.exports = function createRaveEngine(controls) {
     );
     const tempoBlend = clamp(
       0.2 +
-      (motion * 0.28) +
+      (motionSignal * 0.28) +
       (beat * 0.18) +
       (build ? 0.14 : 0) +
       (drop ? 0.2 : 0),
@@ -2379,8 +2465,8 @@ module.exports = function createRaveEngine(controls) {
     if (
       drop &&
       intensity > 0.96 &&
-      drive > 0.82 &&
-      motion > 0.82 &&
+      driveSignal > 0.72 &&
+      motionSignal > 0.72 &&
       (audioTransient > 0.56 || audioFlux > 0.52) &&
       bpm >= 118
     ) {
@@ -2389,9 +2475,9 @@ module.exports = function createRaveEngine(controls) {
     if (
       chaotic &&
       intensity > 0.86 &&
-      drive > 0.56 &&
+      driveSignal > 0.5 &&
       (audioTransient > 0.54 || audioFlux > 0.5) &&
-      motion > 0.62 &&
+      motionSignal > 0.56 &&
       bpm >= 112
     ) {
       targetHz = Math.max(targetHz, Math.min(maxHz, 14));
@@ -2399,8 +2485,8 @@ module.exports = function createRaveEngine(controls) {
     if (
       chaotic &&
       intensity > 0.98 &&
-      drive > 0.64 &&
-      motion > 0.74 &&
+      driveSignal > 0.58 &&
+      motionSignal > 0.66 &&
       beat > 0.4 &&
       (audioTransient > 0.6 || audioFlux > 0.56) &&
       bpm >= 116
@@ -2474,6 +2560,13 @@ module.exports = function createRaveEngine(controls) {
       metaAutoLastDropAt = 0;
       metaAutoLastChaosAt = 0;
       metaAutoLastTargetHz = META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2;
+      metaAutoDriveEma = 0;
+      metaAutoMotionEma = 0;
+      metaAutoIntensityEma = 0;
+      metaAutoDrivePeak = 0;
+      metaAutoMotionPeak = 0;
+      metaAutoIntensityPeak = 0;
+      metaAutoHeavySince = 0;
       telemetry.metaAutoReason = "enabled";
       telemetry.metaAutoProfile = autoProfile;
       telemetry.metaAutoGenre = metaAutoGenreStable;
@@ -2485,6 +2578,13 @@ module.exports = function createRaveEngine(controls) {
       metaAutoCandidateSince = now;
       metaAutoLastChaosAt = 0;
       metaAutoLastTargetHz = META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2;
+      metaAutoDriveEma = 0;
+      metaAutoMotionEma = 0;
+      metaAutoIntensityEma = 0;
+      metaAutoDrivePeak = 0;
+      metaAutoMotionPeak = 0;
+      metaAutoIntensityPeak = 0;
+      metaAutoHeavySince = 0;
       telemetry.metaAutoReason = "off";
       telemetry.metaAutoProfile = autoProfile;
       telemetry.metaAutoGenre = "off";
@@ -3897,6 +3997,13 @@ function getModeSwitchBias() {
       metaAutoLastDropAt = 0;
       metaAutoLastChaosAt = 0;
       metaAutoLastTargetHz = META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2;
+      metaAutoDriveEma = 0;
+      metaAutoMotionEma = 0;
+      metaAutoIntensityEma = 0;
+      metaAutoDrivePeak = 0;
+      metaAutoMotionPeak = 0;
+      metaAutoIntensityPeak = 0;
+      metaAutoHeavySince = 0;
 
       console.log("[RAVE] v2.9 started");
       loop();

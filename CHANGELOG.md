@@ -2,6 +2,11 @@
 
 ## v1.4.3 - Telemetry Log Spam Hotfix (2026-02-14)
 
+### Meta Auto Song Learning
+- Meta Auto now learns live song behavior using short-term EMA + decaying peak memory across drive/motion/intensity.
+- Aggressive tracks (metal/dnb/techno) now gain sustained-build promotion so overclock/HZ can climb out of 2Hz/4Hz lock when the song ramps.
+- Added stability guardrails so low-energy songs still settle into calm low-rate bands.
+
 ### Mod Loader + Logging
 - Sanitized `onTelemetry` debug payloads so high-churn snapshots no longer dump full telemetry objects to release logs.
 - Added telemetry hook debug sampling controls in mod debug runtime config (`telemetryDebugSampleMs`).

@@ -1,7 +1,7 @@
 # RaveLink Bridge Redistributable Notes
 
 This file mirrors high-level usage guidance for packaged/source redistribution.
-Release note: `v1.4.3` is a log-spam hotfix update (no installation workflow changes).
+Release note: `v1.4.3` is a stability + Meta Auto song-learning hotfix update (no installation workflow changes).
 
 Primary docs:
 - `README.md` (full setup + runtime usage)

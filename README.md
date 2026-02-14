@@ -20,6 +20,8 @@ This repository state is aligned to `v1.4.3`:
 
 ## Update Log (v1.4.3 Telemetry Log Spam Hotfix)
 
+- Meta Auto now learns from live song behavior (EMA + peak memory on drive/motion/intensity) so heavy tracks ramp above low 2Hz/4Hz tiers instead of sticking there.
+- Aggressive genres (especially metal/dnb/techno) now get sustained-build promotion logic for better high-energy response while calm tracks keep low-rate guardrails.
 - Hotfix for mod debug noise: high-frequency `onTelemetry` debug events are now sanitized and sampled instead of flooding logs every poll tick.
 - `onTelemetry` hook batches with no handlers no longer spam repetitive debug lines.
 - Modder diagnostics remain available through `/mods/debug` with explicit telemetry sampling controls.
