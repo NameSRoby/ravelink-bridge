@@ -5132,6 +5132,19 @@ app.post("/rave/meta/auto", (req, res) => {
   });
 });
 
+app.post("/rave/meta/auto/default", (_, res) => {
+  engine.setOverclock?.(2);
+  const next = engine.setMetaAutoEnabled?.(true);
+  const telemetry = engine.getTelemetry?.() || {};
+  const overclockLevel = Number(telemetry.overclockLevel || 2);
+  console.log("[RAVE] meta auto DEFAULT 6HZ");
+  res.json({
+    ok: true,
+    enabled: Boolean(next),
+    overclockLevel
+  });
+});
+
 app.post("/rave/meta/auto/on", (_, res) => {
   const next = engine.setMetaAutoEnabled?.(true);
   console.log("[RAVE] meta auto ON");

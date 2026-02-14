@@ -1918,8 +1918,9 @@ tr:last-child td{
       </div>
       <div class="clusterBody">
         <h3>ADAPTIVE META <span class="infoTip" title="Meta Auto infers genre from live audio metrics and controls profile/reactivity/Hz. Choosing manual PROFILE, AUDIO REACTIVITY, GENRE, DECADE, or OVERCLOCK automatically turns Meta Auto off.">?</span></h3>
-        <div class="grid2">
+        <div class="grid3">
           <button id="metaAutoOnBtn" type="button">META AUTO ON</button>
+          <button id="metaAutoDefaultBtn" type="button" class="warn">META AUTO DEFAULT 6HZ</button>
           <button id="metaAutoOffBtn" type="button">META AUTO OFF</button>
         </div>
 
@@ -3604,6 +3605,7 @@ const el = {
   gameBtn: document.getElementById("gameBtn"),
   bpmBtn: document.getElementById("bpmBtn"),
   metaAutoOnBtn: document.getElementById("metaAutoOnBtn"),
+  metaAutoDefaultBtn: document.getElementById("metaAutoDefaultBtn"),
   metaAutoOffBtn: document.getElementById("metaAutoOffBtn"),
   ocInsaneBtn: document.getElementById("ocInsaneBtn"),
   ocHyperBtn: document.getElementById("ocHyperBtn"),
@@ -4193,6 +4195,10 @@ function applyUiTooltips() {
   setNodeTitle(
     el.metaAutoOnBtn,
     "Enable Meta Auto. It infers genre from live audio metrics and controls profile/reactivity/Hz."
+  );
+  setNodeTitle(
+    el.metaAutoDefaultBtn,
+    "Set baseline overclock to DEFAULT 6Hz and enable Meta Auto in one action."
   );
   setNodeTitle(
     el.metaAutoOffBtn,
@@ -9825,6 +9831,24 @@ el.metaAutoOnBtn.onclick = async () => {
   setBadge(el.health, "ok", "META AUTO ON");
   sync();
 };
+
+if (el.metaAutoDefaultBtn) {
+  el.metaAutoDefaultBtn.onclick = async () => {
+    const r = await postJson("/rave/meta/auto/default", {});
+    if (!r.ok || !r.data || !r.data.ok) {
+      setBadge(el.health, "bad", "META AUTO DEFAULT FAIL");
+      return;
+    }
+
+    ui.metaAutoEnabled = Boolean(r.data.enabled);
+    ui.metaAutoReason = "enabled";
+    ui.overclockLevel = Number(r.data.overclockLevel || 2);
+    ui.overclock = ui.overclockLevel > 0;
+    maybeApplySmartLiveReactivityPolicy("META AUTO DEFAULT");
+    setBadge(el.health, "ok", "META AUTO DEFAULT 6HZ");
+    sync();
+  };
+}
 
 el.metaAutoOffBtn.onclick = async () => {
   const r = await postJson("/rave/meta/auto?enabled=false", {});
