@@ -1,0 +1,608 @@
+<!doctype html>
+
+<!-- [TITLE] Page: mods/dev-feature-probe-mod/ui/index.html -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dev Feature Probe</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b16;
+      --panel: #11182b;
+      --line: #26334d;
+      --text: #e7edf8;
+      --muted: #a9b5cc;
+      --accent: #5ab5ff;
+      --warn: #f5b342;
+      --bad: #f45d5d;
+      --ok: #59d281;
+      --btn: #1a2338;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.35;
+      padding: 14px;
+    }
+    h1, h2, p { margin: 0; }
+    .app {
+      display: grid;
+      gap: 12px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)) var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .muted { color: var(--muted); font-size: 12px; }
+    .row {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .row3 {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    input, select, textarea, button {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #0d1426;
+      color: var(--text);
+      padding: 9px 10px;
+      font: inherit;
+    }
+    button {
+      background: var(--btn);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { border-color: #3a4f75; }
+    button.warn { color: var(--warn); }
+    button.bad { color: var(--bad); }
+    .buttonRow {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    }
+    .statusBox {
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0d1426;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .statusBox.ok { color: var(--ok); }
+    .statusBox.bad { color: var(--bad); }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      background: #090f20;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      max-height: 220px;
+      overflow: auto;
+      font-size: 12px;
+    }
+    .danger {
+      border: 1px solid #55333b;
+      background: #190f14;
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: #ffc0cc;
+      font-size: 12px;
+    }
+    .inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .inline input {
+      width: auto;
+      padding: 0;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card">
+      <h1>Dev Feature Probe Mod</h1>
+      <p class="muted">Stress test custom fixture APIs, prefix config, and overclock routes from one mod UI panel.</p>
+      <div id="status" class="statusBox">Ready.</div>
+      <div class="buttonRow">
+        <button id="refreshStatusBtn" type="button">REFRESH STATUS</button>
+        <button id="runSelftestBtn" type="button">RUN SELFTEST</button>
+        <button id="refreshCatalogBtn" type="button">CHECK MOD UI CATALOG</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Custom Fixture Control</h2>
+      <div class="row3">
+        <div>
+          <label for="fixtureSelect">Fixture</label>
+          <select id="fixtureSelect"></select>
+        </div>
+        <div>
+          <label for="batchAllToggle">Batch Mode</label>
+          <div class="inline">
+            <input id="batchAllToggle" type="checkbox" />
+            <span>Apply custom patch to all custom fixtures</span>
+          </div>
+        </div>
+        <div>
+          <label for="fixtureRefreshBtn">Fixtures</label>
+          <button id="fixtureRefreshBtn" type="button">REFRESH FIXTURES</button>
+        </div>
+      </div>
+      <div class="buttonRow">
+        <button data-preset="standalone_flash" type="button">FLASH PRESET</button>
+        <button data-preset="standalone_static" type="button">STATIC CCT PRESET</button>
+        <button data-preset="standalone_audio" type="button">AUDIO FLOW PRESET</button>
+      </div>
+      <div>
+        <label for="statePatchInput">Custom State Patch JSON</label>
+        <textarea id="statePatchInput" rows="8"></textarea>
+      </div>
+      <div class="buttonRow">
+        <button id="applyPatchBtn" type="button">APPLY PATCH</button>
+        <button id="readStandaloneBtn" type="button">GET /fixtures/standalone/custom</button>
+      </div>
+      <pre id="fixturesOut"></pre>
+    </div>
+
+    <div class="card">
+      <h2>Color Prefix Config</h2>
+      <div class="row3">
+        <div>
+          <label for="huePrefixInput">Hue Prefix</label>
+          <input id="huePrefixInput" type="text" value="hue" />
+        </div>
+        <div>
+          <label for="wizPrefixInput">WiZ Prefix</label>
+          <input id="wizPrefixInput" type="text" value="wiz" />
+        </div>
+        <div>
+          <label for="otherPrefixInput">Other Prefix</label>
+          <input id="otherPrefixInput" type="text" value="" />
+        </div>
+      </div>
+      <div class="row3">
+        <div>
+          <label for="defaultTargetSelect">Default Target</label>
+          <select id="defaultTargetSelect">
+            <option value="both">both</option>
+            <option value="hue">hue</option>
+            <option value="wiz">wiz</option>
+          </select>
+        </div>
+      </div>
+      <div class="buttonRow">
+        <button id="refreshPrefixBtn" type="button">GET PREFIX CONFIG</button>
+        <button id="savePrefixBtn" type="button">SAVE VIA /color/prefixes</button>
+        <button id="syncPrefixBtn" type="button">UNPREFIX BOTH (MOD API)</button>
+        <button id="resetPrefixBtn" type="button">RESET DEFAULTS (MOD API)</button>
+      </div>
+      <pre id="prefixOut"></pre>
+    </div>
+
+    <div class="card">
+      <h2>Overclock Route Probe</h2>
+      <div class="danger">
+        Unsafe 20-60Hz modes are destructive stress paths. Do not use this on production lights or weak networks.
+      </div>
+      <div class="buttonRow">
+        <button data-safe-route="/rave/overclock/off" type="button">2HZ</button>
+        <button data-safe-route="/rave/overclock/on" type="button">4HZ</button>
+        <button data-safe-route="/rave/overclock/turbo/on" type="button">6HZ</button>
+        <button data-safe-route="/rave/overclock/ultra/on" type="button">8HZ</button>
+        <button data-safe-route="/rave/overclock/extreme/on" type="button">10HZ</button>
+        <button data-safe-route="/rave/overclock/insane/on" type="button">12HZ</button>
+        <button data-safe-route="/rave/overclock/hyper/on" type="button">14HZ</button>
+        <button data-safe-route="/rave/overclock/ludicrous/on" type="button">16HZ</button>
+      </div>
+      <div class="inline">
+        <input id="unlockDevHzToggle" type="checkbox" />
+        <span>Unlock unsafe dev Hz controls (manual use only)</span>
+      </div>
+      <div class="buttonRow">
+        <button class="warn" data-dev-hz="20" type="button">DEV 20HZ</button>
+        <button class="warn" data-dev-hz="30" type="button">DEV 30HZ</button>
+        <button class="warn" data-dev-hz="40" type="button">DEV 40HZ</button>
+        <button class="warn" data-dev-hz="50" type="button">DEV 50HZ</button>
+        <button class="bad" data-dev-hz="60" type="button">DEV 60HZ</button>
+      </div>
+      <div class="buttonRow">
+        <button id="tiersBtn" type="button">GET /rave/overclock/tiers</button>
+      </div>
+      <pre id="overclockOut"></pre>
+    </div>
+
+    <div class="card">
+      <h2>Logs</h2>
+      <pre id="logOut"></pre>
+    </div>
+  </div>
+
+  <script>
+    const ACK_TEXT = "I ACCEPT DEV OVERCLOCK RISK";
+    const state = {
+      modId: detectModId(),
+      fixtures: [],
+      devUnlocked: false
+    };
+
+    const el = {
+      status: document.getElementById("status"),
+      refreshStatusBtn: document.getElementById("refreshStatusBtn"),
+      runSelftestBtn: document.getElementById("runSelftestBtn"),
+      refreshCatalogBtn: document.getElementById("refreshCatalogBtn"),
+      fixtureSelect: document.getElementById("fixtureSelect"),
+      batchAllToggle: document.getElementById("batchAllToggle"),
+      fixtureRefreshBtn: document.getElementById("fixtureRefreshBtn"),
+      statePatchInput: document.getElementById("statePatchInput"),
+      applyPatchBtn: document.getElementById("applyPatchBtn"),
+      readStandaloneBtn: document.getElementById("readStandaloneBtn"),
+      fixturesOut: document.getElementById("fixturesOut"),
+      huePrefixInput: document.getElementById("huePrefixInput"),
+      wizPrefixInput: document.getElementById("wizPrefixInput"),
+      otherPrefixInput: document.getElementById("otherPrefixInput"),
+      defaultTargetSelect: document.getElementById("defaultTargetSelect"),
+      refreshPrefixBtn: document.getElementById("refreshPrefixBtn"),
+      savePrefixBtn: document.getElementById("savePrefixBtn"),
+      syncPrefixBtn: document.getElementById("syncPrefixBtn"),
+      resetPrefixBtn: document.getElementById("resetPrefixBtn"),
+      prefixOut: document.getElementById("prefixOut"),
+      unlockDevHzToggle: document.getElementById("unlockDevHzToggle"),
+      tiersBtn: document.getElementById("tiersBtn"),
+      overclockOut: document.getElementById("overclockOut"),
+      logOut: document.getElementById("logOut")
+    };
+
+    const defaultPatch = {
+      on: true,
+      mode: "scene",
+      scene: "flow",
+      speedMode: "audio",
+      speedHzMin: 1.1,
+      speedHzMax: 4.4,
+      static: false,
+      updateOnRaveStop: true,
+      colorMode: "hsv",
+      hueMin: 30,
+      hueMax: 320,
+      satMin: 55,
+      satMax: 100,
+      bri: 78,
+      transitionMs: 180
+    };
+
+    function detectModId() {
+      const parts = String(location.pathname || "").split("/").filter(Boolean);
+      const uiRoot = parts.findIndex(part => part.toLowerCase() === "mods-ui");
+      const fromPath = uiRoot >= 0 ? decodeURIComponent(parts[uiRoot + 1] || "") : "";
+      return fromPath || "dev-feature-probe-mod";
+    }
+
+    function setStatus(text, kind) {
+      el.status.textContent = String(text || "");
+      el.status.classList.remove("ok", "bad");
+      if (kind === "ok") el.status.classList.add("ok");
+      if (kind === "bad") el.status.classList.add("bad");
+    }
+
+    function setOut(node, payload) {
+      node.textContent = typeof payload === "string"
+        ? payload
+        : JSON.stringify(payload, null, 2);
+    }
+
+    function appendLog(title, payload) {
+      const stamp = new Date().toLocaleTimeString();
+      const text = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+      const next = `[${stamp}] ${title}\n${text}\n\n`;
+      el.logOut.textContent = `${next}${el.logOut.textContent || ""}`.slice(0, 24000);
+    }
+
+    async function request(path, options = {}) {
+      let response = null;
+      try {
+        response = await fetch(path, {
+          method: options.method || "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+          },
+          body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+        });
+      } catch (error) {
+        return { ok: false, status: 0, data: null, error: String(error?.message || error) };
+      }
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+      return {
+        ok: response.ok,
+        status: response.status,
+        data,
+        error: data?.error || ""
+      };
+    }
+
+    async function modAction(action, method = "GET", body) {
+      const actionName = String(action || "").trim();
+      if (!actionName) return { ok: false, status: 400, data: { error: "missing action" } };
+      const fixtureId = String(el.fixtureSelect?.value || "").trim();
+      const query = fixtureId ? `?id=${encodeURIComponent(fixtureId)}` : "";
+      const path = `/mods/${encodeURIComponent(state.modId)}/${encodeURIComponent(actionName)}${query}`;
+      return request(path, { method, body });
+    }
+
+    function updateFixtureSelect(fixtures) {
+      state.fixtures = Array.isArray(fixtures) ? fixtures : [];
+      const previous = String(el.fixtureSelect.value || "").trim();
+      el.fixtureSelect.innerHTML = "";
+      if (!state.fixtures.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "no custom fixtures available";
+        el.fixtureSelect.appendChild(opt);
+        return;
+      }
+      for (const fixture of state.fixtures) {
+        const opt = document.createElement("option");
+        opt.value = String(fixture?.id || "");
+        opt.textContent = `${fixture?.id || "unknown"} | ${fixture?.brand || "brand"} | route:${fixture?.routeMode || "-"}`;
+        el.fixtureSelect.appendChild(opt);
+      }
+      const hasPrevious = state.fixtures.some(fixture => String(fixture?.id || "") === previous);
+      el.fixtureSelect.value = hasPrevious ? previous : String(state.fixtures[0]?.id || "");
+    }
+
+    async function refreshStatus() {
+      const response = await modAction("status");
+      if (!response.ok || !response.data?.ok) {
+        setStatus(`Status failed (${response.status})`, "bad");
+        appendLog("status error", response);
+        return;
+      }
+      const fixtures = Array.isArray(response.data.customFixtures) ? response.data.customFixtures : [];
+      updateFixtureSelect(fixtures);
+      setOut(el.fixturesOut, fixtures);
+      setOut(el.prefixOut, response.data.colorConfig || {});
+      setStatus(
+        `Loaded: ${new Date(response.data.stats?.loadedAt || Date.now()).toLocaleString()} | Custom fixtures: ${fixtures.length}`,
+        "ok"
+      );
+      appendLog("status", response.data);
+    }
+
+    async function runPreset(action) {
+      const response = await modAction(action, "POST", {});
+      appendLog(action, response.data || response);
+      if (!response.ok || !response.data?.ok) {
+        setStatus(`${action} failed (${response.status})`, "bad");
+        return;
+      }
+      setStatus(`${action} applied to ${response.data.target || "fixture"}`, "ok");
+      await refreshStatus();
+    }
+
+    async function applyPatch() {
+      let patch = null;
+      try {
+        patch = JSON.parse(String(el.statePatchInput.value || "{}"));
+      } catch {
+        setStatus("Invalid JSON patch.", "bad");
+        return;
+      }
+
+      const batchMode = el.batchAllToggle.checked === true;
+      const action = batchMode ? "standalone_batch" : "standalone_apply";
+      const body = batchMode ? { state: patch } : { state: patch, id: el.fixtureSelect.value };
+      const response = await modAction(action, "POST", body);
+      appendLog(action, response.data || response);
+      if (!response.ok || !response.data?.ok) {
+        setStatus(`${action} failed (${response.status})`, "bad");
+        return;
+      }
+      setStatus(batchMode ? "Patch applied to batch." : "Patch applied to selected fixture.", "ok");
+      await refreshStatus();
+    }
+
+    async function refreshStandaloneSnapshot() {
+      const response = await request("/fixtures/standalone/custom");
+      if (!response.ok || !response.data?.ok) {
+        setStatus("Standalone custom query failed.", "bad");
+        appendLog("fixtures/standalone/custom error", response);
+        return;
+      }
+      const fixtures = Array.isArray(response.data.fixtures) ? response.data.fixtures : [];
+      updateFixtureSelect(fixtures);
+      setOut(el.fixturesOut, fixtures);
+      appendLog("fixtures/standalone/custom", response.data);
+      setStatus(`Standalone fixtures fetched: ${fixtures.length}`, "ok");
+    }
+
+    async function refreshPrefixConfig() {
+      const response = await request("/color/prefixes");
+      if (!response.ok || !response.data?.ok) {
+        setStatus("Prefix query failed.", "bad");
+        appendLog("prefix_get error", response);
+        return;
+      }
+      const config = response.data.config || {};
+      const prefixes = config.prefixes || {};
+      el.huePrefixInput.value = String(prefixes.hue || "");
+      el.wizPrefixInput.value = String(prefixes.wiz || "");
+      el.otherPrefixInput.value = String(prefixes.other || "");
+      el.defaultTargetSelect.value = String(config.defaultTarget || "both");
+      setOut(el.prefixOut, response.data);
+      appendLog("prefix_get", response.data);
+      setStatus("Prefix config refreshed.", "ok");
+    }
+
+    async function savePrefixConfigDirect() {
+      const body = {
+        huePrefix: String(el.huePrefixInput.value || "").trim(),
+        wizPrefix: String(el.wizPrefixInput.value || "").trim(),
+        otherPrefix: String(el.otherPrefixInput.value || "").trim(),
+        defaultTarget: String(el.defaultTargetSelect.value || "both").trim().toLowerCase()
+      };
+      const response = await request("/color/prefixes", { method: "POST", body });
+      appendLog("prefix_save_direct", response.data || response);
+      if (!response.ok || !response.data?.ok) {
+        setStatus("Prefix save failed.", "bad");
+        return;
+      }
+      setOut(el.prefixOut, response.data);
+      setStatus("Prefix config saved.", "ok");
+    }
+
+    async function runPrefixPreset(action) {
+      const response = await modAction(action, "POST", {});
+      appendLog(action, response.data || response);
+      if (!response.ok || !response.data?.ok) {
+        setStatus(`${action} failed (${response.status})`, "bad");
+        return;
+      }
+      setOut(el.prefixOut, response.data);
+      setStatus(`${action} complete.`, "ok");
+      await refreshPrefixConfig();
+    }
+
+    async function runSafeOverclock(route) {
+      const response = await request(route, { method: "POST", body: {} });
+      appendLog(`safe_oc ${route}`, response.data || response);
+      if (!response.ok || !response.data?.ok) {
+        setStatus(`Safe overclock failed (${response.status}).`, "bad");
+        return;
+      }
+      setOut(el.overclockOut, response.data);
+      setStatus(`Safe overclock route applied: ${route}`, "ok");
+    }
+
+    function confirmDevOverclock(hz) {
+      if (!state.devUnlocked) {
+        setStatus("Unlock unsafe dev controls first.", "bad");
+        return false;
+      }
+      const warn1 = window.confirm(
+        `DEV ${hz}Hz is destructive and unstable.\n\n` +
+        "This can flood packets, desync fixtures, and produce unpredictable behavior.\n\nContinue?"
+      );
+      if (!warn1) return false;
+      const warn2 = window.confirm("Final warning: this can break expected behavior. Continue anyway?");
+      if (!warn2) return false;
+      const ack = window.prompt(`Type exactly:\n${ACK_TEXT}`);
+      return String(ack || "").trim() === ACK_TEXT;
+    }
+
+    async function runDevOverclock(hz) {
+      if (!confirmDevOverclock(hz)) {
+        setStatus("Unsafe overclock canceled.", "bad");
+        return;
+      }
+      const route = `/rave/overclock/dev/${encodeURIComponent(String(hz))}/on?unsafe=true`;
+      const response = await request(route, { method: "POST", body: { unsafe: true } });
+      appendLog(`dev_oc ${hz}`, response.data || response);
+      if (!response.ok || !response.data?.ok) {
+        setStatus(`DEV ${hz}Hz failed (${response.status}).`, "bad");
+        return;
+      }
+      setOut(el.overclockOut, response.data);
+      setStatus(`DEV ${hz}Hz armed.`, "ok");
+    }
+
+    async function getOverclockTiers() {
+      const response = await request("/rave/overclock/tiers");
+      appendLog("tiers", response.data || response);
+      if (!response.ok || !response.data?.ok) {
+        setStatus("Overclock tiers query failed.", "bad");
+        return;
+      }
+      setOut(el.overclockOut, response.data);
+      setStatus("Overclock tiers fetched.", "ok");
+    }
+
+    async function checkModUiCatalog() {
+      const response = await request("/mods/ui/catalog");
+      appendLog("mods/ui/catalog", response.data || response);
+      if (!response.ok || !response.data?.ok) {
+        setStatus("Catalog check failed.", "bad");
+        return;
+      }
+      setStatus(`Catalog loaded: ${response.data.total || 0} mod UI package(s).`, "ok");
+    }
+
+    function wireEvents() {
+      el.refreshStatusBtn.onclick = refreshStatus;
+      el.runSelftestBtn.onclick = () => runPreset("selftest");
+      el.refreshCatalogBtn.onclick = checkModUiCatalog;
+      el.fixtureRefreshBtn.onclick = refreshStandaloneSnapshot;
+      el.applyPatchBtn.onclick = applyPatch;
+      el.readStandaloneBtn.onclick = refreshStandaloneSnapshot;
+      el.refreshPrefixBtn.onclick = refreshPrefixConfig;
+      el.savePrefixBtn.onclick = savePrefixConfigDirect;
+      el.syncPrefixBtn.onclick = () => runPrefixPreset("prefix_sync");
+      el.resetPrefixBtn.onclick = () => runPrefixPreset("prefix_reset");
+      el.tiersBtn.onclick = getOverclockTiers;
+      el.unlockDevHzToggle.onchange = () => {
+        state.devUnlocked = el.unlockDevHzToggle.checked === true;
+      };
+
+      document.querySelectorAll("[data-preset]").forEach(button => {
+        button.addEventListener("click", () => runPreset(button.getAttribute("data-preset")));
+      });
+      document.querySelectorAll("[data-safe-route]").forEach(button => {
+        button.addEventListener("click", () => runSafeOverclock(button.getAttribute("data-safe-route")));
+      });
+      document.querySelectorAll("[data-dev-hz]").forEach(button => {
+        button.addEventListener("click", () => runDevOverclock(button.getAttribute("data-dev-hz")));
+      });
+    }
+
+    async function init() {
+      el.statePatchInput.value = JSON.stringify(defaultPatch, null, 2);
+      wireEvents();
+      await refreshStatus();
+      await refreshPrefixConfig();
+      await getOverclockTiers();
+    }
+
+    init().catch(error => {
+      setStatus(`Init failed: ${error?.message || error}`, "bad");
+      appendLog("init error", String(error?.stack || error));
+    });
+  </script>
+</body>
+</html>

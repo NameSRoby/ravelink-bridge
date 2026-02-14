@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "description": "Core protection targets. 'files' can be lock/unlock toggled. 'immutableFiles' are always kept read-only, even in unlock mode.",
+  "files": [
+    "package.json",
+    "scripts/start-bridge.js",
+    "scripts/stop-bridge.js",
+    "scripts/sanitize-release.js",
+    "scripts/export-redistributable.js"
+  ],
+  "immutableFiles": [
+    "server.js",
+    "core/rave-engine.js",
+    "core/audio.js",
+    "core/fixtures.js",
+    "core/hue-entertainment.js",
+    "core/mods/mod-loader.js",
+    "scripts/core-lock.js",
+    "core/core-lock-manifest.json"
+  ]
+}

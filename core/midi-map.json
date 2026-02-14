@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "enabled": true,
+  "deviceIndex": null,
+  "deviceMatch": "",
+  "velocityThreshold": 1,
+  "bindings": {
+    "drop": {
+      "type": "note",
+      "number": 36,
+      "channel": null,
+      "minValue": 1
+    },
+    "overclock_toggle": {
+      "type": "cc",
+      "number": 64,
+      "channel": null,
+      "minValue": 64
+    }
+  }
+}

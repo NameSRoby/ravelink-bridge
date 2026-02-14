@@ -1,0 +1,8 @@
+{
+  "id": "quiet-hours-mod",
+  "name": "Quiet Hours Mod",
+  "version": "1.0.0",
+  "description": "Schedule-based night guard: caps brightness and suppresses strobe-like behavior during quiet windows.",
+  "main": "index.js",
+  "enabled": false
+}
