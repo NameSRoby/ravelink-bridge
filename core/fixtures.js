@@ -569,7 +569,6 @@ function reload() {
   try {
     const rawConfig = loadConfigFile();
     applyConfig(rawConfig);
-    console.log(`[FIXTURES] reloaded (v${registry.version})`);
     return true;
   } catch (err) {
     console.warn(`[FIXTURES] reload failed (${err.message}); keeping previous config`);

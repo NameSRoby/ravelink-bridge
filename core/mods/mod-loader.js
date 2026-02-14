@@ -536,7 +536,7 @@ module.exports = function createModLoader(options = {}) {
   const logger = options.log || console;
   const initialDebugEnabled = parseBool(
     options.debug ?? process.env.RAVELINK_MOD_DEBUG,
-    true
+    false
   );
   const initialDebugMaxEvents = parseIntRange(
     options.debugMaxEvents ?? process.env.RAVELINK_MOD_DEBUG_MAX_EVENTS,

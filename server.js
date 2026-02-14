@@ -1886,6 +1886,7 @@ async function runAutomationEvent(eventName, seqId = automationEventSeq) {
 const wizAdapters = new Map();
 const wizSchedulers = new Map();
 let wizAdapterVersion = -1;
+let lastFixtureSummaryLogKey = "";
 const wizTelemetry = {
   sent: 0,
   skippedScheduler: 0,
@@ -2253,9 +2254,17 @@ function refreshWizAdapters() {
   wizAdapterVersion = version;
 
   const fixtureSummary = fixtureRegistry.summary();
-  console.log(
-    `[FIXTURES] reloaded v${fixtureSummary.version} | Hue=${fixtureSummary.hue} WiZ=${fixtureSummary.wiz} routes=${JSON.stringify(fixtureSummary.routes)}`
-  );
+  const summaryKey = JSON.stringify({
+    hue: fixtureSummary.hue,
+    wiz: fixtureSummary.wiz,
+    routes: fixtureSummary.routes || {}
+  });
+  if (summaryKey !== lastFixtureSummaryLogKey) {
+    lastFixtureSummaryLogKey = summaryKey;
+    console.log(
+      `[FIXTURES] reloaded v${fixtureSummary.version} | Hue=${fixtureSummary.hue} WiZ=${fixtureSummary.wiz} routes=${JSON.stringify(fixtureSummary.routes)}`
+    );
+  }
 }
 
 function getWizTargets(zone) {

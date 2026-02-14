@@ -31,6 +31,7 @@ const toNum = (v, fallback) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
+const AUDIO_VERBOSE_LOGS = String(process.env.RAVE_AUDIO_VERBOSE_LOGS || "").trim() === "1";
 const softLimit01 = (value, threshold, knee) => {
   const x = Math.max(0, value);
   if (x <= threshold) return x;
@@ -572,7 +573,8 @@ module.exports = function createAudio(onLevel) {
     lastLevelRaw = levelRaw;
     lastLevel = level;
 
-    if ((tick++ % cfg.logEveryTicks) === 0) {
+    tick += 1;
+    if (AUDIO_VERBOSE_LOGS && (tick % cfg.logEveryTicks) === 0) {
       console.log(
         "[AUDIO]",
         "rms:", rms.toFixed(4),
@@ -619,10 +621,12 @@ module.exports = function createAudio(onLevel) {
       return;
     }
 
-    console.log("[AUDIO] scanning devices...");
-    devices.forEach(d => {
-      console.log(`- ${d.name} | API=${d.hostAPIName} | in=${d.maxInputChannels}`);
-    });
+    if (AUDIO_VERBOSE_LOGS) {
+      console.log("[AUDIO] scanning devices...");
+      devices.forEach(d => {
+        console.log(`- ${d.name} | API=${d.hostAPIName} | in=${d.maxInputChannels}`);
+      });
+    }
 
     const input = chooseInputDevice(devices);
     if (!input) {

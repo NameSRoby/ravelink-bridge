@@ -3132,6 +3132,17 @@ tr:last-child td{
       </div>
       <div class="controlRow">
         <div>
+          <label>MOD DEBUG LOGS</label>
+          <input id="modsDebugStatus" type="text" value="MOD DEBUG OFF" readonly>
+        </div>
+        <div class="grid2">
+          <button id="modsDebugToggleBtn" type="button" title="Enable or disable verbose [MODS][DBG] console logs.">MOD DEBUG OFF</button>
+          <button id="modsDebugClearBtn" type="button" title="Clear in-memory mod debug history buffer.">CLEAR DEBUG BUFFER</button>
+        </div>
+      </div>
+      <p class="hint">Average-user mode keeps mod debug logs off. Turn this on only while troubleshooting.</p>
+      <div class="controlRow">
+        <div>
           <label for="modEnableId">MOD ID</label>
           <input id="modEnableId" type="text" placeholder="quiet-hours-mod">
           <label for="modHotswapStatus">HOTSWAP STATUS</label>
@@ -3350,6 +3361,8 @@ const ui = {
   modsLoadedAt: 0,
   modsTotal: 0,
   modsActive: 0,
+  modsDebugEnabled: false,
+  modsDebugLoaded: false,
   modUiCatalog: [],
   modUiSelectedId: localStorage.getItem("ravelink_mod_ui_selected_v1") || "",
   modUiLastId: "",
@@ -3433,7 +3446,7 @@ const ONBOARD_ACK_KEY = "ravelink_onboard_ack_v1";
 const HUE_ENT_GUIDE_ACK_KEY = "ravelink_hue_ent_guide_ack_v1";
 const GUIDED_ONBOARDING_STATE_KEY = "ravelink_guided_onboarding_v1";
 const UI_STORAGE_MIGRATION_KEY = "ravelink_ui_storage_migration_v1";
-const UI_STORAGE_MIGRATION_TARGET = "2026-02-14-release-1-4-2-behavior-stability-hotfix-2";
+const UI_STORAGE_MIGRATION_TARGET = "2026-02-14-release-1-4-2-log-sanity-hotfix-3";
 const UI_START_TAB_KEY = "ravelink_ui_start_tab_v1";
 const UI_CONFIRM_DANGER_KEY = "ravelink_ui_confirm_danger_v1";
 const UI_POLL_PAUSED_KEY = "ravelink_ui_poll_paused_v1";
@@ -3893,6 +3906,9 @@ const el = {
   moddingReadmeBtn: document.getElementById("moddingReadmeBtn"),
   modsRefreshBtn: document.getElementById("modsRefreshBtn"),
   modsReloadBtn: document.getElementById("modsReloadBtn"),
+  modsDebugStatus: document.getElementById("modsDebugStatus"),
+  modsDebugToggleBtn: document.getElementById("modsDebugToggleBtn"),
+  modsDebugClearBtn: document.getElementById("modsDebugClearBtn"),
   modEnableId: document.getElementById("modEnableId"),
   modEnableBtn: document.getElementById("modEnableBtn"),
   modDisableBtn: document.getElementById("modDisableBtn"),
@@ -5674,6 +5690,61 @@ function updateModHotswapUi(mods = []) {
   el.modDiscardBtn.disabled = pendingCount <= 0;
 }
 
+function setModsDebugUi(debugSnapshot = null) {
+  const snapshot = debugSnapshot && typeof debugSnapshot === "object"
+    ? debugSnapshot
+    : { enabled: false };
+  const enabled = snapshot.enabled === true;
+  const sampleMs = Math.max(0, Number(snapshot.telemetryDebugSampleMs) || 0);
+  const noHandlerMs = Math.max(0, Number(snapshot.telemetryNoHandlerDebugMs) || 0);
+
+  ui.modsDebugEnabled = enabled;
+  ui.modsDebugLoaded = true;
+
+  if (el.modsDebugStatus) {
+    if (enabled) {
+      el.modsDebugStatus.value = `MOD DEBUG ON | sampled telemetry: ${sampleMs}ms | no-handler: ${noHandlerMs}ms`;
+    } else {
+      el.modsDebugStatus.value = "MOD DEBUG OFF | concise logs for normal use";
+    }
+  }
+  if (el.modsDebugToggleBtn) {
+    el.modsDebugToggleBtn.textContent = enabled ? "MOD DEBUG ON" : "MOD DEBUG OFF";
+    el.modsDebugToggleBtn.classList.toggle("warn", enabled);
+  }
+}
+
+async function setModsDebugEnabled(enabled) {
+  if (!el.modsDebugToggleBtn) return false;
+  const desired = Boolean(enabled);
+  el.modsDebugToggleBtn.disabled = true;
+  try {
+    const response = await postJson("/mods/debug", { enabled: desired });
+    if (!response.ok || !response.data?.ok || !response.data?.debug) {
+      return false;
+    }
+    setModsDebugUi(response.data.debug);
+    return true;
+  } finally {
+    el.modsDebugToggleBtn.disabled = false;
+  }
+}
+
+async function clearModsDebugBuffer() {
+  if (!el.modsDebugClearBtn) return false;
+  el.modsDebugClearBtn.disabled = true;
+  try {
+    const response = await postJson("/mods/debug/clear", {});
+    if (!response.ok || !response.data?.ok || !response.data?.debug) {
+      return false;
+    }
+    setModsDebugUi(response.data.debug);
+    return true;
+  } finally {
+    el.modsDebugClearBtn.disabled = false;
+  }
+}
+
 function getModTooltipText(mod) {
   const primary = String(mod?.tooltip || "").trim();
   const fallback = String(mod?.description || "").trim();
@@ -5701,6 +5772,11 @@ function renderMods(modSnapshot) {
   ui.modsLoadedAt = Date.now();
   syncFixtureBrandOptions();
   ui.modsRuntimeConfig = normalizeModConfig(modSnapshot?.config || {});
+  if (modSnapshot?.debug && typeof modSnapshot.debug === "object") {
+    setModsDebugUi(modSnapshot.debug);
+  } else if (!ui.modsDebugLoaded) {
+    setModsDebugUi({ enabled: false });
+  }
   if (!ui.modsDraftDirty) {
     ui.modsDraftConfig = cloneModConfig(ui.modsRuntimeConfig);
   }
@@ -9353,6 +9429,27 @@ el.modsReloadBtn.onclick = async () => {
   renderMods(r.data);
   setBadge(el.health, "ok", "MODS RELOADED");
 };
+
+if (el.modsDebugToggleBtn) {
+  el.modsDebugToggleBtn.onclick = async () => {
+    const next = !ui.modsDebugEnabled;
+    const ok = await setModsDebugEnabled(next);
+    setBadge(
+      el.health,
+      ok ? "ok" : "bad",
+      ok
+        ? (next ? "MOD DEBUG ENABLED" : "MOD DEBUG DISABLED")
+        : "MOD DEBUG TOGGLE FAIL"
+    );
+  };
+}
+
+if (el.modsDebugClearBtn) {
+  el.modsDebugClearBtn.onclick = async () => {
+    const ok = await clearModsDebugBuffer();
+    setBadge(el.health, ok ? "ok" : "bad", ok ? "MOD DEBUG BUFFER CLEARED" : "MOD DEBUG CLEAR FAIL");
+  };
+}
 
 if (el.modImportBrowseBtn && el.modImportPicker) {
   el.modImportBrowseBtn.onclick = () => {

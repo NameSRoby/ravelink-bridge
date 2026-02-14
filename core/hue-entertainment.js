@@ -34,6 +34,7 @@ const hueHttpsAgentByBridge = new Map();
 const HUE_INSECURE_TLS_ENV_REQUESTED = String(process.env.RAVELINK_ALLOW_INSECURE_HUE_TLS || "").trim() === "1";
 const HUE_ENT_ENABLE_ORIGINAL_START_FALLBACK =
   String(process.env.RAVE_HUE_ENT_ORIGINAL_START_FALLBACK || "1").trim() !== "0";
+const HUE_ENT_VERBOSE_LOGS = String(process.env.RAVE_HUE_ENT_VERBOSE_LOGS || "").trim() === "1";
 let hueInsecureTlsWarningLogged = false;
 
 const SENSITIVE_LOG_KEY_RE = /(client[\s_-]*key|clientkey|client_key|app[\s_-]*key|user[\s_-]*name|username|authorization|token|password|api[_-]?key|secret|cookie|set-cookie|bridge[\s_-]*id|bridgeid|entertainment[\s_-]*area(?:[\s_-]*id)?|entertainmentareaid)\s*[=:]\s*([^\s,;|]+)/gi;
@@ -72,6 +73,11 @@ function resolveHueCaPath() {
 
 function normalizeHost(value) {
   return String(value || "").trim().replace(/\.$/, "").toLowerCase();
+}
+
+function logHueEntVerbose(log = console, ...args) {
+  if (!HUE_ENT_VERBOSE_LOGS) return;
+  log.log?.(...args);
 }
 
 // [TITLE] Section: IPv4 Private/Loopback Guard
@@ -157,7 +163,7 @@ function installBridgeDnsPatch(log = console) {
   };
 
   dnsPatchInstalled = true;
-  log.log?.("[HUE][ENT] installed bridge DNS patch");
+  logHueEntVerbose(log, "[HUE][ENT] installed bridge DNS patch");
 }
 
 function registerBridgeDns(bridgeId, bridgeIp, log = console) {
@@ -181,7 +187,7 @@ function ensureHueFetchCompatibility(log = console) {
       if (crossFetch?.Headers) globalThis.Headers = crossFetch.Headers;
       if (crossFetch?.Request) globalThis.Request = crossFetch.Request;
       if (crossFetch?.Response) globalThis.Response = crossFetch.Response;
-      log.log?.("[HUE][ENT] using cross-fetch compatibility mode");
+      logHueEntVerbose(log, "[HUE][ENT] using cross-fetch compatibility mode");
       return true;
     }
   } catch (err) {
@@ -290,7 +296,10 @@ function installBridgeIpRequestOverride(bridgeRef, cfg, log = console) {
   };
 
   bridgeRef.__bridgeIpRequestOverride = bridgeIp;
-  log.log?.(`[HUE][ENT] bridge IP request override active (${redactSensitiveLogValue(bridgeIp, "[redacted-ip]")})`);
+  logHueEntVerbose(
+    log,
+    `[HUE][ENT] bridge IP request override active (${redactSensitiveLogValue(bridgeIp, "[redacted-ip]")})`
+  );
   return true;
 }
 
@@ -354,7 +363,7 @@ function installBridgeDtlsStartOverride(bridgeRef, cfg, log = console) {
   };
 
   bridgeRef.__dtlsStartOverrideInstalled = true;
-  log.log?.("[HUE][ENT] DTLS start override active (forced ciphers)");
+  logHueEntVerbose(log, "[HUE][ENT] DTLS start override active (forced ciphers)");
   return true;
 }
 
@@ -645,14 +654,17 @@ module.exports = function createHueEntertainmentTransport({ fixtureRegistry, log
     }
     try {
       await bridgeRef.updateEntertainmentArea(areaId, { action: "stop" });
-      log.log?.(`[HUE][ENT] area stop (${redactSensitiveLogValue(origin)}) -> ${redactSensitiveLogValue(areaId)}`);
+      logHueEntVerbose(
+        log,
+        `[HUE][ENT] area stop (${redactSensitiveLogValue(origin)}) -> ${redactSensitiveLogValue(areaId)}`
+      );
     } catch (err) {
       const detail = stringifyError(err);
       if (
         /ERR_INVALID_IP_ADDRESS/i.test(detail) ||
         /Invalid IP address:\s*undefined/i.test(detail)
       ) {
-        log.log?.(`[HUE][ENT] area stop skipped (${origin}): ${detail}`);
+        logHueEntVerbose(log, `[HUE][ENT] area stop skipped (${origin}): ${detail}`);
         return;
       }
       log.warn?.(`[HUE][ENT] area stop failed (${origin}): ${detail}`);
