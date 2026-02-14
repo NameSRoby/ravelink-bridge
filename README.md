@@ -11,14 +11,14 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.4.3): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.4.3
+- Current Windows release (v1.4.2): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.4.2
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
-This repository state is aligned to `v1.4.3`:
+This repository state is aligned to `v1.4.2`:
 - Full security hardening passes applied
 - Code structure/title indexing improved for faster maintenance
 
-## Update Log (v1.4.3 Telemetry Log Spam Hotfix)
+## Update Log (v1.4.2 Behavior + Stability Hotfix)
 
 - Meta Auto now learns from live song behavior (EMA + peak memory on drive/motion/intensity) so heavy tracks ramp above low 2Hz/4Hz tiers instead of sticking there.
 - Aggressive genres (especially metal/dnb/techno) now get sustained-build promotion logic for better high-energy response while calm tracks keep low-rate guardrails.
@@ -49,7 +49,7 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 - MIDI controller mapping tab (learn + bindings + trigger tests)
 - Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
 
-## Security Defaults (v1.4.3)
+## Security Defaults (v1.4.2)
 
 RaveLink Bridge is local-first and now ships with stricter default protections:
 
@@ -319,7 +319,7 @@ Notes:
 - The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
 - Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
 
-## Version 1.4.3 Patch Notes
+## Version 1.4.2 Patch Notes
 
 - Telemetry log spam hotfix on top of 1.4.2 baseline:
   - Sanitized high-frequency mod `onTelemetry` hook debug payloads.
@@ -502,11 +502,11 @@ npm run export:redistributable
 3. Zip:
 
 ```powershell
-Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.4.3\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.4.3.zip -Force
+Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.4.2\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.4.2.zip -Force
 ```
 
 Output:
-- `release/RaveLink-Bridge-Windows-v1.4.3`
+- `release/RaveLink-Bridge-Windows-v1.4.2`
 
 ## Security And Data Hygiene
 

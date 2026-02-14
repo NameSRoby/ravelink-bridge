@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.4.3 - Telemetry Log Spam Hotfix (2026-02-14)
+## v1.4.2 - Behavior Tuning + Stability Hotfix (2026-02-14)
 
 ### Meta Auto Song Learning
 - Meta Auto now learns live song behavior using short-term EMA + decaying peak memory across drive/motion/intensity.
@@ -18,7 +18,7 @@
 ### Notes
 - This is a release-stability hotfix focused on log hygiene and runtime noise reduction.
 
-## v1.4.2 - Behavior Tuning Update (2026-02-14)
+### Behavior Tuning Baseline
 
 ### Behavior Tuning
 - Added live scene-link controls so WiZ follows Hue scene mode by default with one-click manual desync.
@@ -76,7 +76,7 @@
 
 1. Open releases:
    - `https://github.com/NameSRoby/ravelink-bridge/releases`
-2. Download the latest `RaveLink-Bridge-Windows-v1.4.3.zip`.
+2. Download the latest `RaveLink-Bridge-Windows-v1.4.2.zip`.
 3. Extract the zip.
 4. Install dependencies if needed:
    - `npm install`
