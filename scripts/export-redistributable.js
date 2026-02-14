@@ -14,6 +14,7 @@ const OUT_DIR = path.join(RELEASE_ROOT, RELEASE_NAME);
 
 const SKIP_DIRS = new Set([
   ".git",
+  ".pushrepo",
   ".github",
   ".husky",
   ".idea",
