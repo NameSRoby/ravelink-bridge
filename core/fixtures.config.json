@@ -1,0 +1,44 @@
+{
+  "intentRoutes": {
+    "HUE_STATE": "all",
+    "WIZ_PULSE": "all",
+    "TWITCH_HUE": "all",
+    "TWITCH_WIZ": "all"
+  },
+  "fixtures": [
+    {
+      "id": "hue-main-1",
+      "brand": "hue",
+      "zone": "hue",
+      "enabled": true,
+      "engineEnabled": true,
+      "twitchEnabled": true,
+      "customEnabled": false,
+      "bridgeIp": "192.168.x.x",
+      "username": "replace_with_hue_username",
+      "bridgeId": "replace_with_bridge_id",
+      "clientKey": "replace_with_client_key",
+      "lightId": 1
+    },
+    {
+      "id": "wiz-background-1",
+      "brand": "wiz",
+      "zone": "wiz",
+      "enabled": true,
+      "engineEnabled": true,
+      "twitchEnabled": true,
+      "customEnabled": false,
+      "ip": "192.168.x.x"
+    },
+    {
+      "id": "wiz-custom-1",
+      "brand": "wiz",
+      "zone": "custom",
+      "enabled": true,
+      "engineEnabled": false,
+      "twitchEnabled": true,
+      "customEnabled": true,
+      "ip": "192.168.x.x"
+    }
+  ]
+}

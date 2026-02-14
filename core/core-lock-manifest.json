@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "description": "Core protection targets. 'files' can be lock/unlock toggled. 'immutableFiles' are always kept read-only, even in unlock mode. Unlock requires matching key.",
+  "unlock": {
+    "keyFile": "core/.core-lock.key",
+    "envVar": "RAVELINK_CORE_UNLOCK_KEY",
+    "requireForUnlock": true
+  },
+  "files": [
+    "package.json",
+    "package-lock.json",
+    "README.md",
+    "CHANGELOG.md",
+    "REDISTRIBUTABLE.md",
+    "public/index.html",
+    "scripts/start-bridge.js",
+    "scripts/stop-bridge.js",
+    "scripts/sanitize-release.js",
+    "scripts/export-redistributable.js"
+  ],
+  "immutableFiles": [
+    "server.js",
+    "core/rave-engine.js",
+    "core/audio.js",
+    "core/fixtures.js",
+    "core/hue-entertainment.js",
+    "core/mods/mod-loader.js",
+    "scripts/core-lock.js",
+    "core/core-lock-manifest.json"
+  ]
+}

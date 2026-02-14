@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<!-- [TITLE] Page: public/modding-readme.html -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RaveLink Modding README</title>
+<style>
+:root{
+  --bg:#060913;
+  --panel:#0d1528;
+  --edge:#2c426f;
+  --ink:#e9efff;
+  --muted:#9fb2dc;
+  --accent:#8b001f;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  color:var(--ink);
+  font-family:"Rajdhani","Trebuchet MS",sans-serif;
+  background:
+    radial-gradient(900px 400px at 5% -10%, #24345d55 0%, transparent 54%),
+    radial-gradient(700px 260px at 100% 0%, #4f1a2e44 0%, transparent 58%),
+    var(--bg);
+}
+.wrap{
+  max-width:1060px;
+  margin:0 auto;
+  padding:20px 16px 32px;
+}
+.header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.title{
+  margin:0;
+  letter-spacing:2px;
+  font-size:clamp(1.3rem,2.5vw,1.8rem);
+}
+.sub{
+  margin:4px 0 0;
+  color:var(--muted);
+  font-size:0.95rem;
+}
+.backBtn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+  color:var(--ink);
+  border:1px solid #3e5e98;
+  border-radius:10px;
+  min-height:38px;
+  padding:8px 12px;
+  background:linear-gradient(180deg,#132448,#0f1c38);
+  font-size:0.9rem;
+  letter-spacing:0.6px;
+}
+.warning{
+  border:1px solid #583748;
+  border-radius:12px;
+  padding:10px 12px;
+  background:linear-gradient(180deg,#2c1021,#180c15);
+  color:#ffd5df;
+  margin-bottom:12px;
+  font-size:0.95rem;
+}
+.status{
+  border:1px solid var(--edge);
+  border-radius:12px;
+  background:linear-gradient(180deg,#0d1830,#091124);
+  padding:10px 12px;
+  color:var(--muted);
+}
+.doc{
+  margin-top:12px;
+  border:1px solid #21365d;
+  border-radius:14px;
+  background:linear-gradient(180deg,#0d1528,#0a111f);
+  padding:16px;
+  line-height:1.5;
+}
+.doc.hidden{display:none}
+.doc h1,.doc h2,.doc h3,.doc h4,.doc h5,.doc h6{
+  margin:1.2em 0 0.45em;
+  letter-spacing:1px;
+}
+.doc h1{font-size:1.5rem}
+.doc h2{font-size:1.25rem}
+.doc h3{font-size:1.08rem}
+.doc p{margin:0.75em 0}
+.doc ul,.doc ol{margin:0.6em 0 0.9em;padding-left:1.2em}
+.doc li{margin:0.25em 0}
+.doc a{color:#a2c8ff}
+.doc code{
+  background:#111f3a;
+  border:1px solid #2a4577;
+  border-radius:6px;
+  padding:1px 5px;
+  font-family:Consolas, "Courier New", monospace;
+  font-size:0.9em;
+}
+.doc pre{
+  margin:0.8em 0;
+  overflow:auto;
+  border:1px solid #2f4a7d;
+  border-radius:10px;
+  background:#060d1b;
+  padding:11px;
+}
+.doc pre code{
+  background:none;
+  border:none;
+  border-radius:0;
+  padding:0;
+  font-size:0.9rem;
+}
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="header">
+      <div>
+        <h1 class="title">MODDING README</h1>
+        <p class="sub">Developer reference rendered from <code>docs/MODS.md</code></p>
+      </div>
+      <a class="backBtn" href="/">BACK TO CONTROL UI</a>
+    </header>
+
+    <div class="warning">
+      Mods execute with full local Node.js privileges. Only run trusted mod code.
+    </div>
+
+    <div id="status" class="status">Loading docs/MODS.md...</div>
+    <article id="doc" class="doc hidden" aria-live="polite"></article>
+  </main>
+
+<script>
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'");
+}
+
+function sanitizeDocHref(rawHref) {
+  const decoded = decodeHtmlEntities(String(rawHref || "").trim());
+  if (!decoded) return "";
+  if (/[\u0000-\u001F\u007F]/.test(decoded)) return "";
+  if (decoded.startsWith("#")) return decoded;
+  if (decoded.startsWith("/") || decoded.startsWith("./") || decoded.startsWith("../")) return decoded;
+  try {
+    const parsed = new URL(decoded);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "mailto:") {
+      return parsed.toString();
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+function formatInline(text) {
+  return escapeHtml(text)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+      const safeHref = sanitizeDocHref(href);
+      if (!safeHref) return label;
+      return `<a href="${escapeHtml(safeHref)}" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`;
+    })
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+
+function markdownToHtml(markdown) {
+  const lines = String(markdown || "").replace(/\r/g, "").split("\n");
+  const html = [];
+  const paragraph = [];
+  const codeLines = [];
+  let inCodeFence = false;
+  let listType = "";
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    html.push(`<p>${formatInline(paragraph.join(" "))}</p>`);
+    paragraph.length = 0;
+  };
+
+  const closeList = () => {
+    if (!listType) return;
+    html.push(listType === "ol" ? "</ol>" : "</ul>");
+    listType = "";
+  };
+
+  const flushCode = () => {
+    if (!codeLines.length) return;
+    html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+    codeLines.length = 0;
+  };
+
+  for (const rawLine of lines) {
+    const line = String(rawLine || "");
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("```")) {
+      flushParagraph();
+      closeList();
+      inCodeFence = !inCodeFence;
+      if (!inCodeFence) flushCode();
+      continue;
+    }
+
+    if (inCodeFence) {
+      codeLines.push(line);
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      closeList();
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      closeList();
+      const level = Math.min(6, Math.max(1, heading[1].length));
+      html.push(`<h${level}>${formatInline(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    const ul = trimmed.match(/^[-*+]\s+(.+)$/);
+    if (ul) {
+      flushParagraph();
+      if (listType !== "ul") {
+        closeList();
+        html.push("<ul>");
+        listType = "ul";
+      }
+      html.push(`<li>${formatInline(ul[1])}</li>`);
+      continue;
+    }
+
+    const ol = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (ol) {
+      flushParagraph();
+      if (listType !== "ol") {
+        closeList();
+        html.push("<ol>");
+        listType = "ol";
+      }
+      html.push(`<li>${formatInline(ol[1])}</li>`);
+      continue;
+    }
+
+    closeList();
+    paragraph.push(trimmed);
+  }
+
+  flushParagraph();
+  closeList();
+  flushCode();
+  return html.join("\n");
+}
+
+async function loadModdingReadme() {
+  const status = document.getElementById("status");
+  const doc = document.getElementById("doc");
+
+  try {
+    const response = await fetch(`/docs/mods/readme?ts=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const markdown = await response.text();
+    const rendered = markdownToHtml(markdown);
+    const parser = new DOMParser();
+    const parsed = parser.parseFromString(
+      rendered || "<p>No documentation content found.</p>",
+      "text/html"
+    );
+    doc.replaceChildren(...Array.from(parsed.body.childNodes));
+    doc.classList.remove("hidden");
+    status.textContent = "Loaded docs/MODS.md";
+  } catch (err) {
+    status.textContent = `Failed to load docs/MODS.md: ${err?.message || "unknown error"}`;
+  }
+}
+
+loadModdingReadme();
+</script>
+</body>
+</html>

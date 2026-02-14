@@ -1,0 +1,12 @@
+node_modules/
+release/
+.runtime/
+core/fixtures.config.local.backup.json
+core/.core-lock.key
+ravelink-bridge/
+
+# Runtime/local artifacts that may contain personal network data or keys
+backups/
+core/backups/
+*.log
+*.tmp

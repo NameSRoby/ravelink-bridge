@@ -1,0 +1,29 @@
+{
+  "enabled": false,
+  "timezone": "local",
+  "windows": [
+    {
+      "name": "night",
+      "days": ["sun", "mon", "tue", "wed", "thu", "fri", "sat"],
+      "start": "22:30",
+      "end": "07:30"
+    }
+  ],
+  "hue": {
+    "maxBri": 130,
+    "maxSat": 185,
+    "minTransitionTime": 5
+  },
+  "wiz": {
+    "maxBrightness": 0.42,
+    "minBrightness": 0.1,
+    "maxDimming": 42
+  },
+  "strobeSuppression": {
+    "enabled": true,
+    "blockDrop": true,
+    "blockBeatBoost": true,
+    "minRateMsHue": 240,
+    "minRateMsWiz": 150
+  }
+}

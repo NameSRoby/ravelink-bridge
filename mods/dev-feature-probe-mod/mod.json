@@ -1,0 +1,12 @@
+{
+  "id": "dev-feature-probe-mod",
+  "name": "Dev Feature Probe Mod",
+  "version": "1.0.0",
+  "description": "Stress-tests standalone custom control and Twitch prefix APIs with a mod UI dashboard.",
+  "main": "index.js",
+  "ui": {
+    "entry": "ui/index.html",
+    "title": "Dev Feature Probe"
+  },
+  "enabled": false
+}

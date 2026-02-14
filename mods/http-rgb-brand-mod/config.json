@@ -1,0 +1,35 @@
+{
+  "enabled": true,
+  "brand": "http-rgb",
+  "intentModes": {
+    "engine": true,
+    "twitch": true
+  },
+  "http": {
+    "method": "POST",
+    "timeoutMs": 1200,
+    "authHeader": "X-Api-Key"
+  },
+  "scheduler": {
+    "defaultMinIntervalMs": 100,
+    "defaultMinColorDelta": 8,
+    "defaultMinDimmingDelta": 3
+  },
+  "mapping": {
+    "fallback": {
+      "r": 255,
+      "g": 110,
+      "b": 20,
+      "dimming": 50
+    }
+  },
+  "targets": [
+    {
+      "id": "sample-http-rgb",
+      "zone": "desk",
+      "endpoint": "http://192.168.x.x:8080/color",
+      "token": "replace-with-device-api-token",
+      "enabled": false
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "dropEnabled": false,
+  "hardwareRateLimitsEnabled": true,
+  "targets": {
+    "hue": {
+      "enabled": true,
+      "amount": 1,
+      "sources": [
+        "smart",
+        "drums",
+        "beat"
+      ]
+    },
+    "wiz": {
+      "enabled": true,
+      "amount": 1,
+      "sources": [
+        "smart",
+        "drums",
+        "beat"
+      ]
+    },
+    "other": {
+      "enabled": true,
+      "amount": 1,
+      "sources": [
+        "smart",
+        "drums",
+        "beat"
+      ]
+    }
+  }
+}
