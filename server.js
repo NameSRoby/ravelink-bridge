@@ -2625,10 +2625,35 @@ function resolveStandaloneDynamicHz(state = {}) {
   if (mode === "auto") {
     const telemetry = engine?.getTelemetry?.() || {};
     const bpm = Number(telemetry.bpm);
-    if (Number.isFinite(bpm) && bpm > 0) {
-      return clampNumber(bpm / 90, 0.4, 12, fixedHz);
+    const bpmHz = Number.isFinite(bpm) && bpm > 0
+      ? clampNumber(bpm / 96, 0.35, 12, fixedHz)
+      : fixedHz;
+    const rms = clampNumber(Number(telemetry.rms), 0, 1, 0);
+    const beat = clampNumber(Number(telemetry.beatConfidence), 0, 1, 0);
+    const transient = clampNumber(Number(telemetry.audioTransient), 0, 1, 0);
+    const flux = clampNumber(Number(telemetry.audioFlux ?? telemetry.flux), 0, 1, 0);
+    const energy = getStandaloneReactiveEnergy();
+    const motion = clampNumber(Math.max(beat, transient, flux), 0, 1, 0);
+    const drive = clampNumber((energy * 0.58) + (motion * 0.42), 0, 1, 0);
+    const dynamicHz = clampNumber(
+      0.55 + (drive * 8.2) + (Math.max(0, motion - 0.58) * 4.6),
+      0.35,
+      12,
+      fixedHz
+    );
+    let autoHz = (bpmHz * 0.58) + (dynamicHz * 0.42);
+
+    const calmTrack = rms < 0.09 && transient < 0.14 && flux < 0.14 && motion < 0.2;
+    if (calmTrack) {
+      autoHz = Math.min(autoHz, 2.4 + (drive * 1.4));
     }
-    return fixedHz;
+
+    const intensePeak = drive > 0.72 || motion > 0.68;
+    if (intensePeak) {
+      autoHz = Math.max(autoHz, clampNumber(6.2 + (drive * 5.2), 6.2, 12, 8));
+    }
+
+    return clampNumber(autoHz, 0.35, 12, fixedHz);
   }
   if (String(state.speedMode || "").trim().toLowerCase() !== "audio") {
     return fixedHz;
@@ -5132,18 +5157,50 @@ app.post("/rave/meta/auto", (req, res) => {
   });
 });
 
-app.post("/rave/meta/auto/default", (_, res) => {
-  engine.setOverclock?.(2);
-  const next = engine.setMetaAutoEnabled?.(true);
+function setOverclockAutoRoute(req, res, enabledFallback = null) {
+  const raw = req.query.enabled
+    ?? req.query.on
+    ?? req.query.value
+    ?? req.body?.enabled
+    ?? req.body?.on
+    ?? req.body?.value
+    ?? enabledFallback;
+  const hasInput = raw !== null && raw !== undefined && String(raw).trim() !== "";
+  if (!hasInput) {
+    res.status(400).json({
+      ok: false,
+      error: "missing enabled flag",
+      allowed: ["true", "false"]
+    });
+    return;
+  }
+
+  const enabled = parseBoolean(raw, null);
+  if (enabled === null) {
+    res.status(400).json({
+      ok: false,
+      error: "invalid enabled flag",
+      allowed: ["true", "false"]
+    });
+    return;
+  }
+
+  const next = engine.setOverclockAutoEnabled?.(enabled);
   const telemetry = engine.getTelemetry?.() || {};
-  const overclockLevel = Number(telemetry.overclockLevel || 2);
-  console.log("[RAVE] meta auto DEFAULT 6HZ");
+  const hz = Number(telemetry.overclockAutoHz || telemetry.metaAutoHz || 2);
+  const overclockLevel = Number(telemetry.overclockLevel || 0);
+  console.log(`[RAVE] overclock auto ${next ? "ON" : "OFF"}`);
   res.json({
     ok: true,
     enabled: Boolean(next),
+    hz,
     overclockLevel
   });
-});
+}
+
+app.post("/rave/overclock/auto", (req, res) => setOverclockAutoRoute(req, res));
+app.post("/rave/overclock/auto/on", (req, res) => setOverclockAutoRoute(req, res, true));
+app.post("/rave/overclock/auto/off", (req, res) => setOverclockAutoRoute(req, res, false));
 
 app.post("/rave/meta/auto/on", (_, res) => {
   const next = engine.setMetaAutoEnabled?.(true);

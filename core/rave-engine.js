@@ -247,6 +247,10 @@ module.exports = function createRaveEngine(controls) {
     metaAutoReactivity: "",
     metaAutoHz: 2,
     metaAutoOverclock: 0,
+    overclockAutoEnabled: false,
+    overclockAutoReason: "off",
+    overclockAutoHz: 2,
+    overclockAutoOverclock: DEFAULT_OVERCLOCK_LEVEL,
     audioReactivityPreset: audioReactivityPreset,
     flowIntensity: flowIntensity,
     sceneSync: wizSceneSync,
@@ -1953,8 +1957,19 @@ module.exports = function createRaveEngine(controls) {
   const META_AUTO_LEARN_PEAK_DECAY = 0.987;
   const META_AUTO_LEARN_HOLD_MS = 1800;
   const META_AUTO_LEARN_SURGE_MS = 4200;
+  const OVERCLOCK_AUTO_TIMING = {
+    evalMs: 220,
+    confirmMs: 420,
+    holdMs: 900,
+    fastConfirmMs: 180,
+    fastHoldMs: 480
+  };
 
   let metaAutoEnabled = process.env.RAVE_META_AUTO_DEFAULT === "1";
+  let overclockAutoEnabled = process.env.RAVE_OVERCLOCK_AUTO_DEFAULT === "1";
+  if (metaAutoEnabled && overclockAutoEnabled) {
+    overclockAutoEnabled = false;
+  }
   let metaAutoLastEvalAt = 0;
   let metaAutoLastAppliedAt = 0;
   let metaAutoCandidateSince = 0;
@@ -1972,6 +1987,10 @@ module.exports = function createRaveEngine(controls) {
   let metaAutoMotionPeak = 0;
   let metaAutoIntensityPeak = 0;
   let metaAutoHeavySince = 0;
+  let overclockAutoLastEvalAt = 0;
+  let overclockAutoLastAppliedAt = 0;
+  let overclockAutoCandidateSince = 0;
+  let overclockAutoCandidate = null;
 
   const META_AUTO_HZ_BY_LEVEL = [2, 4, 6, 8, 10, 12, 14, 16, 20, 30, 40, 50, 60];
   const META_AUTO_GENRE_STYLE = {
@@ -1998,6 +2017,10 @@ module.exports = function createRaveEngine(controls) {
   telemetry.metaAutoReactivity = audioReactivityPreset;
   telemetry.metaAutoHz = META_AUTO_HZ_BY_LEVEL[DEFAULT_OVERCLOCK_LEVEL] || 2;
   telemetry.metaAutoOverclock = 0;
+  telemetry.overclockAutoEnabled = overclockAutoEnabled;
+  telemetry.overclockAutoReason = overclockAutoEnabled ? "armed" : "off";
+  telemetry.overclockAutoHz = META_AUTO_HZ_BY_LEVEL[DEFAULT_OVERCLOCK_LEVEL] || 2;
+  telemetry.overclockAutoOverclock = DEFAULT_OVERCLOCK_LEVEL;
 
   function snapshotMetaPlan(reason = "steady") {
     return {
@@ -2560,7 +2583,7 @@ module.exports = function createRaveEngine(controls) {
       changed = setAudioReactivityPreset(plan.audioReactivityPreset) || changed;
     }
     if (Number(plan.overclockLevel) !== Number(overclockLevel)) {
-      setOverclock(Number(plan.overclockLevel));
+      setOverclock(Number(plan.overclockLevel), { manual: false });
       changed = true;
     }
 
@@ -2587,6 +2610,16 @@ module.exports = function createRaveEngine(controls) {
     const now = Date.now();
 
     if (metaAutoEnabled) {
+      overclockAutoEnabled = false;
+      telemetry.overclockAutoEnabled = false;
+      telemetry.overclockAutoReason = "meta-auto";
+      telemetry.overclockAutoHz = META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2;
+      telemetry.overclockAutoOverclock = overclockLevel;
+      overclockAutoCandidate = null;
+      overclockAutoCandidateSince = 0;
+      overclockAutoLastEvalAt = 0;
+      overclockAutoLastAppliedAt = now - OVERCLOCK_AUTO_TIMING.holdMs;
+
       metaAutoLastEvalAt = 0;
       metaAutoLastAppliedAt = now - META_AUTO_TIMING.holdMs;
       metaAutoCandidate = snapshotMetaPlan("enabled");
@@ -2669,6 +2702,103 @@ module.exports = function createRaveEngine(controls) {
     if (now - metaAutoCandidateSince < confirmMs) return;
 
     applyMetaPlan(plan, now);
+  }
+
+  function snapshotOverclockAutoPlan(reason = "steady", targetHz = 2, source = "meta-plan", fastPath = false) {
+    return {
+      overclockLevel: clamp(Number(overclockLevel) || 0, 0, MAX_OVERCLOCK_LEVEL),
+      reason: String(reason || "steady"),
+      targetHz: Number(targetHz) || 2,
+      source: String(source || "meta-plan"),
+      fastPath: Boolean(fastPath)
+    };
+  }
+
+  function sameOverclockAutoPlan(a, b) {
+    if (!a || !b) return false;
+    return Number(a.overclockLevel) === Number(b.overclockLevel);
+  }
+
+  function setOverclockAutoEnabled(enabled) {
+    const next = Boolean(enabled);
+    overclockAutoEnabled = next;
+    telemetry.overclockAutoEnabled = next;
+
+    const now = Date.now();
+    overclockAutoLastEvalAt = 0;
+    overclockAutoLastAppliedAt = now - OVERCLOCK_AUTO_TIMING.holdMs;
+    overclockAutoCandidateSince = now;
+    overclockAutoCandidate = snapshotOverclockAutoPlan(
+      next ? "enabled" : "off",
+      META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2
+    );
+    telemetry.overclockAutoHz = META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2;
+    telemetry.overclockAutoOverclock = overclockLevel;
+    telemetry.overclockAutoReason = next ? "enabled" : "off";
+
+    if (next) {
+      // This mode intentionally controls only Hz/overclock without Meta profile/reactivity automation.
+      metaAutoEnabled = false;
+      telemetry.metaAutoEnabled = false;
+      telemetry.metaAutoReason = "off";
+      telemetry.metaAutoGenre = "off";
+      telemetry.metaAutoProfile = autoProfile;
+      telemetry.metaAutoReactivity = audioReactivityPreset;
+      telemetry.metaAutoHz = META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2;
+      telemetry.metaAutoOverclock = overclockLevel;
+    }
+
+    return overclockAutoEnabled;
+  }
+
+  function updateOverclockAuto(now) {
+    if (!overclockAutoEnabled) return;
+    if (metaAutoEnabled) return;
+    if (now - overclockAutoLastEvalAt < OVERCLOCK_AUTO_TIMING.evalMs) return;
+    overclockAutoLastEvalAt = now;
+
+    const plan = computeMetaPlan(now);
+    const targetPlan = {
+      overclockLevel: clamp(Number(plan.overclockLevel) || 0, 0, MAX_OVERCLOCK_LEVEL),
+      reason: String(plan.reason || "steady"),
+      targetHz: Number(plan.targetHz) || (META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2),
+      source: String(plan.metaGenre || "auto"),
+      fastPath: Boolean(plan.fastPath)
+    };
+
+    telemetry.overclockAutoEnabled = true;
+    telemetry.overclockAutoHz = targetPlan.targetHz;
+    telemetry.overclockAutoOverclock = targetPlan.overclockLevel;
+    telemetry.overclockAutoReason = targetPlan.reason;
+
+    const current = snapshotOverclockAutoPlan(
+      telemetry.overclockAutoReason,
+      telemetry.overclockAutoHz,
+      targetPlan.source,
+      targetPlan.fastPath
+    );
+    if (sameOverclockAutoPlan(targetPlan, current)) {
+      overclockAutoCandidate = targetPlan;
+      overclockAutoCandidateSince = now;
+      return;
+    }
+
+    if (!overclockAutoCandidate || !sameOverclockAutoPlan(targetPlan, overclockAutoCandidate)) {
+      overclockAutoCandidate = targetPlan;
+      overclockAutoCandidateSince = now;
+      return;
+    }
+
+    const levelDelta = Math.abs(Number(targetPlan.overclockLevel) - Number(overclockLevel));
+    const fastPath = Boolean(targetPlan.fastPath || levelDelta >= 2);
+    const holdMs = fastPath ? OVERCLOCK_AUTO_TIMING.fastHoldMs : OVERCLOCK_AUTO_TIMING.holdMs;
+    const confirmMs = fastPath ? OVERCLOCK_AUTO_TIMING.fastConfirmMs : OVERCLOCK_AUTO_TIMING.confirmMs;
+
+    if (now - overclockAutoLastAppliedAt < holdMs) return;
+    if (now - overclockAutoCandidateSince < confirmMs) return;
+
+    setOverclock(Number(targetPlan.overclockLevel), { manual: false });
+    overclockAutoLastAppliedAt = now;
   }
 
   /* =========================
@@ -2803,7 +2933,9 @@ module.exports = function createRaveEngine(controls) {
     return clamp(Math.pow(drive, 1.0) * 1.08, 0.14, 1);
   }
 
-  function setOverclock(v) {
+  function setOverclock(v, options = {}) {
+    const opts = options && typeof options === "object" ? options : {};
+    const manual = opts.manual !== false;
     let next = 0;
 
     if (typeof v === "number") {
@@ -2825,6 +2957,16 @@ module.exports = function createRaveEngine(controls) {
       else next = 0;
     } else {
       next = v ? DEFAULT_OVERCLOCK_LEVEL : 0;
+    }
+
+    if (manual && overclockAutoEnabled) {
+      overclockAutoEnabled = false;
+      telemetry.overclockAutoEnabled = false;
+      telemetry.overclockAutoReason = "manual";
+      telemetry.overclockAutoHz = META_AUTO_HZ_BY_LEVEL[clamp(next, 0, MAX_OVERCLOCK_LEVEL)] || 2;
+      telemetry.overclockAutoOverclock = next;
+      overclockAutoCandidate = null;
+      overclockAutoCandidateSince = 0;
     }
 
     overclockLevel = next;
@@ -3914,6 +4056,7 @@ function getModeSwitchBias() {
       updatePhrase();
       maybeRefreshGenreReference(now);
       updateMetaAuto(now);
+      updateOverclockAuto(now);
 
       emitHue(now, isBeat);
       emitWiz(now, isBeat);
@@ -4023,6 +4166,10 @@ function getModeSwitchBias() {
       telemetry.metaAutoHz = META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2;
       telemetry.metaAutoOverclock = overclockLevel;
       telemetry.metaAutoReason = metaAutoEnabled ? "armed" : "off";
+      telemetry.overclockAutoEnabled = overclockAutoEnabled;
+      telemetry.overclockAutoReason = overclockAutoEnabled ? "armed" : "off";
+      telemetry.overclockAutoHz = META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2;
+      telemetry.overclockAutoOverclock = overclockLevel;
 
       metaAutoLastEvalAt = 0;
       metaAutoLastAppliedAt = now - META_AUTO_TIMING.holdMs;
@@ -4040,6 +4187,13 @@ function getModeSwitchBias() {
       metaAutoMotionPeak = 0;
       metaAutoIntensityPeak = 0;
       metaAutoHeavySince = 0;
+      overclockAutoLastEvalAt = 0;
+      overclockAutoLastAppliedAt = now - OVERCLOCK_AUTO_TIMING.holdMs;
+      overclockAutoCandidate = snapshotOverclockAutoPlan(
+        overclockAutoEnabled ? "start" : "off",
+        META_AUTO_HZ_BY_LEVEL[clamp(overclockLevel, 0, MAX_OVERCLOCK_LEVEL)] || 2
+      );
+      overclockAutoCandidateSince = now;
 
       console.log("[RAVE] v2.9 started");
       loop();
@@ -4170,6 +4324,14 @@ function getModeSwitchBias() {
 
     getMetaAutoEnabled() {
       return metaAutoEnabled;
+    },
+
+    setOverclockAutoEnabled(enabled) {
+      return setOverclockAutoEnabled(enabled);
+    },
+
+    getOverclockAutoEnabled() {
+      return overclockAutoEnabled;
     },
 
     getAudioReactivityPreset() {
