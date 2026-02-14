@@ -11,17 +11,18 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.4.2): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.4.2
+- Current Windows release (v1.4.3): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.4.3
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
-This repository state is aligned to `v1.4.2`:
+This repository state is aligned to `v1.4.3`:
 - Full security hardening passes applied
 - Code structure/title indexing improved for faster maintenance
 
-## Update Log (v1.4.2 Behavior Tuning)
+## Update Log (v1.4.3 Telemetry Log Spam Hotfix)
 
-- Behavior tuning update only: Hue/WiZ scene sync controls (with manual desync), Hue Entertainment recovery tuning, and timing/scene consistency tuning.
-- Modder diagnostics expanded with detailed sectioned debug events, explanations, and high-resolution hook timing (`/mods/debug`).
+- Hotfix for mod debug noise: high-frequency `onTelemetry` debug events are now sanitized and sampled instead of flooding logs every poll tick.
+- `onTelemetry` hook batches with no handlers no longer spam repetitive debug lines.
+- Modder diagnostics remain available through `/mods/debug` with explicit telemetry sampling controls.
 - Core lock workflow upgraded to key-protected unlock with explicit key init/status commands.
 - Security hardening completed across API boundaries, logging redaction, and route guards.
 - Hue entertainment path stabilized with safer fallback/recovery behavior and bounded retries.
@@ -30,7 +31,7 @@ This repository state is aligned to `v1.4.2`:
 - Scheduler heartbeat safeguards added to prevent long static stalls under low-delta conditions.
 - Hue REST responsiveness tuned (safe transition + adaptive interval behavior) for better practical latency.
 - Linux source startup path added (`.sh` launchers) while keeping Windows as official packaged target.
-- UI storage migration bumped so stale browser state is cleared on first load of this release.
+- UI storage migration bumped again so stale browser state is wiped on first load of this hotfix.
 
 Detailed release notes:
 - `CHANGELOG.md`
@@ -46,7 +47,7 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 - MIDI controller mapping tab (learn + bindings + trigger tests)
 - Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
 
-## Security Defaults (v1.4.2)
+## Security Defaults (v1.4.3)
 
 RaveLink Bridge is local-first and now ships with stricter default protections:
 
@@ -316,11 +317,12 @@ Notes:
 - The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
 - Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
 
-## Version 1.4.2 Patch Notes
+## Version 1.4.3 Patch Notes
 
-- Behavior tuning update on top of 1.4.1 baseline:
-  - Added Live scene link controls so WiZ follows Hue by default, with manual desync toggle.
-  - Tuned Hue Entertainment recovery behavior and diagnostics for more consistent reconnect cycles.
+- Telemetry log spam hotfix on top of 1.4.2 baseline:
+  - Sanitized high-frequency mod `onTelemetry` hook debug payloads.
+  - Added default sampling for `onTelemetry` debug emission to prevent console spam.
+  - Disabled no-handler `onTelemetry` batch spam by default.
   - Bumped UI storage migration target so stale UI memory is cleared on first load of this release.
 - Full security hardening pass:
   - Loopback-only protection for mutating endpoints by default.
@@ -498,11 +500,11 @@ npm run export:redistributable
 3. Zip:
 
 ```powershell
-Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.4.2\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.4.2.zip -Force
+Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.4.3\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.4.3.zip -Force
 ```
 
 Output:
-- `release/RaveLink-Bridge-Windows-v1.4.2`
+- `release/RaveLink-Bridge-Windows-v1.4.3`
 
 ## Security And Data Hygiene
 

@@ -34,6 +34,8 @@ const MAX_MOD_SUMMARY_CHARS = 320;
 const DEFAULT_MOD_DEBUG_MAX_EVENTS = 800;
 const DEFAULT_MOD_DEBUG_PAYLOAD_CHARS = 2400;
 const DEFAULT_MOD_DEBUG_MAX_DEPTH = 5;
+const DEFAULT_MOD_TELEMETRY_DEBUG_SAMPLE_MS = 4000;
+const DEFAULT_MOD_TELEMETRY_NO_HANDLER_DEBUG_MS = 0;
 const DEBUG_REDACT_KEY_RE = /(secret|token|password|passwd|clientkey|api[_-]?key|authorization|cookie|session|bearer)/i;
 
 function cloneJsonSafe(value, fallback = null) {
@@ -56,6 +58,50 @@ function parseIntRange(value, min, max, fallback) {
   const n = Number.parseInt(String(value ?? ""), 10);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, n));
+}
+
+function roundDebugNumber(value, digits = 3) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  const safeDigits = Math.max(0, Math.min(6, Math.round(Number(digits) || 0)));
+  const factor = Math.pow(10, safeDigits);
+  return Math.round(n * factor) / factor;
+}
+
+function sanitizeHookDebugPayload(hookName, payload = {}) {
+  const hook = String(hookName || "").trim();
+  const sourcePayload = payload && typeof payload === "object" ? payload : {};
+  if (hook !== "onTelemetry") return sourcePayload;
+
+  const telemetry = sourcePayload.telemetry && typeof sourcePayload.telemetry === "object"
+    ? sourcePayload.telemetry
+    : {};
+
+  return {
+    telemetry: {
+      behavior: String(telemetry.behavior || ""),
+      scene: String(telemetry.scene || ""),
+      phrase: String(telemetry.phrase || ""),
+      mode: String(telemetry.mode || ""),
+      modeLock: String(telemetry.modeLock || ""),
+      genre: String(telemetry.genre || ""),
+      overclockLevel: Number.isFinite(Number(telemetry.overclockLevel))
+        ? Math.round(Number(telemetry.overclockLevel))
+        : 0,
+      rms: roundDebugNumber(telemetry.rms, 4),
+      energy: roundDebugNumber(telemetry.energy, 4),
+      intensity: roundDebugNumber(telemetry.intensity, 4),
+      bpm: roundDebugNumber(telemetry.bpm, 2),
+      beat: Boolean(telemetry.beat),
+      beatConfidence: roundDebugNumber(telemetry.beatConfidence, 4),
+      drop: Boolean(telemetry.drop),
+      audioTransient: roundDebugNumber(telemetry.audioTransient, 4),
+      audioPeak: roundDebugNumber(telemetry.audioPeak, 4),
+      audioFlux: roundDebugNumber(telemetry.audioFlux, 4)
+    },
+    __sanitized: true,
+    __source: "onTelemetry"
+  };
 }
 
 function nowHrNs() {
@@ -510,6 +556,18 @@ module.exports = function createModLoader(options = {}) {
     8,
     DEFAULT_MOD_DEBUG_MAX_DEPTH
   );
+  const initialTelemetryDebugSampleMs = parseIntRange(
+    options.telemetryDebugSampleMs ?? process.env.RAVELINK_MOD_TELEMETRY_DEBUG_SAMPLE_MS,
+    250,
+    60000,
+    DEFAULT_MOD_TELEMETRY_DEBUG_SAMPLE_MS
+  );
+  const initialTelemetryNoHandlerDebugMs = parseIntRange(
+    options.telemetryNoHandlerDebugMs ?? process.env.RAVELINK_MOD_TELEMETRY_NO_HANDLER_DEBUG_MS,
+    0,
+    300000,
+    DEFAULT_MOD_TELEMETRY_NO_HANDLER_DEBUG_MS
+  );
 
   let activeConfig = normalizeConfig(DEFAULT_CONFIG);
   let entries = [];
@@ -518,9 +576,13 @@ module.exports = function createModLoader(options = {}) {
   let debugMaxEvents = initialDebugMaxEvents;
   let debugPayloadChars = initialDebugPayloadChars;
   let debugMaxDepth = initialDebugMaxDepth;
+  let telemetryDebugSampleMs = initialTelemetryDebugSampleMs;
+  let telemetryNoHandlerDebugMs = initialTelemetryNoHandlerDebugMs;
   let debugSequence = 0;
   const debugEvents = [];
   const hookStats = Object.create(null);
+  const hookDebugLastAt = Object.create(null);
+  const hookNoHandlerDebugLastAt = Object.create(null);
 
   const debugCounters = {
     loadAttempts: 0,
@@ -551,6 +613,15 @@ module.exports = function createModLoader(options = {}) {
     }
     if (kind === "mods.hook.error") {
       return `Hook${hook ? ` '${hook}'` : ""}${modId ? ` for mod '${modId}'` : ""} failed and returned an error.`;
+    }
+    if (kind === "mods.hook.batch.start") {
+      return `Starting hook batch${hook ? ` for '${hook}'` : ""}.`;
+    }
+    if (kind === "mods.hook.batch.done") {
+      return `Finished hook batch${hook ? ` for '${hook}'` : ""}.`;
+    }
+    if (kind === "mods.hook.batch.skipped") {
+      return `Skipped hook batch${hook ? ` for '${hook}'` : ""} because no loaded handlers are registered.`;
     }
     if (kind === "mods.instantiate.start") {
       return `Loading mod module${modId ? ` '${modId}'` : ""} and preparing exported hooks.`;
@@ -597,6 +668,25 @@ module.exports = function createModLoader(options = {}) {
     if (key.startsWith("debug.")) return "DEBUG";
     if (key.startsWith("mod.user.")) return "MOD USER";
     return "GENERAL";
+  }
+
+  function shouldLogHookBatchDebug(hookName, hasHandlers = true) {
+    const hook = String(hookName || "").trim();
+    if (hook !== "onTelemetry") return true;
+
+    const intervalMs = hasHandlers
+      ? telemetryDebugSampleMs
+      : telemetryNoHandlerDebugMs;
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0) return false;
+
+    const now = Date.now();
+    const map = hasHandlers ? hookDebugLastAt : hookNoHandlerDebugLastAt;
+    const lastAt = Number(map[hook] || 0);
+    if (Number.isFinite(lastAt) && (now - lastAt) < intervalMs) {
+      return false;
+    }
+    map[hook] = now;
+    return true;
   }
 
   function appendDebugEvent(kind, detail = {}, options = {}) {
@@ -705,6 +795,8 @@ module.exports = function createModLoader(options = {}) {
       maxEvents: debugMaxEvents,
       maxPayloadChars: debugPayloadChars,
       maxDepth: debugMaxDepth,
+      telemetryDebugSampleMs,
+      telemetryNoHandlerDebugMs,
       sequence: debugSequence,
       counters: { ...debugCounters },
       hookStats: statsOut,
@@ -729,6 +821,22 @@ module.exports = function createModLoader(options = {}) {
     if (Object.prototype.hasOwnProperty.call(next, "maxDepth")) {
       debugMaxDepth = parseIntRange(next.maxDepth, 2, 8, debugMaxDepth);
     }
+    if (Object.prototype.hasOwnProperty.call(next, "telemetryDebugSampleMs")) {
+      telemetryDebugSampleMs = parseIntRange(
+        next.telemetryDebugSampleMs,
+        250,
+        60000,
+        telemetryDebugSampleMs
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "telemetryNoHandlerDebugMs")) {
+      telemetryNoHandlerDebugMs = parseIntRange(
+        next.telemetryNoHandlerDebugMs,
+        0,
+        300000,
+        telemetryNoHandlerDebugMs
+      );
+    }
     if (next.clear === true) {
       clearDebugEvents();
     }
@@ -738,6 +846,8 @@ module.exports = function createModLoader(options = {}) {
       maxEvents: debugMaxEvents,
       maxPayloadChars: debugPayloadChars,
       maxDepth: debugMaxDepth,
+      telemetryDebugSampleMs,
+      telemetryNoHandlerDebugMs,
       cleared: next.clear === true
     });
 
@@ -1010,7 +1120,7 @@ module.exports = function createModLoader(options = {}) {
     };
   }
 
-  async function invokeSingle(entry, hookName, payload = {}) {
+  async function invokeSingle(entry, hookName, payload = {}, options = {}) {
     if (!entry || !entry.loaded || !entry.instance) {
       return { ok: false, skipped: true, reason: "entry_not_loaded", durationMs: 0 };
     }
@@ -1019,13 +1129,21 @@ module.exports = function createModLoader(options = {}) {
       return { ok: false, skipped: true, reason: "handler_missing", durationMs: 0 };
     }
 
+    const opts = options && typeof options === "object" ? options : {};
+    const logLifecycleDebug = opts.logLifecycleDebug !== false;
+    const debugPayload = Object.prototype.hasOwnProperty.call(opts, "debugPayload")
+      ? opts.debugPayload
+      : sanitizeHookDebugPayload(hookName, payload);
+
     const startedAtNs = nowHrNs();
-    appendDebugEvent("mods.hook.call", {
-      hook: hookName,
-      modId: entry.id,
-      modName: entry.name,
-      payload
-    });
+    if (logLifecycleDebug) {
+      appendDebugEvent("mods.hook.call", {
+        hook: hookName,
+        modId: entry.id,
+        modName: entry.name,
+        payload: debugPayload
+      });
+    }
 
     const api = makeApiFor(entry);
     const context = {
@@ -1044,12 +1162,14 @@ module.exports = function createModLoader(options = {}) {
       const result = await Promise.resolve(handler(payload, context));
       const durationMs = elapsedMsFromNs(startedAtNs);
       recordHookStat(hookName, entry.id, durationMs, true);
-      appendDebugEvent("mods.hook.ok", {
-        hook: hookName,
-        modId: entry.id,
-        durationMs,
-        result
-      });
+      if (logLifecycleDebug) {
+        appendDebugEvent("mods.hook.ok", {
+          hook: hookName,
+          modId: entry.id,
+          durationMs,
+          result
+        });
+      }
       return { ok: true, skipped: false, durationMs, result };
     } catch (err) {
       const message = asErrorMessage(err);
@@ -1265,10 +1385,6 @@ module.exports = function createModLoader(options = {}) {
 
   async function invokeHook(hookName, payload = {}) {
     const hook = String(hookName || "").trim();
-    appendDebugEvent("mods.hook.batch.start", {
-      hook,
-      payload
-    });
     if (!SUPPORTED_HOOKS.has(hook) || hook === "onHttp") {
       appendDebugEvent(
         "mods.hook.batch.unsupported",
@@ -1287,14 +1403,49 @@ module.exports = function createModLoader(options = {}) {
       };
     }
 
+    const handlers = entries.filter(entry => (
+      entry &&
+      entry.loaded &&
+      entry.instance &&
+      typeof entry.instance[hook] === "function"
+    ));
+    const hasHandlers = handlers.length > 0;
+    const debugPayload = sanitizeHookDebugPayload(hook, payload);
+    const logBatchDebug = shouldLogHookBatchDebug(hook, hasHandlers);
+
+    if (logBatchDebug) {
+      appendDebugEvent("mods.hook.batch.start", {
+        hook,
+        payload: debugPayload
+      });
+    }
+
+    if (!hasHandlers) {
+      if (logBatchDebug) {
+        appendDebugEvent("mods.hook.batch.skipped", {
+          hook,
+          reason: "no loaded handlers",
+          invoked: 0
+        });
+      }
+      return {
+        ok: true,
+        hook,
+        invoked: 0,
+        failed: 0,
+        errors: []
+      };
+    }
+
     const errors = [];
     let invoked = 0;
-    for (const entry of entries) {
-      if (!entry.loaded || !entry.instance) continue;
-      if (typeof entry.instance[hook] !== "function") continue;
+    for (const entry of handlers) {
       invoked++;
       try {
-        await invokeSingle(entry, hook, payload);
+        await invokeSingle(entry, hook, payload, {
+          logLifecycleDebug: logBatchDebug,
+          debugPayload
+        });
       } catch (err) {
         errors.push({
           modId: entry.id,
@@ -1303,11 +1454,13 @@ module.exports = function createModLoader(options = {}) {
       }
     }
 
-    appendDebugEvent("mods.hook.batch.done", {
-      hook,
-      invoked,
-      failed: errors.length
-    });
+    if (logBatchDebug) {
+      appendDebugEvent("mods.hook.batch.done", {
+        hook,
+        invoked,
+        failed: errors.length
+      });
+    }
 
     return {
       ok: errors.length === 0,

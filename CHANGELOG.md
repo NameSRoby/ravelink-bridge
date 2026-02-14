@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.4.3 - Telemetry Log Spam Hotfix (2026-02-14)
+
+### Mod Loader + Logging
+- Sanitized `onTelemetry` debug payloads so high-churn snapshots no longer dump full telemetry objects to release logs.
+- Added telemetry hook debug sampling controls in mod debug runtime config (`telemetryDebugSampleMs`).
+- Disabled no-handler `onTelemetry` batch debug spam by default (`telemetryNoHandlerDebugMs=0`).
+
+### UI + State Hygiene
+- Bumped UI storage migration target to force a one-time browser UI memory wipe for this hotfix release.
+
+### Notes
+- This is a release-stability hotfix focused on log hygiene and runtime noise reduction.
+
 ## v1.4.2 - Behavior Tuning Update (2026-02-14)
 
 ### Behavior Tuning
@@ -58,7 +71,7 @@
 
 1. Open releases:
    - `https://github.com/NameSRoby/ravelink-bridge/releases`
-2. Download the latest `RaveLink-Bridge-Windows-v1.4.2.zip`.
+2. Download the latest `RaveLink-Bridge-Windows-v1.4.3.zip`.
 3. Extract the zip.
 4. Install dependencies if needed:
    - `npm install`
