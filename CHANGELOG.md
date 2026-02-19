@@ -14,6 +14,7 @@
 
 ### UI + Docs
 - Bumped UI storage migration target to force a clean browser memory baseline for this release.
+- Re-bumped UI storage migration target for the reissued `v1.5` package so previously installed `v1.5` clients get a one-time UI memory wipe again.
 - Updated onboarding flow text/steps to current priority controls and fixture palette/metric routing workflow.
 - Updated mod developer guide to `v1.4.2-dev` runtime behavior model and endpoint set.
 
