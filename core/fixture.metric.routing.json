@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "config": {
+    "mode": "manual",
+    "metric": "baseline",
+    "metaAutoFlip": false,
+    "harmonySize": 1,
+    "maxHz": null
+  },
+  "brands": {
+    "hue": null,
+    "wiz": null
+  },
+  "fixtures": {}
+}

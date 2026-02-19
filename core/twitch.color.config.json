@@ -2,8 +2,15 @@
   "version": 1,
   "defaultTarget": "hue",
   "prefixes": {
-    "hue": "hue",
+    "hue": "",
     "wiz": "wiz",
     "other": ""
+  },
+  "fixturePrefixes": {},
+  "raveOff": {
+    "enabled": true,
+    "defaultText": "random",
+    "groups": {},
+    "fixtures": {}
   }
 }

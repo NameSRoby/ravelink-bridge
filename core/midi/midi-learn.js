@@ -12,8 +12,9 @@ const ACTIONS = Object.freeze([
   "overclock_off",
   "overclock_up",
   "overclock_down",
-  "behavior_auto",
-  "behavior_clamp",
+  "overclock_auto_toggle",
+  "overclock_auto_on",
+  "overclock_auto_off",
   "behavior_interpret",
   "scene_auto",
   "scene_idle",
@@ -27,7 +28,27 @@ const ACTIONS = Object.freeze([
   "audio_reactivity_precision",
   "meta_auto_toggle",
   "meta_auto_on",
-  "meta_auto_off"
+  "meta_auto_off",
+  "flow_intensity_up",
+  "flow_intensity_down",
+  "flow_intensity_reset",
+  "wiz_scene_sync_toggle",
+  "wiz_scene_sync_on",
+  "wiz_scene_sync_off",
+  "palette_ordered",
+  "palette_disorder",
+  "palette_colors_1",
+  "palette_colors_3",
+  "palette_colors_5",
+  "palette_family_blue",
+  "palette_family_purple",
+  "palette_family_red",
+  "palette_family_green",
+  "palette_family_yellow",
+  "palette_preset_all_1",
+  "palette_preset_all_3",
+  "palette_preset_duo_cool",
+  "palette_preset_duo_warm"
 ]);
 const ACTION_SET = new Set(ACTIONS);
 const TYPE_SET = new Set(["note", "cc"]);
@@ -65,6 +86,14 @@ function toInt(value, min, max, fallback) {
 function normalizeAction(action) {
   let key = String(action || "").trim().toLowerCase();
   if (key === "overclock" || key === "oc") key = "overclock_toggle";
+  if (key === "behavior_auto" || key === "behavior_clamp") key = "behavior_interpret";
+  if (key === "flow_up") key = "flow_intensity_up";
+  if (key === "flow_down") key = "flow_intensity_down";
+  if (key === "flow_reset") key = "flow_intensity_reset";
+  if (key === "palette_all_1") key = "palette_preset_all_1";
+  if (key === "palette_all_3") key = "palette_preset_all_3";
+  if (key === "palette_duo_cool") key = "palette_preset_duo_cool";
+  if (key === "palette_duo_warm") key = "palette_preset_duo_warm";
   return ACTION_SET.has(key) ? key : "";
 }
 

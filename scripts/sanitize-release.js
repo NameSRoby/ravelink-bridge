@@ -5,13 +5,14 @@ const fs = require("fs");
 const path = require("path");
 
 const DEFAULT_ROOT = path.join(__dirname, "..");
+const LEGACY_ARCHIVE_DIRNAME = "RaveLink-Bridge-Windows-v1.4.1-EXTRACT-FIRST.BAK-20260214-0139";
 
 const FIXTURES_TEMPLATE = {
   intentRoutes: {
-    HUE_STATE: "all",
-    WIZ_PULSE: "all",
-    TWITCH_HUE: "all",
-    TWITCH_WIZ: "all"
+    HUE_STATE: "hue",
+    WIZ_PULSE: "wiz",
+    TWITCH_HUE: "hue",
+    TWITCH_WIZ: "wiz"
   },
   fixtures: [
     {
@@ -26,13 +27,16 @@ const FIXTURES_TEMPLATE = {
       username: "replace_with_hue_username",
       bridgeId: "replace_with_bridge_id",
       clientKey: "replace_with_client_key",
+      entertainmentAreaId: "replace_with_entertainment_area",
       lightId: 1
     },
     {
       id: "wiz-background-1",
       brand: "wiz",
-      zone: "wiz",
+      zone: "background",
       enabled: true,
+      controlMode: "engine",
+      engineBinding: "wiz",
       engineEnabled: true,
       twitchEnabled: true,
       customEnabled: false,
@@ -41,10 +45,12 @@ const FIXTURES_TEMPLATE = {
     {
       id: "wiz-custom-1",
       brand: "wiz",
-      zone: "custom",
+      zone: "desk",
       enabled: true,
+      controlMode: "standalone",
+      engineBinding: "standalone",
       engineEnabled: false,
-      twitchEnabled: true,
+      twitchEnabled: false,
       customEnabled: true,
       ip: "192.168.x.x"
     }
@@ -55,10 +61,110 @@ const TWITCH_COLOR_TEMPLATE = {
   version: 1,
   defaultTarget: "hue",
   prefixes: {
-    hue: "hue",
+    hue: "",
     wiz: "wiz",
     other: ""
+  },
+  fixturePrefixes: {},
+  raveOff: {
+    enabled: true,
+    defaultText: "random",
+    groups: {},
+    fixtures: {}
   }
+};
+
+const AUDIO_RUNTIME_TEMPLATE = {
+  inputBackend: "auto",
+  sampleRate: 96000,
+  framesPerBuffer: 256,
+  channels: 2,
+  noiseFloorMin: 0.00045,
+  peakDecay: 0.93,
+  outputGain: 1,
+  autoLevelEnabled: true,
+  autoLevelTargetRms: 0.028,
+  autoLevelMinGain: 0.45,
+  autoLevelMaxGain: 1.55,
+  autoLevelResponse: 0.015,
+  autoLevelGate: 0.007,
+  limiterThreshold: 0.82,
+  limiterKnee: 0.16,
+  restartMs: 1500,
+  watchdogMs: 3000,
+  logEveryTicks: 60,
+  bandLowHz: 180,
+  bandMidHz: 2200,
+  deviceMatch: "",
+  deviceId: null,
+  ffmpegPath: "ffmpeg",
+  ffmpegInputFormat: "dshow",
+  ffmpegInputDevice: "",
+  ffmpegInputDevices: [],
+  ffmpegLogLevel: "error",
+  ffmpegUseWallclock: true,
+  ffmpegAppIsolationEnabled: false,
+  ffmpegAppIsolationStrict: false,
+  ffmpegAppIsolationPrimaryApp: "",
+  ffmpegAppIsolationFallbackApp: "",
+  ffmpegAppIsolationPrimaryDevices: [],
+  ffmpegAppIsolationFallbackDevices: [],
+  ffmpegAppIsolationMultiSource: false,
+  ffmpegAppIsolationCheckMs: 300000
+};
+
+const AUDIO_REACTIVITY_MAP_TEMPLATE = {
+  version: 1,
+  dropEnabled: false,
+  hardwareRateLimitsEnabled: true,
+  metaAutoHueWizBaselineBlend: true,
+  metaAutoTempoTrackersAuto: false,
+  metaAutoTempoTrackers: {
+    baseline: true,
+    peaks: false,
+    transients: false,
+    flux: false
+  },
+  targets: {
+    hue: { enabled: true, amount: 1, sources: ["smart"] },
+    wiz: { enabled: true, amount: 1, sources: ["smart"] },
+    other: { enabled: true, amount: 1, sources: ["smart"] }
+  }
+};
+
+const SYSTEM_CONFIG_TEMPLATE = {
+  version: 3,
+  autoLaunchBrowser: true,
+  browserLaunchDelayMs: 1200,
+  unsafeExposeSensitiveLogs: false,
+  hueTransportPreference: "auto",
+  legacyComponentsEnabled: false
+};
+
+const FIXTURE_METRIC_ROUTING_TEMPLATE = {
+  version: 1,
+  config: {
+    mode: "manual",
+    metric: "baseline",
+    metaAutoFlip: false,
+    harmonySize: 1,
+    maxHz: null
+  },
+  brands: {
+    hue: null,
+    wiz: null
+  },
+  fixtures: {}
+};
+
+const PALETTE_FIXTURE_OVERRIDES_TEMPLATE = {
+  version: 1,
+  fixtures: {}
+};
+
+const STANDALONE_STATE_TEMPLATE = {
+  version: 1,
+  fixtures: {}
 };
 
 function writeJson(filePath, payload) {
@@ -66,28 +172,28 @@ function writeJson(filePath, payload) {
   fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
-function wipeFolderKeepReadme(folderPath) {
-  if (!fs.existsSync(folderPath)) return;
-  for (const entry of fs.readdirSync(folderPath, { withFileTypes: true })) {
-    const fullPath = path.join(folderPath, entry.name);
-    if (entry.name.toLowerCase() === "readme.md") continue;
-    fs.rmSync(fullPath, { recursive: true, force: true });
-  }
-}
-
 function wipeFolder(folderPath) {
   if (!fs.existsSync(folderPath)) return;
   fs.rmSync(folderPath, { recursive: true, force: true });
 }
 
-function sanitizeRelease(rootDir = DEFAULT_ROOT) {
+function deleteFile(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.rmSync(filePath, { force: true });
+    }
+  } catch {}
+}
+
+function sanitizeRoot(rootDir = DEFAULT_ROOT) {
   const root = path.resolve(String(rootDir || DEFAULT_ROOT));
-  const backupsRoot = path.join(root, "backups");
-  const coreBackupsRoot = path.join(root, "core", "backups");
-  const runtimeRoot = path.join(root, ".runtime");
-  wipeFolderKeepReadme(backupsRoot);
-  wipeFolderKeepReadme(coreBackupsRoot);
-  wipeFolder(runtimeRoot);
+  wipeFolder(path.join(root, ".runtime"));
+  wipeFolder(path.join(root, "backups"));
+  wipeFolder(path.join(root, "core", "backups"));
+  wipeFolder(path.join(root, "release"));
+  wipeFolder(path.join(root, LEGACY_ARCHIVE_DIRNAME));
+  deleteFile(path.join(root, "core", ".core-lock.key"));
+  deleteFile(path.join(root, "core", "audio.process-locks.json"));
 
   const fixturesPath = path.join(root, "core", "fixtures.config.json");
   writeJson(fixturesPath, FIXTURES_TEMPLATE);
@@ -95,27 +201,30 @@ function sanitizeRelease(rootDir = DEFAULT_ROOT) {
   writeJson(fixturesLocalBackupPath, FIXTURES_TEMPLATE);
   const twitchColorConfigPath = path.join(root, "core", "twitch.color.config.json");
   writeJson(twitchColorConfigPath, TWITCH_COLOR_TEMPLATE);
+  const audioRuntimeConfigPath = path.join(root, "core", "audio.config.json");
+  writeJson(audioRuntimeConfigPath, AUDIO_RUNTIME_TEMPLATE);
+  const audioReactivityMapPath = path.join(root, "core", "audio.reactivity.map.json");
+  writeJson(audioReactivityMapPath, AUDIO_REACTIVITY_MAP_TEMPLATE);
+  const systemConfigPath = path.join(root, "core", "system.config.json");
+  writeJson(systemConfigPath, SYSTEM_CONFIG_TEMPLATE);
+  const fixtureMetricRoutingPath = path.join(root, "core", "fixture.metric.routing.json");
+  writeJson(fixtureMetricRoutingPath, FIXTURE_METRIC_ROUTING_TEMPLATE);
+  const paletteFixtureOverridesPath = path.join(root, "core", "palette.fixture.overrides.json");
+  writeJson(paletteFixtureOverridesPath, PALETTE_FIXTURE_OVERRIDES_TEMPLATE);
+  const standaloneStatePath = path.join(root, "core", "standalone.state.json");
+  writeJson(standaloneStatePath, STANDALONE_STATE_TEMPLATE);
 
-  const cleanFixtureBackup = path.join(
-    root,
-    "core",
-    "backups",
-    "fixtures",
-    "fixtures.config.clean.json"
-  );
-  writeJson(cleanFixtureBackup, FIXTURES_TEMPLATE);
+  console.log(`[sanitize-release] sanitized root: ${root}`);
+}
 
-  const automationTemplatePath = path.join(root, "core", "automation.config.json");
-  if (fs.existsSync(automationTemplatePath)) {
-    const automation = JSON.parse(fs.readFileSync(automationTemplatePath, "utf8"));
-    const cleanAutomationBackup = path.join(
-      root,
-      "core",
-      "backups",
-      "automation",
-      "automation.config.clean.json"
-    );
-    writeJson(cleanAutomationBackup, automation);
+function sanitizeRelease(rootDir = DEFAULT_ROOT) {
+  const root = path.resolve(String(rootDir || DEFAULT_ROOT));
+  sanitizeRoot(root);
+
+  // Mirror repo used for publish workflows; sanitize it too if present.
+  const pushMirror = path.join(root, ".pushrepo");
+  if (fs.existsSync(pushMirror) && fs.statSync(pushMirror).isDirectory()) {
+    sanitizeRoot(pushMirror);
   }
 
   console.log("[sanitize-release] done");

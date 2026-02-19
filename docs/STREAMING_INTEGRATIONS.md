@@ -34,7 +34,7 @@ Common mappings:
 - `GET /color?value1=<color>`
 
 More control:
-- `POST /rave/genre?name=techno`
+- `POST /rave/palette` (example: `{"families":["blue","purple"],"colorsPerFamily":3}`)
 - `POST /rave/scene?name=flow`
 - `POST /rave/auto/profile?name=reactive`
 - `POST /rave/audio/reactivity?name=aggressive`

@@ -22,7 +22,7 @@ This guide is for contributors building features, transports, integrations, or m
   - `npm start`
   - `npm run stop`
 
-## Security Model (v1.4.1)
+## Security Model (v1.5.0)
 
 Runtime defaults are now local-first with hardened boundaries:
 
@@ -137,14 +137,11 @@ Key behavior:
 - `POST /rave/drop`
 - `POST /rave/panic`
 - `POST /rave/reload`
-- `POST /rave/genre?name=...`
-- `POST /rave/genre/decade?mode=...`
-- `GET /rave/genre/decade`
-- `POST /rave/mode?name=auto|game|bpm`
+- `GET /rave/palette`
+- `POST /rave/palette`
+- `POST /rave/mode?name=bpm`
 - `POST /rave/scene?name=...`
 - `POST /rave/scene/auto`
-- `POST /rave/mode/competitive/on`
-- `POST /rave/mode/competitive/off`
 - `POST /rave/overclock/*`
 - `GET /rave/overclock/tiers`
 - `POST /rave/overclock/dev/:hz/on?unsafe=true` (unsafe dev tiers: 20/30/40/50/60)
@@ -157,7 +154,7 @@ Key behavior:
 - `POST /rave/meta/auto?enabled=true|false`
 - `POST /rave/meta/auto/on`
 - `POST /rave/meta/auto/off`
-- `GET /rave/genres`
+- `GET /rave/palettes`
 - `GET /rave/telemetry`
 
 ### Twitch color and teach

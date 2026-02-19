@@ -2,32 +2,34 @@
   "version": 1,
   "dropEnabled": false,
   "hardwareRateLimitsEnabled": true,
+  "metaAutoHueWizBaselineBlend": true,
+  "metaAutoTempoTrackersAuto": false,
+  "metaAutoTempoTrackers": {
+    "baseline": true,
+    "peaks": false,
+    "transients": false,
+    "flux": false
+  },
   "targets": {
     "hue": {
       "enabled": true,
       "amount": 1,
       "sources": [
-        "smart",
-        "drums",
-        "beat"
+        "smart"
       ]
     },
     "wiz": {
       "enabled": true,
       "amount": 1,
       "sources": [
-        "smart",
-        "drums",
-        "beat"
+        "smart"
       ]
     },
     "other": {
       "enabled": true,
       "amount": 1,
       "sources": [
-        "smart",
-        "drums",
-        "beat"
+        "smart"
       ]
     }
   }

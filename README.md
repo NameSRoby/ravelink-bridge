@@ -11,17 +11,17 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.4.2): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.4.2
+- Current Windows release (v1.5.0): https://github.com/NameSRoby/ravelink-bridge/releases/latest
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
-This repository state is aligned to `v1.4.2`:
+This repository state is aligned to `v1.5.0`:
 - Full security hardening passes applied
 - Code structure/title indexing improved for faster maintenance
 
-## Update Log (v1.4.2 Behavior + Stability Hotfix)
+## Update Log (v1.5.0 Baseline)
 
 - Meta Auto now learns from live song behavior (EMA + peak memory on drive/motion/intensity) so heavy tracks ramp above low 2Hz/4Hz tiers instead of sticking there.
-- Aggressive genres (especially metal/dnb/techno) now get sustained-build promotion logic for better high-energy response while calm tracks keep low-rate guardrails.
+- High-motion tracks now get sustained-build promotion logic for better high-energy response while calmer sections keep low-rate guardrails.
 - Hotfix for mod debug noise: high-frequency `onTelemetry` debug events are now sanitized and sampled instead of flooding logs every poll tick.
 - `onTelemetry` hook batches with no handlers no longer spam repetitive debug lines.
 - Modder diagnostics remain available through `/mods/debug` with explicit telemetry sampling controls.
@@ -33,7 +33,7 @@ This repository state is aligned to `v1.4.2`:
 - Scheduler heartbeat safeguards added to prevent long static stalls under low-delta conditions.
 - Hue REST responsiveness tuned (safe transition + adaptive interval behavior) for better practical latency.
 - Linux source startup path added (`.sh` launchers) while keeping Windows as official packaged target.
-- UI storage migration bumped again so stale browser state is wiped on first load of this hotfix.
+- UI storage migration bumped again so stale browser state is wiped on first load of this baseline.
 
 Detailed release notes:
 - `CHANGELOG.md`
@@ -49,7 +49,7 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 - MIDI controller mapping tab (learn + bindings + trigger tests)
 - Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
 
-## Security Defaults (v1.4.2)
+## Security Defaults (v1.5.0)
 
 RaveLink Bridge is local-first and now ships with stricter default protections:
 
@@ -70,7 +70,8 @@ Optional compatibility env flags (advanced users only):
 If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
 
 1. Install Node.js LTS from `https://nodejs.org`.
-2. Double-click `RaveLink-Bridge.bat` (first run auto-installs missing dependencies).
+2. Double-click `RaveLink-Bridge.bat`.
+   - First launch on a new system runs a full dependency bootstrap automatically (Node dependencies + Windows audio helper dependencies).
 3. Wait for the launcher window to show:
    - `Bridge URL: http://127.0.0.1:5050`
 4. The browser should open automatically.
@@ -234,9 +235,9 @@ The routes below are available in the bridge API, but anything beyond the 3 defa
 | Color only Hue | `GET or POST /color` | `/color?value1=cyan&target=hue` |
 | Color only WiZ | `GET or POST /color` | `/color?value1=orange&target=wiz` |
 | Color specific route zone | `GET or POST /color` | `/color?value1=red&zone=wiz` |
-| Set genre | `POST /rave/genre?name=<genre>` | `/rave/genre?name=techno` |
-| Set genre decade mode | `POST /rave/genre/decade?mode=<mode>` | `/rave/genre/decade?mode=20s` |
-| Set behavior mode | `POST /rave/mode?name=<auto|game|bpm>` | `/rave/mode?name=game` |
+| Get palette runtime | `GET /rave/palette` | `/rave/palette` |
+| Update palette config | `POST /rave/palette` | body: `{"families":["blue","purple"],"colorsPerFamily":3,"disorder":false}` |
+| Set behavior mode (interpret only) | `POST /rave/mode?name=bpm` | `/rave/mode?name=bpm` |
 | Lock scene | `POST /rave/scene?name=<scene>` | `/rave/scene?name=flow` |
 | Release scene lock | `POST /rave/scene/auto` | `/rave/scene/auto` |
 | Scene sync on (Hue+WiZ) | `POST /rave/scene/sync/on` | `/rave/scene/sync/on` |
@@ -304,6 +305,7 @@ Log hints:
 Notes:
 - If no MIDI device is detected, you can force-show the MIDI tab from the settings cog (`MIDI TAB` toggle).
 - `DEV TOOLS` in the settings cog only appear when `DEV DEBUG` is enabled.
+- Expanded MIDI actions include palette controls (`ORDERED/DISORDER`, family toggles, `1/3/5` colors, quick presets), `AUTO HZ` toggles, `FLOW INTENSITY` up/down/reset, and WiZ scene-sync toggle.
 
 ## OBS Dock
 
@@ -319,13 +321,16 @@ Notes:
 - The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
 - Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
 
-## Version 1.4.2 Patch Notes
+## Version 1.5.0 Notes
 
-- Telemetry log spam hotfix on top of 1.4.2 baseline:
+- Runtime and security baseline on top of 1.4.2 behavior:
+  - Startup bootstraps dependency state automatically on first launch on a new system.
+  - Kept local-first route protections with explicit advanced env overrides for compatibility.
+- Telemetry log spam hotfix baseline retained:
   - Sanitized high-frequency mod `onTelemetry` hook debug payloads.
   - Added default sampling for `onTelemetry` debug emission to prevent console spam.
   - Disabled no-handler `onTelemetry` batch spam by default.
-  - Bumped UI storage migration target so stale UI memory is cleared on first load of this release.
+  - Bumped UI storage migration target so stale UI memory is cleared on first load of this baseline.
 - Full security hardening pass:
   - Loopback-only protection for mutating endpoints by default.
   - Loopback-only protection for privileged read endpoints by default.
@@ -502,11 +507,11 @@ npm run export:redistributable
 3. Zip:
 
 ```powershell
-Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.4.2\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.4.2.zip -Force
+Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.0\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.5.0.zip -Force
 ```
 
 Output:
-- `release/RaveLink-Bridge-Windows-v1.4.2`
+- `release/RaveLink-Bridge-Windows-v1.5.0`
 
 ## Security And Data Hygiene
 

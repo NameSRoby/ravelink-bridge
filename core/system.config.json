@@ -1,5 +1,8 @@
 {
-  "version": 1,
+  "version": 3,
   "autoLaunchBrowser": true,
-  "browserLaunchDelayMs": 1200
+  "browserLaunchDelayMs": 1200,
+  "unsafeExposeSensitiveLogs": false,
+  "hueTransportPreference": "auto",
+  "legacyComponentsEnabled": false
 }

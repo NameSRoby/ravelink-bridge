@@ -34,13 +34,11 @@ const BASE_COLORS = {
    BRIGHTNESS MODIFIERS
 ========================= */
 const BRIGHTNESS = {
-    dark:   100,
-    dim:    100,
-    bright: 254,
-    light:  220
+    dim:    178,
+    bright: 254
 };
 
-const DEFAULT_BRI = 180;
+const DEFAULT_BRI = 254;
 
 /* =========================
    LOAD CUSTOM COLORS
@@ -116,11 +114,14 @@ function parseColor(input) {
 
     // ---- resolve color word ----
     let rgb = null;
+    let matchedAnyColor = false;
+    let matchedWhite = false;
 
     // hex anywhere
     const hexWord = words.find(w => /^#[0-9a-f]{6}$/i.test(w));
     if (hexWord) {
         rgb = hexToRgb(hexWord);
+        matchedAnyColor = true;
     }
 
     // learned colors
@@ -129,6 +130,7 @@ function parseColor(input) {
             const key = normalize(w);
             if (CUSTOM_COLORS[key]) {
                 rgb = hexToRgb(CUSTOM_COLORS[key]);
+                matchedAnyColor = true;
                 break;
             }
         }
@@ -140,13 +142,19 @@ function parseColor(input) {
             const key = normalize(w);
             if (key in BASE_COLORS) {
                 rgb = BASE_COLORS[key];
+                matchedAnyColor = true;
+                matchedWhite = key === "white";
                 break;
             }
         }
     }
 
+    if (!matchedAnyColor) {
+        return null;
+    }
+
     // ---- WHITE (CT MODE) ----
-    if (rgb === null) {
+    if (matchedWhite) {
         return {
             on: true,
             ct: 366,

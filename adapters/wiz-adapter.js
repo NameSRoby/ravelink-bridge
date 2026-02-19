@@ -42,9 +42,9 @@ module.exports = function createWizAdapter({ ip }) {
     };
 
     if (Number.isFinite(Number(source.dimming))) {
-      payload.params.dimming = Math.max(10, Math.min(100, Math.round(Number(source.dimming))));
+      payload.params.dimming = Math.max(1, Math.min(100, Math.round(Number(source.dimming))));
     } else {
-      payload.params.dimming = on ? 50 : 10;
+      payload.params.dimming = on ? 50 : 1;
     }
 
     if (on && Number.isFinite(Number(source.temp))) {

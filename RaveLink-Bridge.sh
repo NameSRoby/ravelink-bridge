@@ -23,11 +23,6 @@ if [ ! -f "package.json" ]; then
   exit 1
 fi
 
-if [ ! -f "node_modules/express/package.json" ]; then
-  echo "[RaveLink] First run or dependencies missing. Installing packages..."
-  npm install
-fi
-
 if [ -z "${NODE_EXTRA_CA_CERTS:-}" ] && [ -f "node_modules/hue-sync/signify.pem" ]; then
   export NODE_EXTRA_CA_CERTS="$PWD/node_modules/hue-sync/signify.pem"
 fi

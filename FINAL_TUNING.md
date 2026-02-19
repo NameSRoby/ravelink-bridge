@@ -6,7 +6,6 @@
 - Supported rates: `2/4/6/8/10/12/14/16 Hz`.
 - Default auto profile: `balanced` (`RAVE_AUTO_PROFILE=balanced`).
 - Default audio reactivity preset: `balanced` (`RAVE_AUDIO_REACTIVITY_PRESET=balanced`).
-- Genre decade mode: `auto` (`RAVE_GENRE_DECADE_MODE=auto`).
 - Meta auto recommended default: `on` (`RAVE_META_AUTO_DEFAULT=1`).
 - Hue transport on engine start: automatically switches to entertainment mode in `server.js` (`handleRaveOn`).
 
@@ -17,8 +16,7 @@
 
 ## Burn-In Validation (10-minute virtual run)
 - Duration: `600000 ms` simulated.
-- Coverage: all genres (`edm, hiphop, metal, ambient, house, trance, dnb, pop, rock, rnb, techno, media, auto`).
-- Coverage: all decade modes (`auto, 90s, 00s, 10s, 20s`).
+- Coverage: all core scenes (`idle_soft, flow, pulse_drive`) with palette families and meta-auto on/off.
 
 Results:
 - Scene changes: `60` total (`6.0/min`).
@@ -30,12 +28,10 @@ Results:
 ## Runtime Quick Check
 1. Start engine and audio: `POST /rave/on`
 2. Ensure meta auto ON: `POST /rave/meta/auto/on`
-3. Set decade mode auto: `POST /rave/genre/decade?mode=auto`
-4. Set decade mode 90s: `POST /rave/genre/decade?mode=90s`
-5. Set decade mode 00s: `POST /rave/genre/decade?mode=00s`
-6. Set decade mode 10s: `POST /rave/genre/decade?mode=10s`
-7. Set decade mode 20s: `POST /rave/genre/decade?mode=20s`
-8. Verify telemetry: `GET /rave/telemetry` (`genre`, `scene`, `behavior`, `overclockLevel`, `metaAutoReason`, `genreRefMode`, `genreRefDecade`)
+3. Verify palette runtime: `GET /rave/palette`
+4. Set palette families: `POST /rave/palette` body `{"families":["blue","purple"],"colorsPerFamily":3,"disorder":false}`
+5. Set palette disorder: `POST /rave/palette` body `{"disorder":true,"disorderAggression":0.35}`
+6. Verify telemetry: `GET /rave/telemetry` (`scene`, `behavior`, `overclockLevel`, `metaAutoReason`, `metaAutoGenre`)
 
 ## Notes
 - `metaAutoReason` can change frequently by design; this is expected and does not imply scene thrash.

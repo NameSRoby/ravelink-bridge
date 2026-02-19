@@ -36,17 +36,6 @@ if not exist "package.json" (
   exit /b 1
 )
 
-if not exist "node_modules\\express\\package.json" (
-  echo [RaveLink] First run or dependencies missing. Installing packages...
-  call %NPM_BIN% install
-  if errorlevel 1 (
-    echo [RaveLink][ERROR] npm install failed.
-    echo.
-    pause
-    exit /b 1
-  )
-)
-
 set "HUE_CERT=%CD%\node_modules\hue-sync\signify.pem"
 if not defined NODE_EXTRA_CA_CERTS if exist "%HUE_CERT%" (
   set "NODE_EXTRA_CA_CERTS=%HUE_CERT%"
@@ -55,7 +44,11 @@ if not defined NODE_EXTRA_CA_CERTS if exist "%HUE_CERT%" (
 echo [RaveLink] Bridge URL: http://127.0.0.1:5050
 echo [RaveLink] Press Ctrl+C in this window to stop the bridge.
 echo.
-call %NPM_BIN% start
+if exist "scripts\start-bridge.js" (
+  node scripts\start-bridge.js
+) else (
+  call %NPM_BIN% start
+)
 set "EXIT_CODE=%ERRORLEVEL%"
 
 if not "%EXIT_CODE%"=="0" (

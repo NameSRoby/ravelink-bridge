@@ -2,10 +2,12 @@ RaveLink Bridge - Windows Build
 
 Official packaged target: Windows 10/11 (x64).
 Linux/macOS are not currently official packaged targets.
-Source startup on Linux is available in experimental form via:
-- RaveLink-Bridge.sh
-- RaveLink-Bridge-Stop.sh
+Source startup on Linux is available in experimental form via shell launchers.
 
 Launchers:
 - RaveLink-Bridge.bat
 - RaveLink-Bridge-Stop.bat
+
+Experimental source launchers:
+- RaveLink-Bridge.sh
+- RaveLink-Bridge-Stop.sh

@@ -966,11 +966,19 @@ module.exports = function createModLoader(options = {}) {
       const version = String(manifest.version || "0.0.0").trim() || "0.0.0";
       const description = String(manifest.description || "").trim();
       const tooltip = resolveModTooltip(baseDir, manifest);
-      const mainFile = String(manifest.main || "index.js").trim() || "index.js";
-      const modulePath = path.join(baseDir, mainFile);
+      const requestedMainFile = String(manifest.main || "index.js").trim() || "index.js";
+      const mainFile = sanitizeRelativeFilePath(requestedMainFile);
+      const modulePath = mainFile ? path.resolve(baseDir, mainFile) : "";
+      const modulePathAllowed = Boolean(
+        modulePath &&
+        (modulePath === baseDir || modulePath.startsWith(baseDir + path.sep))
+      );
+      const modulePathError = !modulePathAllowed
+        ? "invalid mod entry path (manifest.main)"
+        : "";
       const ui = resolveModUiDescriptor(baseDir, manifest);
       const enabledByConfig = enabledSet.size > 0 ? enabledSet.has(id) : Boolean(manifest.enabled);
-      const enabled = enabledByConfig && !disabledSet.has(id);
+      const enabled = enabledByConfig && !disabledSet.has(id) && !modulePathError;
 
       discovered.push({
         id,
@@ -986,7 +994,7 @@ module.exports = function createModLoader(options = {}) {
         enabled,
         loaded: false,
         instance: null,
-        error: null,
+        error: modulePathError || null,
         hooks: [],
         ui,
         order: orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER
@@ -996,6 +1004,7 @@ module.exports = function createModLoader(options = {}) {
         id,
         enabled,
         modulePath,
+        modulePathError: modulePathError || "",
         hooksDeclared: Array.isArray(manifest.hooks) ? manifest.hooks.length : undefined,
         hasUi: Boolean(ui)
       });

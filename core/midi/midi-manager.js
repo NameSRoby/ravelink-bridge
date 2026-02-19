@@ -10,6 +10,16 @@ try {
 }
 
 const midiLearn = require("./midi-learn");
+const PALETTE_FAMILIES = Object.freeze(["blue", "purple", "red", "green", "yellow"]);
+const PALETTE_PRESETS = Object.freeze({
+  palette_preset_all_1: Object.freeze({ families: Object.freeze(["blue", "purple", "red", "green", "yellow"]), colorsPerFamily: 1 }),
+  palette_preset_all_3: Object.freeze({ families: Object.freeze(["blue", "purple", "red", "green", "yellow"]), colorsPerFamily: 3 }),
+  palette_preset_duo_cool: Object.freeze({ families: Object.freeze(["blue", "purple"]) }),
+  palette_preset_duo_warm: Object.freeze({ families: Object.freeze(["red", "yellow"]) })
+});
+const FLOW_INTENSITY_STEP = 0.1;
+const FLOW_INTENSITY_DEFAULT = 1;
+const MIDI_CC_REPEAT_MIN_MS = 90;
 
 function safePortName(input, index) {
   try {
@@ -20,8 +30,16 @@ function safePortName(input, index) {
 }
 
 function normalizeAction(action) {
-  const key = String(action || "").trim().toLowerCase();
-  if (key === "overclock" || key === "oc") return "overclock_toggle";
+  let key = String(action || "").trim().toLowerCase();
+  if (key === "overclock" || key === "oc") key = "overclock_toggle";
+  if (key === "behavior_auto" || key === "behavior_clamp") key = "behavior_interpret";
+  if (key === "flow_up") key = "flow_intensity_up";
+  if (key === "flow_down") key = "flow_intensity_down";
+  if (key === "flow_reset") key = "flow_intensity_reset";
+  if (key === "palette_all_1") key = "palette_preset_all_1";
+  if (key === "palette_all_3") key = "palette_preset_all_3";
+  if (key === "palette_duo_cool") key = "palette_preset_duo_cool";
+  if (key === "palette_duo_warm") key = "palette_preset_duo_warm";
   return key;
 }
 
@@ -77,7 +95,7 @@ module.exports = function createMidiManager(engine) {
   let disposed = false;
   let input = null;
   let onMessageHandler = null;
-  const latchedByBinding = new Map();
+  const triggerStateByBinding = new Map();
 
   function listPorts() {
     if (!moduleAvailable) return [];
@@ -132,7 +150,7 @@ module.exports = function createMidiManager(engine) {
     state.connected = false;
     state.activePortIndex = null;
     state.activePortName = "";
-    latchedByBinding.clear();
+    triggerStateByBinding.clear();
   }
 
   function resolvePortIndex(ports, config) {
@@ -162,6 +180,54 @@ module.exports = function createMidiManager(engine) {
         engine?.setMetaAutoEnabled?.(false);
       }
     };
+    const getPaletteConfig = () => {
+      const cfg = engine?.getPaletteConfig?.();
+      return cfg && typeof cfg === "object" ? cfg : null;
+    };
+    const setPaletteConfig = patch => {
+      if (!patch || typeof patch !== "object") return false;
+      const next = engine?.setPaletteConfig?.(patch);
+      return Boolean(next);
+    };
+    const setPaletteFamilies = families => {
+      if (!Array.isArray(families) || !families.length) return false;
+      const normalized = Array.from(
+        new Set(
+          families
+            .map(item => String(item || "").trim().toLowerCase())
+            .filter(item => PALETTE_FAMILIES.includes(item))
+        )
+      );
+      if (!normalized.length) return false;
+      return setPaletteConfig({ families: normalized });
+    };
+    const togglePaletteFamily = familyId => {
+      const family = String(familyId || "").trim().toLowerCase();
+      if (!PALETTE_FAMILIES.includes(family)) return false;
+      const current = getPaletteConfig();
+      const currentFamilies = Array.isArray(current?.families)
+        ? current.families.map(name => String(name || "").trim().toLowerCase()).filter(Boolean)
+        : ["blue", "purple"];
+      const next = currentFamilies.includes(family)
+        ? currentFamilies.filter(item => item !== family)
+        : [...currentFamilies, family];
+      const safe = next.length ? next : [family];
+      return setPaletteFamilies(safe);
+    };
+    const setFlowIntensityOffset = delta => {
+      const current = Number(engine?.getFlowIntensity?.());
+      const base = Number.isFinite(current) ? current : FLOW_INTENSITY_DEFAULT;
+      return Boolean(engine?.setFlowIntensity?.(base + Number(delta || 0)));
+    };
+    const setPalettePreset = actionKey => {
+      const preset = PALETTE_PRESETS[actionKey];
+      if (!preset) return false;
+      const patch = {};
+      if (Array.isArray(preset.families)) patch.families = [...preset.families];
+      if (Number.isFinite(Number(preset.colorsPerFamily))) patch.colorsPerFamily = Number(preset.colorsPerFamily);
+      return setPaletteConfig(patch);
+    };
+    const setWizSceneSync = enabled => Boolean(engine?.setWizSceneSync?.(Boolean(enabled)));
 
     switch (key) {
       case "drop":
@@ -192,12 +258,16 @@ module.exports = function createMidiManager(engine) {
         return true;
       }
 
-      case "behavior_auto":
-        engine?.setBehavior?.("auto");
+      case "overclock_auto_toggle":
+        engine?.setOverclockAutoEnabled?.(!Boolean(engine?.getOverclockAutoEnabled?.()));
         return true;
 
-      case "behavior_clamp":
-        engine?.setBehavior?.("clamp");
+      case "overclock_auto_on":
+        engine?.setOverclockAutoEnabled?.(true);
+        return true;
+
+      case "overclock_auto_off":
+        engine?.setOverclockAutoEnabled?.(false);
         return true;
 
       case "behavior_interpret":
@@ -262,6 +332,52 @@ module.exports = function createMidiManager(engine) {
         engine?.setMetaAutoEnabled?.(false);
         return true;
 
+      case "flow_intensity_up":
+        return setFlowIntensityOffset(FLOW_INTENSITY_STEP);
+
+      case "flow_intensity_down":
+        return setFlowIntensityOffset(-FLOW_INTENSITY_STEP);
+
+      case "flow_intensity_reset":
+        return Boolean(engine?.setFlowIntensity?.(FLOW_INTENSITY_DEFAULT));
+
+      case "wiz_scene_sync_toggle":
+        return setWizSceneSync(!Boolean(engine?.getWizSceneSync?.()));
+
+      case "wiz_scene_sync_on":
+        return setWizSceneSync(true);
+
+      case "wiz_scene_sync_off":
+        return setWizSceneSync(false);
+
+      case "palette_ordered":
+        return setPaletteConfig({ disorder: false });
+
+      case "palette_disorder":
+        return setPaletteConfig({ disorder: true });
+
+      case "palette_colors_1":
+        return setPaletteConfig({ colorsPerFamily: 1 });
+
+      case "palette_colors_3":
+        return setPaletteConfig({ colorsPerFamily: 3 });
+
+      case "palette_colors_5":
+        return setPaletteConfig({ colorsPerFamily: 5 });
+
+      case "palette_family_blue":
+      case "palette_family_purple":
+      case "palette_family_red":
+      case "palette_family_green":
+      case "palette_family_yellow":
+        return togglePaletteFamily(key.replace("palette_family_", ""));
+
+      case "palette_preset_all_1":
+      case "palette_preset_all_3":
+      case "palette_preset_duo_cool":
+      case "palette_preset_duo_warm":
+        return setPalettePreset(key);
+
       default:
         return false;
     }
@@ -320,21 +436,43 @@ module.exports = function createMidiManager(engine) {
       const bindingKey = `${actionKey}:${String(binding?.type || "")}:${String(binding?.number || "")}:${String(binding?.channel ?? "any")}`;
 
       if (!bindingMatchesMessage(binding, parsed)) {
-        latchedByBinding.delete(bindingKey);
+        triggerStateByBinding.delete(bindingKey);
         continue;
       }
 
       const activeNow = messageActiveForBinding(binding, parsed, fallbackThreshold);
+      const bindingType = String(binding?.type || "").trim().toLowerCase();
+      const now = Date.now();
+      const prev = triggerStateByBinding.get(bindingKey) || { latched: false, lastAt: 0, lastValue: null };
       if (!activeNow) {
-        latchedByBinding.delete(bindingKey);
+        triggerStateByBinding.delete(bindingKey);
         continue;
       }
 
-      if (latchedByBinding.get(bindingKey)) {
-        continue;
+      if (bindingType === "cc") {
+        const delta = prev.lastValue === null
+          ? 127
+          : Math.abs(Number(parsed.value) - Number(prev.lastValue));
+        const elapsed = now - Number(prev.lastAt || 0);
+        if (elapsed < MIDI_CC_REPEAT_MIN_MS || delta < 1) {
+          prev.lastValue = Number(parsed.value);
+          triggerStateByBinding.set(bindingKey, prev);
+          continue;
+        }
+        prev.lastAt = now;
+        prev.lastValue = Number(parsed.value);
+        prev.latched = false;
+        triggerStateByBinding.set(bindingKey, prev);
+      } else {
+        if (prev.latched) {
+          continue;
+        }
+        prev.latched = true;
+        prev.lastAt = now;
+        prev.lastValue = Number(parsed.value);
+        triggerStateByBinding.set(bindingKey, prev);
       }
 
-      latchedByBinding.set(bindingKey, true);
       const ok = applyAction(actionKey, parsed);
       if (ok) {
         setLastAction(`MIDI ${actionLabel(actionKey)}`);

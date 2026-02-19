@@ -1,10 +1,12 @@
 // [TITLE] Module: wiz/wiz-energy-strategy.js
 // [TITLE] Purpose: wiz-energy-strategy
 
-const GENRES = require("../colors/genre-palettes");
-const genreState = require("../core/genre-state");
+const ROLE_COLORS = Object.freeze({
+  kick: Object.freeze({ rgb: [70, 146, 245] }),
+  snare: Object.freeze({ rgb: [176, 34, 44] })
+});
 
-let flip = false; // 🔑 MUST be module-level (do not redeclare inside function)
+let flip = false;
 
 module.exports = function pickWizColor(intent) {
   const e = intent.energy ?? 0;
@@ -19,8 +21,7 @@ module.exports = function pickWizColor(intent) {
     role = flip ? "kick" : "snare";
   }
 
-  const genre = GENRES[genreState.get()] || GENRES.edm;
-  const [r, g, b] = genre[role].rgb;
+  const [r, g, b] = ROLE_COLORS[role].rgb;
 
   return {
     band: role,

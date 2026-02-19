@@ -155,10 +155,9 @@ const { execFile, execFileSync, spawn } = require("child_process");
 // CORE
 // ======================================================
 let createRaveEngine = require("./core/rave-engine");
-const createAudio = require("./core/audio");
+let createAudio = require("./core/audio");
 const fixtureRegistry = require("./core/fixtures");
 const automationRules = require("./core/automation-rules");
-const genreState = require("./core/genre-state");
 const state = require("./core/state");
 const createModLoader = require("./core/mods/mod-loader");
 
@@ -184,6 +183,7 @@ const createWizScheduler = require("./core/wiz-scheduler");
 const pickWizColor = require("./wiz/wiz-energy-strategy");
 const createWizAdapter = require("./adapters/wiz-adapter");
 const colorEngine = require("./colors/color-engine");
+const registerRavePaletteMetricRoutes = require("./routes/rave-palette-metric-routes");
 
 // [TITLE] Section: Runtime Configuration
 // ======================================================
@@ -196,10 +196,15 @@ const PID_FILE = path.join(RUNTIME_DIR, "bridge.pid");
 const HUE_PAIR_APP_NAME = "hue-bridge-final";
 const TWITCH_COLOR_CONFIG_PATH = path.join(__dirname, "core", "twitch.color.config.json");
 const AUDIO_REACTIVITY_MAP_CONFIG_PATH = path.join(__dirname, "core", "audio.reactivity.map.json");
+const AUDIO_RUNTIME_CONFIG_PATH = path.join(__dirname, "core", "audio.config.json");
 const SYSTEM_CONFIG_PATH = path.join(__dirname, "core", "system.config.json");
+const STANDALONE_STATE_CONFIG_PATH = path.join(__dirname, "core", "standalone.state.json");
+const PALETTE_FIXTURE_OVERRIDES_CONFIG_PATH = path.join(__dirname, "core", "palette.fixture.overrides.json");
+const FIXTURE_METRIC_ROUTING_CONFIG_PATH = path.join(__dirname, "core", "fixture.metric.routing.json");
 const MODS_README_PATH = path.join(__dirname, "docs", "MODS.md");
 const TWITCH_COLOR_TARGETS = new Set(["hue", "wiz", "both", "other"]);
 const TWITCH_COLOR_PREFIX_RE = /^[a-z][a-z0-9_-]{0,31}$/;
+const TWITCH_RANDOM_COLOR_TOKENS = new Set(["random", "rand", "rnd"]);
 const MOD_IMPORT_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
 const TWITCH_COLOR_CONFIG_DEFAULT = Object.freeze({
   version: 1,
@@ -208,6 +213,13 @@ const TWITCH_COLOR_CONFIG_DEFAULT = Object.freeze({
     hue: "hue",
     wiz: "wiz",
     other: ""
+  }),
+  fixturePrefixes: Object.freeze({}),
+  raveOff: Object.freeze({
+    enabled: true,
+    defaultText: "random",
+    groups: Object.freeze({}),
+    fixtures: Object.freeze({})
   })
 });
 const AUDIO_REACTIVITY_SOURCE_CATALOG = Object.freeze({
@@ -225,6 +237,12 @@ const AUDIO_REACTIVITY_SOURCE_CATALOG = Object.freeze({
   groove: Object.freeze({ label: "Groove", description: "Body blend (RMS + bass + mids + beat)." })
 });
 const AUDIO_REACTIVITY_TARGET_KEYS = Object.freeze(["hue", "wiz", "other"]);
+const META_AUTO_TEMPO_TRACKER_KEYS = Object.freeze([
+  "baseline",
+  "peaks",
+  "transients",
+  "flux"
+]);
 const HUE_TRANSPORT_PREFERENCE = Object.freeze({
   AUTO: "auto",
   REST: "rest"
@@ -233,6 +251,14 @@ const AUDIO_REACTIVITY_MAP_DEFAULT = Object.freeze({
   version: 1,
   dropEnabled: false,
   hardwareRateLimitsEnabled: true,
+  metaAutoHueWizBaselineBlend: true,
+  metaAutoTempoTrackersAuto: false,
+  metaAutoTempoTrackers: Object.freeze({
+    baseline: true,
+    peaks: false,
+    transients: false,
+    flux: false
+  }),
   targets: Object.freeze({
     hue: Object.freeze({ enabled: true, amount: 1, sources: Object.freeze(["smart"]) }),
     wiz: Object.freeze({ enabled: true, amount: 1, sources: Object.freeze(["smart"]) }),
@@ -244,7 +270,108 @@ const SYSTEM_CONFIG_DEFAULT = Object.freeze({
   autoLaunchBrowser: true,
   browserLaunchDelayMs: 1200,
   unsafeExposeSensitiveLogs: false,
-  hueTransportPreference: HUE_TRANSPORT_PREFERENCE.AUTO
+  hueTransportPreference: HUE_TRANSPORT_PREFERENCE.AUTO,
+  legacyComponentsEnabled: false
+});
+const STANDALONE_STATE_CONFIG_DEFAULT = Object.freeze({
+  version: 1,
+  fixtures: Object.freeze({})
+});
+const PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5]);
+const PALETTE_SUPPORTED_BRANDS = Object.freeze(["hue", "wiz"]);
+const PALETTE_FAMILY_ORDER = Object.freeze(["blue", "purple", "red", "green", "yellow"]);
+const PALETTE_FAMILY_ALIASES = Object.freeze({
+  magenta: "purple",
+  amber: "yellow"
+});
+const PALETTE_CONFIG_DEFAULT = Object.freeze({
+  colorsPerFamily: 3,
+  families: Object.freeze(["blue", "purple"]),
+  disorder: false,
+  disorderAggression: 0.35
+});
+const PALETTE_FAMILY_DEFS = Object.freeze({
+  blue: Object.freeze({
+    id: "blue",
+    label: "BLUE",
+    colors: Object.freeze([
+      Object.freeze({ r: 12, g: 34, b: 138 }),
+      Object.freeze({ r: 18, g: 72, b: 186 }),
+      Object.freeze({ r: 36, g: 116, b: 228 }),
+      Object.freeze({ r: 62, g: 166, b: 252 }),
+      Object.freeze({ r: 96, g: 212, b: 255 })
+    ])
+  }),
+  purple: Object.freeze({
+    id: "purple",
+    label: "PURPLE",
+    colors: Object.freeze([
+      Object.freeze({ r: 40, g: 20, b: 110 }),
+      Object.freeze({ r: 72, g: 32, b: 150 }),
+      Object.freeze({ r: 108, g: 48, b: 196 }),
+      Object.freeze({ r: 148, g: 72, b: 236 }),
+      Object.freeze({ r: 188, g: 110, b: 255 })
+    ])
+  }),
+  red: Object.freeze({
+    id: "red",
+    label: "RED",
+    colors: Object.freeze([
+      Object.freeze({ r: 88, g: 0, b: 14 }),
+      Object.freeze({ r: 132, g: 0, b: 22 }),
+      Object.freeze({ r: 178, g: 6, b: 34 }),
+      Object.freeze({ r: 226, g: 16, b: 50 }),
+      Object.freeze({ r: 255, g: 40, b: 70 })
+    ])
+  }),
+  green: Object.freeze({
+    id: "green",
+    label: "GREEN",
+    colors: Object.freeze([
+      Object.freeze({ r: 8, g: 72, b: 22 }),
+      Object.freeze({ r: 14, g: 116, b: 32 }),
+      Object.freeze({ r: 22, g: 162, b: 44 }),
+      Object.freeze({ r: 38, g: 208, b: 62 }),
+      Object.freeze({ r: 92, g: 248, b: 84 })
+    ])
+  }),
+  yellow: Object.freeze({
+    id: "yellow",
+    label: "YELLOW",
+    colors: Object.freeze([
+      Object.freeze({ r: 96, g: 78, b: 0 }),
+      Object.freeze({ r: 140, g: 118, b: 0 }),
+      Object.freeze({ r: 186, g: 162, b: 0 }),
+      Object.freeze({ r: 232, g: 214, b: 28 }),
+      Object.freeze({ r: 255, g: 245, b: 96 })
+    ])
+  })
+});
+const PALETTE_FIXTURE_OVERRIDES_DEFAULT = Object.freeze({
+  version: 1,
+  fixtures: Object.freeze({})
+});
+const FIXTURE_METRIC_MODE_ORDER = Object.freeze(["manual", "meta_auto"]);
+const FIXTURE_METRIC_KEYS = Object.freeze(["baseline", "peaks", "transients", "flux"]);
+const FIXTURE_METRIC_HARMONY_MIN = 1;
+const FIXTURE_METRIC_HARMONY_MAX = 8;
+const FIXTURE_METRIC_MAX_HZ_MIN = 0.5;
+const FIXTURE_METRIC_MAX_HZ_MAX = 24;
+const FIXTURE_METRIC_CONFIG_DEFAULT = Object.freeze({
+  mode: "manual",
+  metric: "baseline",
+  metaAutoFlip: false,
+  harmonySize: 1,
+  maxHz: null
+});
+const FIXTURE_METRIC_ROUTING_DEFAULT = Object.freeze({
+  version: 1,
+  config: Object.freeze({ ...FIXTURE_METRIC_CONFIG_DEFAULT }),
+  brands: Object.freeze({
+    hue: null,
+    wiz: null
+  }),
+  fixtures: Object.freeze({})
 });
 const UNSAFE_SENSITIVE_LOG_ACK_PHRASE = "I_UNDERSTAND_SENSITIVE_LOG_RISK";
 let HueSyncCtor = null;
@@ -407,6 +534,10 @@ function sanitizeSystemConfig(input = {}) {
       raw.unsafeExposeSensitiveLogs,
       SYSTEM_CONFIG_DEFAULT.unsafeExposeSensitiveLogs
     ),
+    legacyComponentsEnabled: parseBooleanLoose(
+      raw.legacyComponentsEnabled,
+      SYSTEM_CONFIG_DEFAULT.legacyComponentsEnabled
+    ),
     hueTransportPreference: sanitizeHueTransportPreference(
       raw.hueTransportPreference,
       SYSTEM_CONFIG_DEFAULT.hueTransportPreference
@@ -428,6 +559,135 @@ function writeSystemConfig(config) {
   fs.mkdirSync(path.dirname(SYSTEM_CONFIG_PATH), { recursive: true });
   fs.writeFileSync(SYSTEM_CONFIG_PATH, `${JSON.stringify(safe, null, 2)}\n`, "utf8");
   return safe;
+}
+
+const AUDIO_RUNTIME_CONFIG_KEYS = Object.freeze([
+  "inputBackend",
+  "sampleRate",
+  "framesPerBuffer",
+  "channels",
+  "noiseFloorMin",
+  "peakDecay",
+  "outputGain",
+  "autoLevelEnabled",
+  "autoLevelTargetRms",
+  "autoLevelMinGain",
+  "autoLevelMaxGain",
+  "autoLevelResponse",
+  "autoLevelGate",
+  "limiterThreshold",
+  "limiterKnee",
+  "restartMs",
+  "watchdogMs",
+  "logEveryTicks",
+  "bandLowHz",
+  "bandMidHz",
+  "deviceMatch",
+  "deviceId",
+  "ffmpegPath",
+  "ffmpegInputFormat",
+  "ffmpegInputDevice",
+  "ffmpegInputDevices",
+  "ffmpegLogLevel",
+  "ffmpegUseWallclock",
+  "ffmpegAppIsolationEnabled",
+  "ffmpegAppIsolationStrict",
+  "ffmpegAppIsolationPrimaryApp",
+  "ffmpegAppIsolationFallbackApp",
+  "ffmpegAppIsolationPrimaryDevices",
+  "ffmpegAppIsolationFallbackDevices",
+  "ffmpegAppIsolationMultiSource",
+  "ffmpegAppIsolationCheckMs"
+]);
+
+function sanitizeAudioRuntimeConfig(input = null) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const safe = {};
+  for (const key of AUDIO_RUNTIME_CONFIG_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(input, key)) continue;
+    safe[key] = input[key];
+  }
+  return Object.keys(safe).length ? safe : null;
+}
+
+function readAudioRuntimeConfig() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(AUDIO_RUNTIME_CONFIG_PATH, "utf8"));
+    return sanitizeAudioRuntimeConfig(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function writeAudioRuntimeConfig(config) {
+  const safe = sanitizeAudioRuntimeConfig(config);
+  if (!safe) return null;
+  fs.mkdirSync(path.dirname(AUDIO_RUNTIME_CONFIG_PATH), { recursive: true });
+  fs.writeFileSync(AUDIO_RUNTIME_CONFIG_PATH, `${JSON.stringify(safe, null, 2)}\n`, "utf8");
+  return safe;
+}
+
+let audioRuntimeConfigWriteTimer = null;
+let audioRuntimeConfigWritePending = null;
+let audioRuntimeConfigWriteInFlight = false;
+
+function scheduleAudioRuntimeConfigWrite(config, options = {}) {
+  const safe = sanitizeAudioRuntimeConfig(config);
+  if (!safe) return;
+  const delayMs = Math.max(25, Math.min(2500, Math.round(Number(options.delayMs || 180))));
+  audioRuntimeConfigWritePending = safe;
+
+  const queueWrite = async () => {
+    if (audioRuntimeConfigWriteInFlight) return;
+    if (!audioRuntimeConfigWritePending) return;
+    const payload = audioRuntimeConfigWritePending;
+    audioRuntimeConfigWritePending = null;
+    audioRuntimeConfigWriteInFlight = true;
+    try {
+      await fs.promises.mkdir(path.dirname(AUDIO_RUNTIME_CONFIG_PATH), { recursive: true });
+      await fs.promises.writeFile(
+        AUDIO_RUNTIME_CONFIG_PATH,
+        `${JSON.stringify(payload, null, 2)}\n`,
+        "utf8"
+      );
+    } catch (err) {
+      console.warn(`[AUDIO] runtime config async write failed: ${err.message || err}`);
+    } finally {
+      audioRuntimeConfigWriteInFlight = false;
+      if (audioRuntimeConfigWritePending && !audioRuntimeConfigWriteTimer) {
+        audioRuntimeConfigWriteTimer = setTimeout(() => {
+          audioRuntimeConfigWriteTimer = null;
+          queueWrite().catch(() => {});
+        }, delayMs);
+        audioRuntimeConfigWriteTimer.unref?.();
+      }
+    }
+  };
+
+  if (audioRuntimeConfigWriteTimer) {
+    clearTimeout(audioRuntimeConfigWriteTimer);
+    audioRuntimeConfigWriteTimer = null;
+  }
+  if (options.immediate === true) {
+    queueWrite().catch(() => {});
+    return;
+  }
+  audioRuntimeConfigWriteTimer = setTimeout(() => {
+    audioRuntimeConfigWriteTimer = null;
+    queueWrite().catch(() => {});
+  }, delayMs);
+  audioRuntimeConfigWriteTimer.unref?.();
+}
+
+function flushScheduledAudioRuntimeConfigWriteSync() {
+  if (audioRuntimeConfigWriteTimer) {
+    clearTimeout(audioRuntimeConfigWriteTimer);
+    audioRuntimeConfigWriteTimer = null;
+  }
+  if (!audioRuntimeConfigWritePending) return null;
+  const pending = audioRuntimeConfigWritePending;
+  audioRuntimeConfigWritePending = null;
+  return writeAudioRuntimeConfig(pending);
 }
 
 function clampAudioReactivityAmount(value, fallback = 1) {
@@ -476,6 +736,29 @@ function sanitizeAudioReactivityTargetConfig(input = {}, fallback = {}) {
   };
 }
 
+function sanitizeMetaAutoTempoTrackersConfig(input = {}, fallback = {}) {
+  const raw = input && typeof input === "object" ? input : {};
+  const safeFallback = fallback && typeof fallback === "object" ? fallback : {};
+  const out = {};
+  for (const key of META_AUTO_TEMPO_TRACKER_KEYS) {
+    out[key] = parseBooleanLoose(raw[key], parseBooleanLoose(safeFallback[key], false));
+  }
+  return out;
+}
+
+function enforceMetaAutoTempoTrackerCompatibility(trackers = {}) {
+  const safe = sanitizeMetaAutoTempoTrackersConfig(
+    trackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  const hasAny = META_AUTO_TEMPO_TRACKER_KEYS.some(key => safe[key] === true);
+  if (!hasAny) {
+    // Empty tracker sets are contradictory to tempo-tracker mode.
+    safe.baseline = true;
+  }
+  return safe;
+}
+
 function sanitizeAudioReactivityMapConfig(input = {}) {
   const raw = input && typeof input === "object" ? input : {};
   const rawTargets = raw.targets && typeof raw.targets === "object" ? raw.targets : {};
@@ -487,6 +770,26 @@ function sanitizeAudioReactivityMapConfig(input = {}) {
       fallbackTargets[target]
     );
   }
+  const defaultTrackers = AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers || {};
+  const fallbackTrackers = sanitizeMetaAutoTempoTrackersConfig(defaultTrackers, defaultTrackers);
+  const baselineLegacy = parseBooleanLoose(
+    raw.metaAutoHueWizBaselineBlend,
+    parseBooleanLoose(fallbackTrackers.baseline, false)
+  );
+  const mergedTrackersInput = {
+    ...fallbackTrackers,
+    baseline: baselineLegacy,
+    ...(
+      raw.metaAutoTempoTrackers && typeof raw.metaAutoTempoTrackers === "object"
+        ? raw.metaAutoTempoTrackers
+        : {}
+    )
+  };
+  const metaAutoTempoTrackers = enforceMetaAutoTempoTrackerCompatibility(
+    mergedTrackersInput,
+    fallbackTrackers
+  );
+  const legacyMetaBlend = metaAutoTempoTrackers.baseline === true;
   return {
     version: 1,
     dropEnabled: parseBooleanLoose(raw.dropEnabled, AUDIO_REACTIVITY_MAP_DEFAULT.dropEnabled),
@@ -494,6 +797,12 @@ function sanitizeAudioReactivityMapConfig(input = {}) {
       raw.hardwareRateLimitsEnabled,
       AUDIO_REACTIVITY_MAP_DEFAULT.hardwareRateLimitsEnabled
     ),
+    metaAutoHueWizBaselineBlend: legacyMetaBlend,
+    metaAutoTempoTrackersAuto: parseBooleanLoose(
+      raw.metaAutoTempoTrackersAuto,
+      parseBooleanLoose(AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackersAuto, false)
+    ),
+    metaAutoTempoTrackers,
     targets
   };
 }
@@ -514,14 +823,321 @@ function writeAudioReactivityMapConfig(config) {
   return safe;
 }
 
+function sanitizeStandaloneStateConfig(input = {}) {
+  const raw = input && typeof input === "object" ? input : {};
+  const rawFixtures = raw.fixtures && typeof raw.fixtures === "object" && !Array.isArray(raw.fixtures)
+    ? raw.fixtures
+    : {};
+  const fixtures = {};
+  for (const [rawId, rawState] of Object.entries(rawFixtures)) {
+    const id = String(rawId || "").trim();
+    if (!id || id.length > 128) continue;
+    if (!rawState || typeof rawState !== "object" || Array.isArray(rawState)) continue;
+    fixtures[id] = { ...rawState };
+  }
+  return {
+    version: 1,
+    fixtures
+  };
+}
+
+function readStandaloneStateConfig() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(STANDALONE_STATE_CONFIG_PATH, "utf8"));
+    return sanitizeStandaloneStateConfig(parsed);
+  } catch {
+    return sanitizeStandaloneStateConfig(STANDALONE_STATE_CONFIG_DEFAULT);
+  }
+}
+
+function writeStandaloneStateConfig(config) {
+  const safe = sanitizeStandaloneStateConfig(config);
+  fs.mkdirSync(path.dirname(STANDALONE_STATE_CONFIG_PATH), { recursive: true });
+  fs.writeFileSync(STANDALONE_STATE_CONFIG_PATH, `${JSON.stringify(safe, null, 2)}\n`, "utf8");
+  return safe;
+}
+
+function normalizePaletteBrandKey(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return PALETTE_SUPPORTED_BRANDS.includes(key) ? key : "";
+}
+
+function normalizePaletteColorCount(value, fallback = PALETTE_CONFIG_DEFAULT.colorsPerFamily) {
+  const parsed = Number(value);
+  if (PALETTE_COLOR_COUNT_OPTIONS.includes(parsed)) return parsed;
+  return Number(fallback) || PALETTE_CONFIG_DEFAULT.colorsPerFamily;
+}
+
+function normalizePaletteDisorderAggression(value, fallback = PALETTE_CONFIG_DEFAULT.disorderAggression) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return Number(fallback) || PALETTE_CONFIG_DEFAULT.disorderAggression;
+  const normalized = parsed > 1 ? (parsed / 100) : parsed;
+  return Math.max(0, Math.min(1, normalized));
+}
+
+function normalizePaletteFamilies(value, fallback = PALETTE_CONFIG_DEFAULT.families) {
+  const list = Array.isArray(value)
+    ? value
+    : String(value || "")
+      .split(",")
+      .map(item => item.trim())
+      .filter(Boolean);
+  const out = [];
+  for (const raw of list) {
+    const key = String(raw || "").trim().toLowerCase();
+    const mapped = PALETTE_FAMILY_ALIASES[key] || key;
+    if (!PALETTE_FAMILY_ORDER.includes(mapped)) continue;
+    if (out.includes(mapped)) continue;
+    out.push(mapped);
+  }
+  if (out.length) return out;
+  const fallbackList = Array.isArray(fallback) && fallback.length
+    ? fallback
+    : PALETTE_CONFIG_DEFAULT.families;
+  return normalizePaletteFamilies(fallbackList, PALETTE_FAMILY_ORDER);
+}
+
+function normalizePaletteConfigSnapshot(source = {}, fallback = PALETTE_CONFIG_DEFAULT) {
+  const raw = source && typeof source === "object" ? source : {};
+  const safeFallback = fallback && typeof fallback === "object"
+    ? fallback
+    : PALETTE_CONFIG_DEFAULT;
+  return {
+    colorsPerFamily: normalizePaletteColorCount(
+      raw.colorsPerFamily,
+      normalizePaletteColorCount(safeFallback.colorsPerFamily, PALETTE_CONFIG_DEFAULT.colorsPerFamily)
+    ),
+    families: normalizePaletteFamilies(
+      raw.families,
+      normalizePaletteFamilies(safeFallback.families, PALETTE_CONFIG_DEFAULT.families)
+    ),
+    disorder: Object.prototype.hasOwnProperty.call(raw, "disorder")
+      ? parseBooleanLoose(raw.disorder, Boolean(safeFallback.disorder))
+      : Boolean(safeFallback.disorder),
+    disorderAggression: normalizePaletteDisorderAggression(
+      raw.disorderAggression,
+      normalizePaletteDisorderAggression(safeFallback.disorderAggression, PALETTE_CONFIG_DEFAULT.disorderAggression)
+    )
+  };
+}
+
+function sanitizePaletteFixtureOverridesConfig(input = {}) {
+  const raw = input && typeof input === "object" ? input : {};
+  const rawFixtures = raw.fixtures && typeof raw.fixtures === "object" && !Array.isArray(raw.fixtures)
+    ? raw.fixtures
+    : {};
+  const fixtures = {};
+  for (const [rawId, rawConfig] of Object.entries(rawFixtures)) {
+    const fixtureId = String(rawId || "").trim();
+    if (!fixtureId || fixtureId.length > 128) continue;
+    if (!rawConfig || typeof rawConfig !== "object" || Array.isArray(rawConfig)) continue;
+    fixtures[fixtureId] = normalizePaletteConfigSnapshot(rawConfig, PALETTE_CONFIG_DEFAULT);
+  }
+  return {
+    version: 1,
+    fixtures
+  };
+}
+
+function readPaletteFixtureOverridesConfig() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(PALETTE_FIXTURE_OVERRIDES_CONFIG_PATH, "utf8"));
+    return sanitizePaletteFixtureOverridesConfig(parsed);
+  } catch {
+    return sanitizePaletteFixtureOverridesConfig(PALETTE_FIXTURE_OVERRIDES_DEFAULT);
+  }
+}
+
+function writePaletteFixtureOverridesConfig(config) {
+  const safe = sanitizePaletteFixtureOverridesConfig(config);
+  fs.mkdirSync(path.dirname(PALETTE_FIXTURE_OVERRIDES_CONFIG_PATH), { recursive: true });
+  fs.writeFileSync(PALETTE_FIXTURE_OVERRIDES_CONFIG_PATH, `${JSON.stringify(safe, null, 2)}\n`, "utf8");
+  return safe;
+}
+
+function normalizeFixtureMetricMode(value, fallback = FIXTURE_METRIC_CONFIG_DEFAULT.mode) {
+  const key = String(value || "").trim().toLowerCase();
+  if (FIXTURE_METRIC_MODE_ORDER.includes(key)) return key;
+  const fallbackKey = String(fallback || "").trim().toLowerCase();
+  return FIXTURE_METRIC_MODE_ORDER.includes(fallbackKey)
+    ? fallbackKey
+    : FIXTURE_METRIC_CONFIG_DEFAULT.mode;
+}
+
+function normalizeFixtureMetricKey(value, fallback = FIXTURE_METRIC_CONFIG_DEFAULT.metric) {
+  const key = String(value || "").trim().toLowerCase();
+  if (FIXTURE_METRIC_KEYS.includes(key)) return key;
+  const fallbackKey = String(fallback || "").trim().toLowerCase();
+  return FIXTURE_METRIC_KEYS.includes(fallbackKey)
+    ? fallbackKey
+    : FIXTURE_METRIC_CONFIG_DEFAULT.metric;
+}
+
+function normalizeFixtureMetricHarmonySize(value, fallback = FIXTURE_METRIC_CONFIG_DEFAULT.harmonySize) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return Math.max(
+      FIXTURE_METRIC_HARMONY_MIN,
+      Math.min(FIXTURE_METRIC_HARMONY_MAX, Math.round(parsed))
+    );
+  }
+  const fallbackParsed = Number(fallback);
+  if (Number.isFinite(fallbackParsed)) {
+    return Math.max(
+      FIXTURE_METRIC_HARMONY_MIN,
+      Math.min(FIXTURE_METRIC_HARMONY_MAX, Math.round(fallbackParsed))
+    );
+  }
+  return FIXTURE_METRIC_CONFIG_DEFAULT.harmonySize;
+}
+
+function normalizeFixtureMetricMaxHz(value, fallback = FIXTURE_METRIC_CONFIG_DEFAULT.maxHz) {
+  const parseValue = input => {
+    if (input === undefined) return { ok: false, value: null };
+    if (input === null) return { ok: true, value: null };
+    if (typeof input === "string") {
+      const raw = input.trim().toLowerCase();
+      if (!raw) return { ok: true, value: null };
+      if (
+        raw === "off" ||
+        raw === "none" ||
+        raw === "null" ||
+        raw === "unclamped" ||
+        raw === "unclamp" ||
+        raw === "disabled"
+      ) {
+        return { ok: true, value: null };
+      }
+    }
+    const parsed = Number(input);
+    if (!Number.isFinite(parsed) || parsed <= 0) return { ok: false, value: null };
+    const clamped = Math.max(
+      FIXTURE_METRIC_MAX_HZ_MIN,
+      Math.min(FIXTURE_METRIC_MAX_HZ_MAX, parsed)
+    );
+    return { ok: true, value: Math.round(clamped * 10) / 10 };
+  };
+
+  const primary = parseValue(value);
+  if (primary.ok) return primary.value;
+  const fallbackValue = parseValue(fallback);
+  return fallbackValue.ok ? fallbackValue.value : null;
+}
+
+function normalizeFixtureMetricConfigSnapshot(source = {}, fallback = FIXTURE_METRIC_CONFIG_DEFAULT) {
+  const raw = source && typeof source === "object" ? source : {};
+  const safeFallback = fallback && typeof fallback === "object"
+    ? fallback
+    : FIXTURE_METRIC_CONFIG_DEFAULT;
+  const mode = normalizeFixtureMetricMode(raw.mode, safeFallback.mode);
+  let metric = normalizeFixtureMetricKey(raw.metric, safeFallback.metric);
+  let metaAutoFlip = Object.prototype.hasOwnProperty.call(raw, "metaAutoFlip")
+    ? parseBooleanLoose(raw.metaAutoFlip, Boolean(safeFallback.metaAutoFlip))
+    : Boolean(safeFallback.metaAutoFlip);
+  let harmonySize = normalizeFixtureMetricHarmonySize(raw.harmonySize, safeFallback.harmonySize);
+  const maxHz = normalizeFixtureMetricMaxHz(raw.maxHz, safeFallback.maxHz);
+
+  if (mode !== "meta_auto") {
+    // Manual mode overrules meta-auto-only controls.
+    metaAutoFlip = false;
+    harmonySize = FIXTURE_METRIC_CONFIG_DEFAULT.harmonySize;
+  } else {
+    // In meta-auto mode, manual metric selection is not used.
+    metric = FIXTURE_METRIC_CONFIG_DEFAULT.metric;
+  }
+
+  return {
+    mode,
+    metric,
+    metaAutoFlip,
+    harmonySize,
+    maxHz
+  };
+}
+
+function sanitizeFixtureMetricRoutingConfig(input = {}) {
+  const raw = input && typeof input === "object" ? input : {};
+  const globalSource = raw.config && typeof raw.config === "object" && !Array.isArray(raw.config)
+    ? raw.config
+    : raw;
+  const config = normalizeFixtureMetricConfigSnapshot(
+    globalSource,
+    FIXTURE_METRIC_CONFIG_DEFAULT
+  );
+
+  const rawBrands = raw.brands && typeof raw.brands === "object" && !Array.isArray(raw.brands)
+    ? raw.brands
+    : {};
+  const brands = {};
+  for (const brand of PALETTE_SUPPORTED_BRANDS) {
+    const entry = rawBrands[brand];
+    brands[brand] = entry && typeof entry === "object" && !Array.isArray(entry)
+      ? normalizeFixtureMetricConfigSnapshot(entry, config)
+      : null;
+  }
+
+  const rawFixtures = raw.fixtures && typeof raw.fixtures === "object" && !Array.isArray(raw.fixtures)
+    ? raw.fixtures
+    : {};
+  const fixtures = {};
+  for (const [rawId, rawConfig] of Object.entries(rawFixtures)) {
+    const fixtureId = String(rawId || "").trim();
+    if (!fixtureId || fixtureId.length > 128) continue;
+    if (!rawConfig || typeof rawConfig !== "object" || Array.isArray(rawConfig)) continue;
+    const brand = normalizePaletteBrandKey(rawConfig.brand);
+    const fallback = brand && brands[brand] ? brands[brand] : config;
+    fixtures[fixtureId] = normalizeFixtureMetricConfigSnapshot(rawConfig, fallback);
+  }
+
+  return {
+    version: 1,
+    config,
+    brands,
+    fixtures
+  };
+}
+
+function readFixtureMetricRoutingConfig() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(FIXTURE_METRIC_ROUTING_CONFIG_PATH, "utf8"));
+    return sanitizeFixtureMetricRoutingConfig(parsed);
+  } catch {
+    return sanitizeFixtureMetricRoutingConfig(FIXTURE_METRIC_ROUTING_DEFAULT);
+  }
+}
+
+function writeFixtureMetricRoutingConfig(config) {
+  const safe = sanitizeFixtureMetricRoutingConfig(config);
+  fs.mkdirSync(path.dirname(FIXTURE_METRIC_ROUTING_CONFIG_PATH), { recursive: true });
+  fs.writeFileSync(FIXTURE_METRIC_ROUTING_CONFIG_PATH, `${JSON.stringify(safe, null, 2)}\n`, "utf8");
+  return safe;
+}
+
 let systemConfigRuntime = readSystemConfig();
 setUnsafeExposeSensitiveLogsRuntime(Boolean(systemConfigRuntime?.unsafeExposeSensitiveLogs));
 console.log(
   `[SYSTEM] config loaded (autoLaunchBrowser=${systemConfigRuntime.autoLaunchBrowser}, ` +
   `delayMs=${systemConfigRuntime.browserLaunchDelayMs}, ` +
   `unsafeExposeSensitiveLogs=${Boolean(systemConfigRuntime.unsafeExposeSensitiveLogs)}, ` +
+  `legacyComponentsEnabled=${Boolean(systemConfigRuntime.legacyComponentsEnabled)}, ` +
   `hueTransportPreference=${sanitizeHueTransportPreference(systemConfigRuntime.hueTransportPreference)})`
 );
+const standaloneStateConfigRuntime = readStandaloneStateConfig();
+console.log(
+  `[STANDALONE] state loaded (${Object.keys(standaloneStateConfigRuntime.fixtures).length} fixtures)`
+);
+let paletteFixtureOverridesRuntime = readPaletteFixtureOverridesConfig();
+console.log(
+  `[PALETTE] fixture overrides loaded (${Object.keys(paletteFixtureOverridesRuntime.fixtures).length} fixtures)`
+);
+let fixtureMetricRoutingRuntime = readFixtureMetricRoutingConfig();
+console.log(
+  `[METRICS] fixture routing loaded (${Object.keys(fixtureMetricRoutingRuntime.fixtures).length} fixture overrides)`
+);
+const initialAudioRuntimeConfig = readAudioRuntimeConfig();
+if (initialAudioRuntimeConfig) {
+  console.log(`[AUDIO] runtime config loaded (${Object.keys(initialAudioRuntimeConfig).length} keys)`);
+}
 
 function isHueLinkButtonPending(err) {
   const type = Number(err?.type);
@@ -560,7 +1176,7 @@ const ALLOW_REMOTE_PRIVILEGED_READ_RUNTIME =
 const ALLOW_LEGACY_MUTATING_GET_RUNTIME =
   String(process.env.RAVELINK_ALLOW_LEGACY_MUTATING_GET || "").trim() === "1";
 const LOOPBACK_HOST_ALIASES = new Set(["127.0.0.1", "localhost", "::1"]);
-const LEGACY_MUTATING_GET_ROUTES = new Set(["/rave/on", "/rave/off", "/teach"]);
+const LEGACY_MUTATING_GET_ROUTES = new Set(["/rave/on", "/rave/off", "/teach", "/color"]);
 const PRIVILEGED_READ_ROUTES = new Set([
   "/fixtures",
   "/fixtures/config",
@@ -871,10 +1487,20 @@ const audioDevicesRateLimit = createIpRateLimiter({
   max: 20,
   bucket: "audio_devices"
 });
+const audioAppsRateLimit = createIpRateLimiter({
+  windowMs: 10000,
+  max: 24,
+  bucket: "audio_apps"
+});
 const audioRestartRateLimit = createIpRateLimiter({
   windowMs: 30000,
   max: 8,
   bucket: "audio_restart"
+});
+const audioAppScanRateLimit = createIpRateLimiter({
+  windowMs: 30000,
+  max: 12,
+  bucket: "audio_app_scan"
 });
 const fixturesReadRateLimit = createIpRateLimiter({
   windowMs: 10000,
@@ -893,7 +1519,8 @@ const modsHttpRouteRateLimit = createIpRateLimiter({
 });
 
 app.use((req, res, next) => {
-  if (!MUTATING_HTTP_METHODS.has(req.method)) {
+  const isLegacyMutatingGetRoute = req.method === "GET" && LEGACY_MUTATING_GET_ROUTES.has(req.path);
+  if (!MUTATING_HTTP_METHODS.has(req.method) && !isLegacyMutatingGetRoute) {
     next();
     return;
   }
@@ -901,7 +1528,8 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  if (!MUTATING_HTTP_METHODS.has(req.method)) {
+  const isLegacyMutatingGetRoute = req.method === "GET" && LEGACY_MUTATING_GET_ROUTES.has(req.path);
+  if (!MUTATING_HTTP_METHODS.has(req.method) && !isLegacyMutatingGetRoute) {
     next();
     return;
   }
@@ -1036,6 +1664,12 @@ const HUE_RECOVERY_TIMEOUT_BACKOFF_MS = 30000;
 const HUE_RECOVERY_FAST_RETRY_STREAK_LIMIT = 1;
 const HUE_RECOVERY_START_DELAY_MS = 300;
 const HUE_RECOVERY_SOCKET_START_DELAY_MS = 1400;
+const HUE_ENT_MODE_SWITCH_TIMEOUT_MS = 12000;
+const HUE_REST_MODE_SWITCH_TIMEOUT_MS = 2200;
+const HUE_RECOVERY_SUPPRESS_LOG_INTERVAL_MS = 15000;
+const HUE_ENT_HARD_FAIL_ESCALATE_STREAK = 5;
+const HUE_ENT_HARD_FAIL_STREAK_WINDOW_MS = 3500;
+const HUE_ENT_CONNECT_GRACE_MS = 12000;
 let hueRecoveryFailStreak = 0;
 let hueRecoveryTimeoutStreak = 0;
 let hueRecoveryLastPendingReason = "";
@@ -1044,6 +1678,13 @@ let hueTransportOp = Promise.resolve();
 let hueTransportRequestSeq = 0;
 let hueTransportPendingMode = null;
 let hueTransportPendingPromise = null;
+let hueEntertainmentHardFailStreak = 0;
+let hueEntertainmentLastHardFailAt = 0;
+let hueEntertainmentConnectedAt = 0;
+let hueRecoverySuppressedByTimeout = false;
+let hueRecoverySuppressedReason = "";
+let hueRecoverySuppressedAt = 0;
+let hueRecoverySuppressedLogAt = 0;
 
 // [TITLE] Section: Hardware Rate Capability Guard
 const TRANSPORT_RATE_CAPS = Object.freeze({
@@ -1057,9 +1698,9 @@ const TRANSPORT_RATE_CAPS = Object.freeze({
       maxSilenceMs: 1200
     }),
     entertainment: Object.freeze({
-      defaultMs: 95,
-      safeMinMs: 72,
-      safeMaxMs: 240,
+      defaultMs: 108,
+      safeMinMs: 84,
+      safeMaxMs: 260,
       unsafeMinMs: 40,
       unsafeMaxMs: 600,
       maxSilenceMs: 780
@@ -1067,12 +1708,12 @@ const TRANSPORT_RATE_CAPS = Object.freeze({
   }),
   wiz: Object.freeze({
     default: Object.freeze({
-      defaultMs: 105,
-      safeMinMs: 75,
-      safeMaxMs: 240,
+      defaultMs: 148,
+      safeMinMs: 108,
+      safeMaxMs: 320,
       unsafeMinMs: 45,
       unsafeMaxMs: 600,
-      maxSilenceMs: 900
+      maxSilenceMs: 1100
     })
   })
 });
@@ -1126,10 +1767,26 @@ function getHueRestAdaptiveSafeMinMs(zone = "hue") {
     : Number(TRANSPORT_RATE_CAPS.hue.rest.safeMinMs || 170);
 }
 
+function shouldForceHueRestScheduling(zone = "hue") {
+  const zoneKey = normalizeRouteZoneToken(zone, "hue");
+  const hueTargets = listEngineFixtures("hue", zoneKey);
+  for (const target of hueTargets) {
+    const fixtureId = String(target?.id || "").trim();
+    if (!fixtureId) continue;
+    if (getFixturePaletteOverrideConfig(fixtureId, "hue")) return true;
+    if (hasFixtureMetricRoutingActiveConfig(fixtureId, "hue")) return true;
+  }
+  return false;
+}
+
 function buildHueScheduleOptions(options = {}, zone = "hue") {
   const input = options && typeof options === "object" ? options : {};
-  const profile = getHueRateProfileForActiveTransport();
-  const adaptiveSafeMinMs = profile === TRANSPORT_RATE_CAPS.hue.rest
+  const forceRestProfile = input.forceRestProfile === true;
+  const useRestProfile = forceRestProfile || hueTransport.active === HUE_TRANSPORT.REST;
+  const profile = useRestProfile
+    ? TRANSPORT_RATE_CAPS.hue.rest
+    : TRANSPORT_RATE_CAPS.hue.entertainment;
+  const adaptiveSafeMinMs = useRestProfile
     ? getHueRestAdaptiveSafeMinMs(zone)
     : Number(profile.safeMinMs || profile.defaultMs || 80);
   const minIntervalMs = clampIntervalMsForProfile(
@@ -1343,7 +2000,21 @@ function isHueEntertainmentSyncInProgress() {
 }
 
 async function flushHue(zone = "hue") {
-  const pendingHueState = pendingHueStateByZone.get(zone);
+  const pendingEntry = pendingHueStateByZone.get(zone);
+  const pendingEnvelope = pendingEntry &&
+    typeof pendingEntry === "object" &&
+    !Array.isArray(pendingEntry) &&
+    (
+      Object.prototype.hasOwnProperty.call(pendingEntry, "state") ||
+      Object.prototype.hasOwnProperty.call(pendingEntry, "fixtureStates") ||
+      Object.prototype.hasOwnProperty.call(pendingEntry, "paletteIntent")
+    );
+  const pendingHueState = pendingEnvelope
+    ? pendingEntry.state
+    : pendingEntry;
+  const fixtureStates = pendingEnvelope && pendingEntry.fixtureStates && typeof pendingEntry.fixtureStates === "object"
+    ? pendingEntry.fixtureStates
+    : null;
   const isInFlight = hueInFlightZones.has(zone);
 
   if (isInFlight || !pendingHueState) {
@@ -1364,13 +2035,31 @@ async function flushHue(zone = "hue") {
     const hueTargets = listEngineFixtures("hue", zone);
     if (!hueTargets.length) return;
 
-    const ops = hueTargets.map(target =>
-      axios.put(
-        `http://${target.bridgeIp}/api/${target.username}/lights/${target.lightId}/state`,
-        stateToSend,
-        { timeout: 1500, httpAgent: hueHttpAgent }
-      )
-    );
+    const ops = [];
+    for (const target of hueTargets) {
+      const fixtureId = String(target?.id || "").trim();
+      const fixtureState = fixtureId && fixtureStates && fixtureStates[fixtureId]
+        ? fixtureStates[fixtureId]
+        : stateToSend;
+      const allowDispatch = shouldDispatchFixtureWithMetricHzClamp(
+        fixtureId,
+        "hue",
+        zone,
+        { forceSend: fixtureState?.on === false }
+      );
+      if (!allowDispatch) {
+        hueTelemetry.skippedScheduler++;
+        continue;
+      }
+      ops.push(
+        axios.put(
+          `http://${target.bridgeIp}/api/${target.username}/lights/${target.lightId}/state`,
+          fixtureState,
+          { timeout: 1500, httpAgent: hueHttpAgent }
+        )
+      );
+    }
+    if (!ops.length) return;
     const results = await Promise.allSettled(ops);
     for (const r of results) {
       if (r.status === "rejected") {
@@ -1393,11 +2082,36 @@ async function flushHue(zone = "hue") {
   }
 }
 
-function sendHueViaEntertainment(state, zone = "hue") {
+function sendHueViaEntertainment(state, zone = "hue", options = {}) {
   const hueTargets = listEngineFixtures("hue", zone);
   if (!hueTargets.length) {
     hueTelemetry.skippedNoTargets++;
     logNoEngineTargets("hue", zone);
+    return;
+  }
+
+  const paletteIntent = options && typeof options === "object"
+    ? options.paletteIntent
+    : null;
+  const fixtureStates = {};
+  let hasFixtureOverrides = false;
+  for (const target of hueTargets) {
+    const fixtureId = String(target?.id || "").trim();
+    if (!fixtureId) continue;
+    const stateForFixture = applyFixturePaletteToHueState(state, target, paletteIntent);
+    const hasMaxHzClamp = hasFixtureMetricMaxHzClamp(fixtureId, "hue");
+    if (stateForFixture !== state || hasMaxHzClamp) {
+      fixtureStates[fixtureId] = stateForFixture;
+      hasFixtureOverrides = true;
+    }
+  }
+  if (hasFixtureOverrides) {
+    pendingHueStateByZone.set(zone, {
+      state,
+      fixtureStates,
+      paletteIntent
+    });
+    flushHue(zone);
     return;
   }
 
@@ -1412,6 +2126,9 @@ function sendHueViaEntertainment(state, zone = "hue") {
       Number(entStatus.channelCount || uniqueHueCount || hueTargets.length)
     );
     hueEntertainment.send(state, channelCount);
+    hueEntertainmentHardFailStreak = 0;
+    hueEntertainmentLastHardFailAt = 0;
+    if (!(hueEntertainmentConnectedAt > 0)) hueEntertainmentConnectedAt = Date.now();
     hueTelemetry.sent++;
     hueTelemetry.sentEntertainment++;
     hueTelemetry.lastDurationMs = Date.now() - start;
@@ -1422,13 +2139,52 @@ function sendHueViaEntertainment(state, zone = "hue") {
     hueTransport.fallbackReason = failureDetail;
 
     if (isHardFailure) {
+      const now = Date.now();
+      const withinConnectGrace =
+        hueEntertainmentConnectedAt > 0 &&
+        (now - hueEntertainmentConnectedAt) < HUE_ENT_CONNECT_GRACE_MS;
+      if (withinConnectGrace) {
+        hueEntertainmentHardFailStreak = 0;
+        hueEntertainmentLastHardFailAt = now;
+        hueTransport.active = HUE_TRANSPORT.ENTERTAINMENT;
+        console.warn(
+          `[HUE][ENT] startup grace hard-send warning: ${hueTransport.fallbackReason}`
+        );
+        return;
+      }
+      if (
+        !hueEntertainmentLastHardFailAt ||
+        (now - hueEntertainmentLastHardFailAt) > HUE_ENT_HARD_FAIL_STREAK_WINDOW_MS
+      ) {
+        hueEntertainmentHardFailStreak = 1;
+      } else {
+        hueEntertainmentHardFailStreak += 1;
+      }
+      hueEntertainmentLastHardFailAt = now;
+
+      if (hueEntertainmentHardFailStreak < HUE_ENT_HARD_FAIL_ESCALATE_STREAK) {
+        // Absorb brief DTLS hiccups without transport flapping.
+        hueTransport.active = HUE_TRANSPORT.ENTERTAINMENT;
+        console.warn(
+          `[HUE][ENT] transient hard send warning (${hueEntertainmentHardFailStreak}/${HUE_ENT_HARD_FAIL_ESCALATE_STREAK}): ${hueTransport.fallbackReason}`
+        );
+        return;
+      }
+
+      hueEntertainmentHardFailStreak = 0;
+      hueEntertainmentLastHardFailAt = 0;
+      hueEntertainmentConnectedAt = 0;
       console.warn(`[HUE][ENT] send fallback to REST: ${hueTransport.fallbackReason}`);
       hueTransport.active = HUE_TRANSPORT.REST;
       hueEntertainment.stop().catch(stopErr => {
         console.warn("[HUE][ENT] cleanup stop failed:", redactErrorForLog(stopErr));
       });
       forceHueEntertainmentRecovery("send_fallback");
-      pendingHueStateByZone.set(zone, state);
+      pendingHueStateByZone.set(zone, {
+        state,
+        fixtureStates: null,
+        paletteIntent
+      });
       flushHue(zone);
     } else {
       // Keep DTLS active on transient transition faults; drop only this frame.
@@ -1446,47 +2202,85 @@ function flushHueSyncQueue() {
   pendingHueSyncStateByZone.clear();
 
   if (hueTransport.active === HUE_TRANSPORT.ENTERTAINMENT) {
-    for (const [zone, state] of queued) {
-      sendHueViaEntertainment(state, zone);
+    for (const [zone, entry] of queued) {
+      const envelope = entry && typeof entry === "object" && !Array.isArray(entry)
+        ? entry
+        : { state: entry };
+      const fixtureStates = envelope.fixtureStates && typeof envelope.fixtureStates === "object"
+        ? envelope.fixtureStates
+        : null;
+      if (fixtureStates && Object.keys(fixtureStates).length) {
+        pendingHueStateByZone.set(zone, envelope);
+        flushHue(zone);
+      } else {
+        sendHueViaEntertainment(envelope.state, zone, { paletteIntent: envelope.paletteIntent });
+      }
     }
     return;
   }
 
-  for (const [zone, state] of queued) {
-    pendingHueStateByZone.set(zone, state);
+  for (const [zone, entry] of queued) {
+    pendingHueStateByZone.set(zone, entry);
     flushHue(zone);
   }
 }
 
 function enqueueHue(state, zone = "hue", options = {}) {
   const scheduler = getHueScheduler(zone);
-  const scheduleOptions = buildHueScheduleOptions(options, zone);
+  const forceRestProfile = shouldForceHueRestScheduling(zone);
+  const scheduleOptions = buildHueScheduleOptions(
+    { ...(options && typeof options === "object" ? options : {}), forceRestProfile },
+    zone
+  );
 
   if (!scheduler.shouldSend(state, scheduleOptions)) {
     hueTelemetry.skippedScheduler++;
     return;
   }
 
-  if (hueTransport.active === HUE_TRANSPORT.ENTERTAINMENT) {
-    sendHueViaEntertainment(state, zone);
+  const paletteIntent = scheduleOptions.paletteIntent;
+  const hueTargets = listEngineFixtures("hue", zone);
+  const fixtureStates = {};
+  let hasFixtureOverrides = false;
+  for (const target of hueTargets) {
+    const fixtureId = String(target?.id || "").trim();
+    if (!fixtureId) continue;
+    const stateForFixture = applyFixturePaletteToHueState(state, target, paletteIntent);
+    if (stateForFixture !== state) {
+      fixtureStates[fixtureId] = stateForFixture;
+      hasFixtureOverrides = true;
+    }
+  }
+
+  const envelope = {
+    state,
+    fixtureStates: hasFixtureOverrides ? fixtureStates : null,
+    paletteIntent
+  };
+
+  if (hueTransport.active === HUE_TRANSPORT.ENTERTAINMENT && !hasFixtureOverrides) {
+    sendHueViaEntertainment(state, zone, { paletteIntent });
     return;
   }
 
   if (isHueEntertainmentSyncInProgress()) {
     hueTelemetry.skippedSyncHold++;
-    pendingHueSyncStateByZone.set(zone, state);
+    pendingHueSyncStateByZone.set(zone, envelope);
     return;
   }
 
   scheduleHueEntertainmentRecovery("rest_emit");
-  pendingHueStateByZone.set(zone, state);
+  pendingHueStateByZone.set(zone, envelope);
   flushHue(zone);
 }
 
 async function setHueTransportMode(nextMode) {
-  const requested = nextMode === HUE_TRANSPORT.ENTERTAINMENT
+  const requestedInput = nextMode === HUE_TRANSPORT.ENTERTAINMENT
     ? HUE_TRANSPORT.ENTERTAINMENT
     : HUE_TRANSPORT.REST;
+  const requested = requestedInput === HUE_TRANSPORT.ENTERTAINMENT && !state.isLockedBy("rave")
+    ? HUE_TRANSPORT.REST
+    : requestedInput;
   if (hueTransportPendingPromise && hueTransportPendingMode === requested) {
     return hueTransportPendingPromise;
   }
@@ -1502,6 +2296,9 @@ async function setHueTransportMode(nextMode) {
         await hueEntertainment.stop();
         hueTransport.active = HUE_TRANSPORT.REST;
         hueTransport.fallbackReason = null;
+        hueEntertainmentConnectedAt = 0;
+        hueEntertainmentHardFailStreak = 0;
+        hueEntertainmentLastHardFailAt = 0;
       } else {
         if (isSuperseded()) {
           return {
@@ -1518,19 +2315,26 @@ async function setHueTransportMode(nextMode) {
           }
           hueTransport.active = HUE_TRANSPORT.REST;
           hueTransport.fallbackReason = "no configured Hue fixtures routed to ENGINE";
+          hueEntertainmentConnectedAt = 0;
         } else if (!status.available) {
           hueTransport.active = HUE_TRANSPORT.REST;
           hueTransport.fallbackReason = sanitizeHueFallbackReason(
             status.reason,
             "entertainment driver unavailable"
           );
+          hueEntertainmentConnectedAt = 0;
         } else if (!status.configured) {
           hueTransport.active = HUE_TRANSPORT.REST;
           hueTransport.fallbackReason =
             "missing bridgeIp/username/bridgeId/clientKey (fixture or env)";
+          hueEntertainmentConnectedAt = 0;
         } else if (status.active) {
           hueTransport.active = HUE_TRANSPORT.ENTERTAINMENT;
           hueTransport.fallbackReason = null;
+          hueEntertainmentConnectedAt = Date.now();
+          hueEntertainmentHardFailStreak = 0;
+          hueEntertainmentLastHardFailAt = 0;
+          clearHueRecoveryTimeoutSuppression();
         } else {
           // Force a clean DTLS state before every (re)start attempt.
           await hueEntertainment.stop().catch(() => {});
@@ -1556,6 +2360,10 @@ async function setHueTransportMode(nextMode) {
           if (result.ok) {
             hueTransport.active = HUE_TRANSPORT.ENTERTAINMENT;
             hueTransport.fallbackReason = null;
+            hueEntertainmentConnectedAt = Date.now();
+            hueEntertainmentHardFailStreak = 0;
+            hueEntertainmentLastHardFailAt = 0;
+            clearHueRecoveryTimeoutSuppression();
           } else {
             await hueEntertainment.stop().catch(() => {});
             hueTransport.active = HUE_TRANSPORT.REST;
@@ -1563,6 +2371,7 @@ async function setHueTransportMode(nextMode) {
               result.reason,
               "entertainment start failed"
             );
+            hueEntertainmentConnectedAt = 0;
             hueTransport.errors++;
           }
         }
@@ -1571,6 +2380,7 @@ async function setHueTransportMode(nextMode) {
       if (!isSuperseded()) {
         hueTransport.active = HUE_TRANSPORT.REST;
         hueTransport.fallbackReason = redactErrorForLog(err);
+        hueEntertainmentConnectedAt = 0;
         hueTransport.errors++;
         console.warn("[HUE][ENT] mode switch failed:", hueTransport.fallbackReason);
       }
@@ -1664,6 +2474,37 @@ function shouldUseHueRecoveryFastRetry(reason = "unspecified") {
   );
 }
 
+function isHueRecoverySuppressionBypassReason(reason = "unspecified") {
+  const token = String(reason || "").trim().toLowerCase();
+  return (
+    token === "manual" ||
+    token === "transport_route" ||
+    token === "system_config" ||
+    token.includes("boot_sync")
+  );
+}
+
+function shouldSkipHueRecoveryReason(reason = "unspecified") {
+  const token = String(reason || "").trim().toLowerCase();
+  if (!token) return false;
+  // While rave is running, avoid startup/background recovery loops
+  // that can repeatedly trigger DTLS reconnect storms and visible flicker.
+  if (state.isLockedBy?.("rave")) {
+    if (token.includes("boot_sync")) return true;
+    if (token === "rest_emit") return true;
+    if (token === "reload") return true;
+    if (token === "rave_off_idle") return true;
+  }
+  return false;
+}
+
+function clearHueRecoveryTimeoutSuppression() {
+  hueRecoverySuppressedByTimeout = false;
+  hueRecoverySuppressedReason = "";
+  hueRecoverySuppressedAt = 0;
+  hueRecoverySuppressedLogAt = 0;
+}
+
 function computeHueRecoveryCooldown(reason = "unspecified", failureDetail = "") {
   const timeoutFailure = isHueRecoveryTimeoutFailure(failureDetail);
   if (timeoutFailure) {
@@ -1695,6 +2536,18 @@ function computeHueRecoveryCooldown(reason = "unspecified", failureDetail = "") 
 
 function scheduleHueEntertainmentRecovery(reason = "unspecified") {
   if (hueTransport.desired !== HUE_TRANSPORT.ENTERTAINMENT) return;
+  if (shouldSkipHueRecoveryReason(reason)) return;
+  const bypassSuppression = isHueRecoverySuppressionBypassReason(reason);
+  if (hueRecoverySuppressedByTimeout && !bypassSuppression) {
+    const now = Date.now();
+    if ((now - hueRecoverySuppressedLogAt) > HUE_RECOVERY_SUPPRESS_LOG_INTERVAL_MS) {
+      hueRecoverySuppressedLogAt = now;
+      console.warn(
+        `[HUE][ENT] auto-recover suppressed for current rave session: ${hueRecoverySuppressedReason || "previous DTLS timeout"}`
+      );
+    }
+    return;
+  }
   if (hueTransport.active === HUE_TRANSPORT.ENTERTAINMENT) return;
   if (!hasConfiguredHueEngineTargets()) {
     hueTransport.active = HUE_TRANSPORT.REST;
@@ -1718,6 +2571,7 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
         hueRecoveryFailStreak = 0;
         hueRecoveryTimeoutStreak = 0;
         hueRecoveryNextAt = Date.now() + HUE_RECOVERY_COOLDOWN_MS;
+        clearHueRecoveryTimeoutSuppression();
         console.log(`[HUE][ENT] auto-recovered (${reason})`);
       } else {
         hueRecoveryFailStreak = Math.min(10, hueRecoveryFailStreak + 1);
@@ -1736,6 +2590,19 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
             `[HUE][ENT] auto-recover pending (${reason}): ${pendingReason} | retry in ${cooldown}ms`
           );
         }
+        if (isHueRecoveryTimeoutFailure(pendingReasonRaw) && !bypassSuppression) {
+          hueRecoverySuppressedByTimeout = true;
+          hueRecoverySuppressedReason = pendingReason;
+          hueRecoverySuppressedAt = Date.now();
+          hueRecoverySuppressedLogAt = hueRecoverySuppressedAt;
+          hueRecoveryNextAt = Math.max(
+            hueRecoveryNextAt,
+            hueRecoverySuppressedAt + HUE_RECOVERY_MAX_COOLDOWN_MS
+          );
+          console.warn(
+            `[HUE][ENT] auto-recover suspended for current rave session after timeout: ${pendingReason}`
+          );
+        }
       }
     } catch (err) {
       hueRecoveryFailStreak = Math.min(10, hueRecoveryFailStreak + 1);
@@ -1743,6 +2610,19 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
       const cooldown = computeHueRecoveryCooldown(reason, errorDetail);
       hueRecoveryNextAt = Date.now() + cooldown;
       console.warn(`[HUE][ENT] auto-recover failed (${reason}):`, errorDetail);
+      if (isHueRecoveryTimeoutFailure(errorDetail) && !bypassSuppression) {
+        hueRecoverySuppressedByTimeout = true;
+        hueRecoverySuppressedReason = errorDetail;
+        hueRecoverySuppressedAt = Date.now();
+        hueRecoverySuppressedLogAt = hueRecoverySuppressedAt;
+        hueRecoveryNextAt = Math.max(
+          hueRecoveryNextAt,
+          hueRecoverySuppressedAt + HUE_RECOVERY_MAX_COOLDOWN_MS
+        );
+        console.warn(
+          `[HUE][ENT] auto-recover suspended for current rave session after timeout: ${errorDetail}`
+        );
+      }
     } finally {
       hueRecoveryInFlight = false;
       hueRecoveryTimer = null;
@@ -1751,7 +2631,11 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
 }
 
 function forceHueEntertainmentRecovery(reason = "manual") {
+  if (shouldSkipHueRecoveryReason(reason)) return;
   const token = String(reason || "").trim().toLowerCase();
+  if (isHueRecoverySuppressionBypassReason(token)) {
+    clearHueRecoveryTimeoutSuppression();
+  }
   const bypassBackoff =
     token === "manual" ||
     token === "send_fallback" ||
@@ -2295,9 +3179,6 @@ function getFixtureDispatchZoneForMode(fixture, mode = "engine") {
   if (brand === "hue") return "hue";
   if (brand === "wiz") {
     if (targetMode === "custom") return "custom";
-    if (targetMode === "twitch" && parseBoolean(fixture?.customEnabled, false)) {
-      return "custom";
-    }
     return "wiz";
   }
   return normalizeRouteZoneToken(fixture?.zone, getCanonicalZoneFallback(brand, "custom"));
@@ -2348,6 +3229,122 @@ function resolveIntentZones(intent, brand, fallbackZone, options = {}) {
   return zones.length ? zones : [fallbackZone || getCanonicalZoneFallback(brandKey, "custom")];
 }
 
+function buildFixtureModeInteroperabilityReport(options = {}) {
+  const verbose = options && options.verbose === true;
+  const fixtures = fixtureRegistry.getFixtures?.() || [];
+  const routes = fixtureRegistry.getIntentRoutes?.() || {};
+  const issues = [];
+  const rows = [];
+
+  const listIds = list => new Set(
+    (Array.isArray(list) ? list : [])
+      .map(item => String(item?.id || "").trim())
+      .filter(Boolean)
+  );
+
+  const engineIdsByBrand = {
+    hue: listIds(fixtureRegistry.listEngineBy?.("hue", "", { requireConfigured: false }) || []),
+    wiz: listIds(fixtureRegistry.listEngineBy?.("wiz", "", { requireConfigured: false }) || [])
+  };
+  const twitchIdsByBrand = {
+    hue: listIds(fixtureRegistry.listTwitchBy?.("hue", "", { requireConfigured: false }) || []),
+    wiz: listIds(fixtureRegistry.listTwitchBy?.("wiz", "", { requireConfigured: false }) || [])
+  };
+  const customIdsByBrand = {
+    hue: listIds(fixtureRegistry.listCustomBy?.("hue", "", { requireConfigured: false }) || []),
+    wiz: listIds(fixtureRegistry.listCustomBy?.("wiz", "", { requireConfigured: false }) || [])
+  };
+
+  const activeCounts = {
+    engine: 0,
+    twitch: 0,
+    custom: 0
+  };
+
+  for (const fixture of fixtures) {
+    if (!fixture || typeof fixture !== "object") continue;
+    const id = String(fixture.id || "").trim();
+    if (!id) continue;
+
+    const brand = String(fixture.brand || "").trim().toLowerCase();
+    const legacyMode = String(fixture.controlMode || "engine").trim().toLowerCase();
+    const enabled = fixture.enabled !== false;
+    const engineEnabled = parseBoolean(fixture.engineEnabled, legacyMode === "engine");
+    const twitchEnabled = parseBoolean(fixture.twitchEnabled, false);
+    const customEnabled = parseBoolean(fixture.customEnabled, legacyMode === "standalone");
+    const controlMode = engineEnabled ? "engine" : "standalone";
+    const engineBinding = String(
+      fixture.engineBinding || (engineEnabled ? brand : "standalone")
+    ).trim().toLowerCase();
+
+    if (engineEnabled) activeCounts.engine += 1;
+    if (twitchEnabled) activeCounts.twitch += 1;
+    if (customEnabled) activeCounts.custom += 1;
+
+    if (engineEnabled && customEnabled) {
+      issues.push({ id, severity: "error", code: "engine_custom_conflict", message: "engineEnabled and customEnabled cannot both be true" });
+    }
+    if (!engineEnabled && !twitchEnabled && !customEnabled) {
+      issues.push({ id, severity: "error", code: "no_mode_enabled", message: "fixture has no enabled routing mode" });
+    }
+    if (engineEnabled && engineBinding !== brand) {
+      issues.push({ id, severity: "error", code: "engine_binding_mismatch", message: `engineBinding must be '${brand}' when engineEnabled=true` });
+    }
+    if (!engineEnabled && engineBinding !== "standalone") {
+      issues.push({ id, severity: "warn", code: "standalone_binding_mismatch", message: "engineBinding should be 'standalone' when engineEnabled=false" });
+    }
+    if (String(legacyMode || "") !== controlMode) {
+      issues.push({ id, severity: "warn", code: "control_mode_mismatch", message: `controlMode should be '${controlMode}' for current mode flags` });
+    }
+
+    if (enabled && (brand === "hue" || brand === "wiz")) {
+      const inEngine = engineIdsByBrand[brand].has(id);
+      const inTwitch = twitchIdsByBrand[brand].has(id);
+      const inCustom = customIdsByBrand[brand].has(id);
+      if (inEngine !== engineEnabled) {
+        issues.push({ id, severity: "error", code: "engine_list_mismatch", message: "engine list membership does not match engineEnabled flag" });
+      }
+      if (inTwitch !== twitchEnabled) {
+        issues.push({ id, severity: "error", code: "twitch_list_mismatch", message: "twitch list membership does not match twitchEnabled flag" });
+      }
+      if (inCustom !== customEnabled) {
+        issues.push({ id, severity: "error", code: "custom_list_mismatch", message: "custom list membership does not match customEnabled flag" });
+      }
+    }
+
+    if (verbose) {
+      rows.push({
+        id,
+        brand,
+        enabled,
+        controlMode: legacyMode,
+        engineBinding,
+        engineEnabled,
+        twitchEnabled,
+        customEnabled
+      });
+    }
+  }
+
+  const byCode = {};
+  for (const issue of issues) {
+    const key = String(issue.code || "unknown");
+    byCode[key] = (byCode[key] || 0) + 1;
+  }
+
+  return {
+    ok: issues.filter(item => item.severity === "error").length === 0,
+    checkedAt: Date.now(),
+    totalFixtures: fixtures.length,
+    activeCounts,
+    routes,
+    issueCount: issues.length,
+    issuesByCode: byCode,
+    issues,
+    ...(verbose ? { fixtures: rows } : {})
+  };
+}
+
 function enqueueWiz(state, zone = "wiz", options = {}) {
   const scheduler = getWizScheduler(zone);
   const scheduleOptions = buildWizScheduleOptions(options);
@@ -2364,17 +3361,1286 @@ function enqueueWiz(state, zone = "wiz", options = {}) {
   }
 
   const start = Date.now();
+  let sentCount = 0;
   for (const target of targets) {
+    const stateForTarget = applyFixturePaletteToWizState(
+      state,
+      target.id,
+      scheduleOptions.paletteIntent
+    );
+    const allowDispatch = shouldDispatchFixtureWithMetricHzClamp(
+      target.id,
+      "wiz",
+      zone,
+      { forceSend: stateForTarget?.on === false }
+    );
+    if (!allowDispatch) {
+      wizTelemetry.skippedScheduler++;
+      continue;
+    }
     try {
-      target.send(state, scheduleOptions.tx);
+      target.send(stateForTarget, scheduleOptions.tx);
+      sentCount += 1;
     } catch (err) {
       wizTelemetry.sendErrors++;
       console.error("[WIZ] send failed:", err.message || err);
     }
   }
 
+  if (sentCount <= 0) {
+    wizTelemetry.lastDurationMs = Date.now() - start;
+    return;
+  }
   wizTelemetry.sent++;
   wizTelemetry.lastDurationMs = Date.now() - start;
+}
+
+const fixturePaletteSequenceState = new Map();
+const PALETTE_PATCH_FIELDS = Object.freeze([
+  "colorsPerFamily",
+  "families",
+  "disorder",
+  "disorderAggression"
+]);
+
+function hasPalettePatchFields(patch = {}) {
+  return PALETTE_PATCH_FIELDS.some(key => Object.prototype.hasOwnProperty.call(patch, key));
+}
+
+function getEngineGlobalPaletteConfig() {
+  const raw = engine?.getPaletteConfig?.();
+  return normalizePaletteConfigSnapshot(raw, PALETTE_CONFIG_DEFAULT);
+}
+
+function getEnginePaletteConfigForBrand(brandKey) {
+  const brand = normalizePaletteBrandKey(brandKey);
+  const globalConfig = getEngineGlobalPaletteConfig();
+  if (!brand) return globalConfig;
+
+  const direct = engine?.getPaletteConfig?.(brand);
+  if (direct && typeof direct === "object" && !Array.isArray(direct)) {
+    return normalizePaletteConfigSnapshot(direct, globalConfig);
+  }
+
+  const globalRaw = engine?.getPaletteConfig?.() || {};
+  const brands = globalRaw && typeof globalRaw === "object" && globalRaw.brands && typeof globalRaw.brands === "object"
+    ? globalRaw.brands
+    : {};
+  const brandRaw = brands[brand];
+  if (brandRaw && typeof brandRaw === "object" && !Array.isArray(brandRaw)) {
+    return normalizePaletteConfigSnapshot(brandRaw, globalConfig);
+  }
+  return globalConfig;
+}
+
+function prunePaletteFixtureOverrides(fixtures = null) {
+  const fixtureList = Array.isArray(fixtures)
+    ? fixtures
+    : (fixtureRegistry.getFixtures?.() || []);
+  const fixtureById = new Map(
+    fixtureList
+      .map(fixture => [String(fixture?.id || "").trim(), fixture])
+      .filter(([id]) => Boolean(id))
+  );
+  const current = paletteFixtureOverridesRuntime?.fixtures || {};
+  const nextFixtures = {};
+  let changed = false;
+
+  for (const [fixtureId, rawConfig] of Object.entries(current)) {
+    const fixture = fixtureById.get(fixtureId);
+    if (!fixture) {
+      changed = true;
+      fixturePaletteSequenceState.delete(fixtureId);
+      continue;
+    }
+    const brand = normalizePaletteBrandKey(fixture.brand);
+    if (!brand) {
+      changed = true;
+      fixturePaletteSequenceState.delete(fixtureId);
+      continue;
+    }
+    const normalized = normalizePaletteConfigSnapshot(
+      rawConfig,
+      getEnginePaletteConfigForBrand(brand)
+    );
+    nextFixtures[fixtureId] = normalized;
+    if (!rawConfig || JSON.stringify(rawConfig) !== JSON.stringify(normalized)) {
+      changed = true;
+    }
+  }
+
+  if (!changed && Object.keys(nextFixtures).length !== Object.keys(current).length) {
+    changed = true;
+  }
+
+  if (changed) {
+    paletteFixtureOverridesRuntime = writePaletteFixtureOverridesConfig({
+      ...paletteFixtureOverridesRuntime,
+      fixtures: nextFixtures
+    });
+  }
+}
+
+function buildPaletteBrandFixtureCatalog(fixtures = null) {
+  const fixtureList = Array.isArray(fixtures)
+    ? fixtures
+    : (fixtureRegistry.getFixtures?.() || []);
+  const byBrand = {};
+  for (const brand of PALETTE_SUPPORTED_BRANDS) {
+    byBrand[brand] = [];
+  }
+
+  for (const fixture of fixtureList) {
+    if (!fixture || typeof fixture !== "object") continue;
+    const fixtureId = String(fixture.id || "").trim();
+    if (!fixtureId) continue;
+    const brand = normalizePaletteBrandKey(fixture.brand);
+    if (!brand) continue;
+    const legacyMode = String(fixture.controlMode || "engine").trim().toLowerCase();
+    const engineEnabled = parseBoolean(fixture.engineEnabled, legacyMode === "engine");
+    if (fixture.enabled === false || !engineEnabled) continue;
+    const zone = getFixtureDispatchZoneForMode(fixture, "engine");
+    byBrand[brand].push({
+      id: fixtureId,
+      brand,
+      zone,
+      label: `${fixtureId} | ${String(zone || brand).toUpperCase()}`
+    });
+  }
+
+  for (const brand of PALETTE_SUPPORTED_BRANDS) {
+    byBrand[brand].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  }
+
+  return byBrand;
+}
+
+function buildPaletteFixtureOverrideSnapshot() {
+  const fixtures = fixtureRegistry.getFixtures?.() || [];
+  prunePaletteFixtureOverrides(fixtures);
+  const fixtureById = new Map(
+    fixtures
+      .map(fixture => [String(fixture?.id || "").trim(), fixture])
+      .filter(([id]) => Boolean(id))
+  );
+  const out = {};
+
+  for (const [fixtureId, rawConfig] of Object.entries(paletteFixtureOverridesRuntime.fixtures || {})) {
+    const fixture = fixtureById.get(fixtureId);
+    if (!fixture) continue;
+    const brand = normalizePaletteBrandKey(fixture.brand);
+    if (!brand) continue;
+    out[fixtureId] = {
+      ...normalizePaletteConfigSnapshot(rawConfig, getEnginePaletteConfigForBrand(brand)),
+      fixtureId,
+      brand
+    };
+  }
+
+  return out;
+}
+
+function getFixturePaletteOverrideConfig(fixtureId, brandKey) {
+  const id = String(fixtureId || "").trim();
+  const brand = normalizePaletteBrandKey(brandKey);
+  if (!id || !brand) return null;
+  const raw = paletteFixtureOverridesRuntime.fixtures?.[id];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  return normalizePaletteConfigSnapshot(raw, getEnginePaletteConfigForBrand(brand));
+}
+
+function buildPaletteFamilyColors(familyId, colorsPerFamily) {
+  const family = PALETTE_FAMILY_DEFS[familyId];
+  if (!family) return [];
+  const colors = Array.isArray(family.colors) ? family.colors.slice() : [];
+  if (!colors.length) return [];
+  const count = normalizePaletteColorCount(colorsPerFamily, 3);
+  if (count === 1) {
+    return [colors[Math.floor(colors.length / 2)]];
+  }
+  if (count === 3) {
+    return [
+      colors[0],
+      colors[Math.floor(colors.length / 2)],
+      colors[Math.min(colors.length - 1, 4)]
+    ];
+  }
+  return colors.slice(0, 5);
+}
+
+function buildPaletteSequence(config = {}) {
+  const normalized = normalizePaletteConfigSnapshot(config, PALETTE_CONFIG_DEFAULT);
+  const out = [];
+  for (const familyId of normalizePaletteFamilies(normalized.families, PALETTE_CONFIG_DEFAULT.families)) {
+    const colors = buildPaletteFamilyColors(familyId, normalized.colorsPerFamily);
+    for (const color of colors) {
+      out.push({
+        r: clampRgb255(color.r),
+        g: clampRgb255(color.g),
+        b: clampRgb255(color.b)
+      });
+    }
+  }
+  if (out.length) return out;
+  return buildPaletteFamilyColors("blue", 3).map(color => ({
+    r: clampRgb255(color.r),
+    g: clampRgb255(color.g),
+    b: clampRgb255(color.b)
+  }));
+}
+
+function getPaletteConfigFingerprint(config = {}) {
+  const normalized = normalizePaletteConfigSnapshot(config, PALETTE_CONFIG_DEFAULT);
+  return [
+    String(normalized.colorsPerFamily),
+    normalizePaletteFamilies(normalized.families, PALETTE_CONFIG_DEFAULT.families).join(","),
+    normalized.disorder ? "1" : "0",
+    String(Math.round(normalizePaletteDisorderAggression(normalized.disorderAggression, 0.35) * 1000))
+  ].join("|");
+}
+
+function pickFixturePaletteColor(fixtureId, brandKey, intent = {}) {
+  const config = getFixturePaletteOverrideConfig(fixtureId, brandKey);
+  if (!config) return null;
+  const sequence = buildPaletteSequence(config);
+  if (!sequence.length) return null;
+
+  const id = String(fixtureId || "").trim();
+  if (!id) return null;
+  const fingerprint = getPaletteConfigFingerprint(config);
+  let state = fixturePaletteSequenceState.get(id);
+  if (!state || state.fingerprint !== fingerprint || Number(state.length) !== sequence.length) {
+    state = { index: 0, fingerprint, length: sequence.length };
+  }
+
+  let index = Number(state.index) || 0;
+  if (index < 0 || index >= sequence.length) index = 0;
+  const color = sequence[index];
+
+  const isBeat = Boolean(intent?.beat);
+  const isDrop = Boolean(intent?.drop);
+  let nextIndex = index;
+
+  if (config.disorder) {
+    const aggression = normalizePaletteDisorderAggression(config.disorderAggression, 0.35);
+    const jumpChance = Math.max(
+      0.12,
+      Math.min(0.98, 0.18 + aggression * 0.64 + (isBeat ? 0.1 : 0) + (isDrop ? 0.12 : 0))
+    );
+    if (Math.random() < jumpChance) {
+      const maxJump = Math.max(1, Math.round(1 + aggression * Math.max(1, sequence.length - 1)));
+      const jump = 1 + Math.floor(Math.random() * maxJump);
+      nextIndex = (index + jump) % sequence.length;
+    } else if (isBeat || isDrop) {
+      nextIndex = (index + 1) % sequence.length;
+    }
+  } else {
+    let step = 1;
+    if (isDrop && sequence.length > 2) step = 2;
+    nextIndex = (index + step) % sequence.length;
+  }
+
+  fixturePaletteSequenceState.set(id, {
+    index: nextIndex,
+    fingerprint,
+    length: sequence.length
+  });
+
+  return {
+    r: clampRgb255(color.r),
+    g: clampRgb255(color.g),
+    b: clampRgb255(color.b)
+  };
+}
+
+function applyFixturePaletteToHueState(state = {}, fixture = null, intent = {}) {
+  const source = state && typeof state === "object" ? state : null;
+  if (!source || source.on === false) return source;
+  const fixtureId = String(fixture?.id || "").trim();
+  if (!fixtureId) return source;
+
+  const color = pickFixturePaletteColor(fixtureId, "hue", intent);
+  const base = color
+    ? (() => {
+      const hsv = rgbToHsv255(color);
+      let hue = Math.round((hsv.h / 360) * 65535) % 65535;
+      if (hue < 0) hue += 65535;
+      return {
+        ...source,
+        hue,
+        sat: Math.max(0, Math.min(254, Math.round((Number(hsv.s) || 0) * 254)))
+      };
+    })()
+    : source;
+
+  return applyFixtureMetricToHueState(base, fixture, intent);
+}
+
+function applyFixturePaletteToWizState(state = {}, fixtureId = "", intent = {}) {
+  const source = state && typeof state === "object" ? state : null;
+  if (!source || source.on === false) return source;
+  const id = String(fixtureId || "").trim();
+  if (!id) return source;
+
+  const color = pickFixturePaletteColor(id, "wiz", intent);
+  const next = color
+    ? {
+      ...source,
+      r: clampRgb255(color.r),
+      g: clampRgb255(color.g),
+      b: clampRgb255(color.b)
+    }
+    : { ...source };
+  if (Object.prototype.hasOwnProperty.call(next, "temp")) {
+    delete next.temp;
+  }
+  return applyFixtureMetricToWizState(next, id, intent);
+}
+
+function setFixturePaletteOverrideConfig(patch = {}) {
+  const next = patch && typeof patch === "object" ? patch : {};
+  const fixtureId = String(next.fixtureId || "").trim();
+  if (!fixtureId) {
+    return { ok: false, status: 400, error: "missing fixtureId" };
+  }
+
+  const fixtures = fixtureRegistry.getFixtures?.() || [];
+  const fixture = fixtures.find(item => String(item?.id || "").trim() === fixtureId) || null;
+  if (!fixture) {
+    return { ok: false, status: 404, error: "fixture not found" };
+  }
+
+  const fixtureBrand = normalizePaletteBrandKey(fixture.brand);
+  if (!fixtureBrand) {
+    return {
+      ok: false,
+      status: 400,
+      error: `fixture brand '${String(fixture.brand || "unknown")}' does not support palette overrides`
+    };
+  }
+
+  const requestedBrand = normalizePaletteBrandKey(next.brand);
+  if (requestedBrand && requestedBrand !== fixtureBrand) {
+    return {
+      ok: false,
+      status: 400,
+      error: `fixtureId '${fixtureId}' belongs to brand '${fixtureBrand}', not '${requestedBrand}'`
+    };
+  }
+
+  const clearRequested = parseBooleanLoose(next.clearOverride, false) === true;
+  if (clearRequested) {
+    if (paletteFixtureOverridesRuntime.fixtures[fixtureId]) {
+      const fixturesNext = { ...paletteFixtureOverridesRuntime.fixtures };
+      delete fixturesNext[fixtureId];
+      paletteFixtureOverridesRuntime = writePaletteFixtureOverridesConfig({
+        ...paletteFixtureOverridesRuntime,
+        fixtures: fixturesNext
+      });
+    }
+    fixturePaletteSequenceState.delete(fixtureId);
+    return {
+      ok: true,
+      fixtureId,
+      brand: fixtureBrand,
+      cleared: true
+    };
+  }
+
+  if (!hasPalettePatchFields(next)) {
+    return { ok: false, status: 400, error: "no valid palette fields" };
+  }
+
+  const base = getEnginePaletteConfigForBrand(fixtureBrand);
+  const currentRaw = paletteFixtureOverridesRuntime.fixtures?.[fixtureId] || {};
+  const current = normalizePaletteConfigSnapshot(currentRaw, base);
+  const updated = { ...current };
+
+  if (Object.prototype.hasOwnProperty.call(next, "colorsPerFamily")) {
+    updated.colorsPerFamily = normalizePaletteColorCount(next.colorsPerFamily, current.colorsPerFamily);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "families")) {
+    updated.families = normalizePaletteFamilies(next.families, current.families);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "disorder")) {
+    updated.disorder = Boolean(next.disorder);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "disorderAggression")) {
+    updated.disorderAggression = normalizePaletteDisorderAggression(
+      next.disorderAggression,
+      current.disorderAggression
+    );
+  }
+
+  const normalized = normalizePaletteConfigSnapshot(updated, base);
+  paletteFixtureOverridesRuntime = writePaletteFixtureOverridesConfig({
+    ...paletteFixtureOverridesRuntime,
+    fixtures: {
+      ...paletteFixtureOverridesRuntime.fixtures,
+      [fixtureId]: normalized
+    }
+  });
+  fixturePaletteSequenceState.delete(fixtureId);
+  return {
+    ok: true,
+    fixtureId,
+    brand: fixtureBrand,
+    cleared: false,
+    config: normalized
+  };
+}
+
+const fixtureMetricAutoStateByScope = new Map();
+const fixtureMetricHzClampStateByBrand = {
+  hue: new Map(),
+  wiz: new Map()
+};
+
+function pruneFixtureMetricAutoStateScopes(validFixtureIds = []) {
+  const validBrands = new Set(PALETTE_SUPPORTED_BRANDS.map(brand => `brand:${brand}`));
+  const validFixtureKeys = new Set(
+    (Array.isArray(validFixtureIds) ? validFixtureIds : [])
+      .map(id => String(id || "").trim().toLowerCase())
+      .filter(Boolean)
+      .map(id => `fixture:${id}`)
+  );
+  const keepKeys = new Set([
+    "global",
+    ...validBrands,
+    ...validFixtureKeys
+  ]);
+  for (const key of fixtureMetricAutoStateByScope.keys()) {
+    if (!keepKeys.has(key)) {
+      fixtureMetricAutoStateByScope.delete(key);
+    }
+  }
+}
+
+function getFixtureMetricHzClampStateMap(brandKey) {
+  const brand = normalizePaletteBrandKey(brandKey);
+  if (!brand) return null;
+  const map = fixtureMetricHzClampStateByBrand[brand];
+  return map instanceof Map ? map : null;
+}
+
+function buildFixtureMetricHzClampDispatchKey(fixtureId, zone, brandKey) {
+  const id = String(fixtureId || "").trim().toLowerCase();
+  if (!id) return "";
+  const brand = normalizePaletteBrandKey(brandKey) || "fixture";
+  const zoneKey = normalizeRouteZoneToken(zone, brand);
+  return `${id}|${zoneKey || brand}`;
+}
+
+function pruneFixtureMetricHzClampState(validFixtureIds = []) {
+  const valid = new Set(
+    (Array.isArray(validFixtureIds) ? validFixtureIds : [])
+      .map(id => String(id || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  for (const brand of PALETTE_SUPPORTED_BRANDS) {
+    const stateMap = getFixtureMetricHzClampStateMap(brand);
+    if (!stateMap) continue;
+    for (const key of stateMap.keys()) {
+      const fixtureId = String(key || "").split("|")[0];
+      if (!fixtureId || !valid.has(fixtureId)) {
+        stateMap.delete(key);
+      }
+    }
+  }
+}
+
+const FIXTURE_METRIC_PATCH_FIELDS = Object.freeze([
+  "mode",
+  "metric",
+  "metaAutoFlip",
+  "harmonySize",
+  "maxHz"
+]);
+
+function hasFixtureMetricPatchFields(patch = {}) {
+  return FIXTURE_METRIC_PATCH_FIELDS.some(key => Object.prototype.hasOwnProperty.call(patch, key));
+}
+
+function getFixtureMetricGlobalConfig() {
+  return normalizeFixtureMetricConfigSnapshot(
+    fixtureMetricRoutingRuntime?.config || {},
+    FIXTURE_METRIC_CONFIG_DEFAULT
+  );
+}
+
+function getFixtureMetricConfigForBrand(brandKey) {
+  const brand = normalizePaletteBrandKey(brandKey);
+  const globalConfig = getFixtureMetricGlobalConfig();
+  if (!brand) return globalConfig;
+  const raw = fixtureMetricRoutingRuntime?.brands?.[brand];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return globalConfig;
+  return normalizeFixtureMetricConfigSnapshot(raw, globalConfig);
+}
+
+function getFixtureMetricOverrideConfig(fixtureId, brandKey) {
+  const id = String(fixtureId || "").trim();
+  const brand = normalizePaletteBrandKey(brandKey);
+  if (!id || !brand) return null;
+  const raw = fixtureMetricRoutingRuntime?.fixtures?.[id];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  return normalizeFixtureMetricConfigSnapshot(raw, getFixtureMetricConfigForBrand(brand));
+}
+
+function getScopedFixtureMetricConfig(fixtureId, brandKey) {
+  const brand = normalizePaletteBrandKey(brandKey);
+  const id = String(fixtureId || "").trim();
+  const brandConfig = getFixtureMetricConfigForBrand(brand);
+  if (!id || !brand) return brandConfig;
+  const fixtureConfig = getFixtureMetricOverrideConfig(id, brand);
+  return fixtureConfig || brandConfig;
+}
+
+function getFixtureMetricMaxHzGateMs(fixtureId, brandKey, baseMinIntervalMs = 0) {
+  const id = String(fixtureId || "").trim();
+  const brand = normalizePaletteBrandKey(brandKey);
+  if (!id || !brand) return 0;
+  const scoped = getScopedFixtureMetricConfig(id, brand);
+  const maxHz = normalizeFixtureMetricMaxHz(scoped?.maxHz, null);
+  if (!(Number.isFinite(maxHz) && maxHz > 0)) return 0;
+  const clampMs = Math.max(1, Math.round(1000 / maxHz));
+  const baseMs = Number(baseMinIntervalMs);
+  if (Number.isFinite(baseMs) && baseMs > 0) {
+    return Math.max(clampMs, Math.round(baseMs));
+  }
+  return clampMs;
+}
+
+function hasFixtureMetricMaxHzClamp(fixtureId, brandKey) {
+  return getFixtureMetricMaxHzGateMs(fixtureId, brandKey, 0) > 0;
+}
+
+function shouldDispatchFixtureWithMetricHzClamp(fixtureId, brandKey, zone, options = {}) {
+  const id = String(fixtureId || "").trim();
+  const brand = normalizePaletteBrandKey(brandKey);
+  if (!id || !brand) return true;
+  const forceSend = options && options.forceSend === true;
+  if (forceSend) return true;
+  const gateMs = getFixtureMetricMaxHzGateMs(id, brand, options?.minIntervalMs || 0);
+  if (!(gateMs > 0)) return true;
+
+  const stateMap = getFixtureMetricHzClampStateMap(brand);
+  if (!stateMap) return true;
+  const key = buildFixtureMetricHzClampDispatchKey(id, zone, brand);
+  if (!key) return true;
+
+  const now = Date.now();
+  const lastAt = Number(stateMap.get(key) || 0);
+  if (Number.isFinite(lastAt) && (now - lastAt) < gateMs) {
+    return false;
+  }
+  stateMap.set(key, now);
+  return true;
+}
+
+function pruneFixtureMetricRoutingOverrides(fixtures = null) {
+  const fixtureList = Array.isArray(fixtures)
+    ? fixtures
+    : (fixtureRegistry.getFixtures?.() || []);
+  const fixtureById = new Map(
+    fixtureList
+      .map(fixture => [String(fixture?.id || "").trim(), fixture])
+      .filter(([id]) => Boolean(id))
+  );
+
+  const safeCurrent = sanitizeFixtureMetricRoutingConfig(fixtureMetricRoutingRuntime);
+  const globalConfig = normalizeFixtureMetricConfigSnapshot(
+    safeCurrent.config,
+    FIXTURE_METRIC_CONFIG_DEFAULT
+  );
+  const nextBrands = {};
+  for (const brand of PALETTE_SUPPORTED_BRANDS) {
+    const rawBrand = safeCurrent.brands?.[brand];
+    nextBrands[brand] = rawBrand && typeof rawBrand === "object" && !Array.isArray(rawBrand)
+      ? normalizeFixtureMetricConfigSnapshot(rawBrand, globalConfig)
+      : null;
+  }
+
+  let changed = false;
+  const nextFixtures = {};
+  for (const [fixtureId, rawConfig] of Object.entries(safeCurrent.fixtures || {})) {
+    const fixture = fixtureById.get(fixtureId);
+    if (!fixture) {
+      changed = true;
+      continue;
+    }
+    const brand = normalizePaletteBrandKey(fixture.brand);
+    if (!brand) {
+      changed = true;
+      continue;
+    }
+    const fallback = nextBrands[brand] || globalConfig;
+    const normalized = normalizeFixtureMetricConfigSnapshot(rawConfig, fallback);
+    nextFixtures[fixtureId] = normalized;
+    if (JSON.stringify(rawConfig) !== JSON.stringify(normalized)) {
+      changed = true;
+    }
+  }
+
+  pruneFixtureMetricAutoStateScopes(Object.keys(nextFixtures));
+  pruneFixtureMetricHzClampState([...fixtureById.keys()]);
+
+  if (
+    !changed &&
+    (
+      Object.keys(nextFixtures).length !== Object.keys(safeCurrent.fixtures || {}).length ||
+      JSON.stringify(nextBrands) !== JSON.stringify(safeCurrent.brands || {})
+    )
+  ) {
+    changed = true;
+  }
+
+  if (changed) {
+    fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
+      ...safeCurrent,
+      config: globalConfig,
+      brands: nextBrands,
+      fixtures: nextFixtures
+    });
+  } else {
+    fixtureMetricRoutingRuntime = {
+      ...safeCurrent,
+      config: globalConfig,
+      brands: nextBrands,
+      fixtures: nextFixtures
+    };
+  }
+}
+
+function buildFixtureMetricRoutingSnapshot(fixtures = null) {
+  const fixtureList = Array.isArray(fixtures)
+    ? fixtures
+    : (fixtureRegistry.getFixtures?.() || []);
+  pruneFixtureMetricRoutingOverrides(fixtureList);
+  const globalConfig = getFixtureMetricGlobalConfig();
+  const brands = {};
+  for (const brand of PALETTE_SUPPORTED_BRANDS) {
+    const brandConfig = getFixtureMetricConfigForBrand(brand);
+    brands[brand] = fixtureMetricRoutingRuntime?.brands?.[brand]
+      ? normalizeFixtureMetricConfigSnapshot(brandConfig, globalConfig)
+      : null;
+  }
+  return {
+    config: globalConfig,
+    brands,
+    fixtureOverrides: buildFixtureMetricOverrideSnapshotFromList(fixtureList),
+    options: {
+      modes: FIXTURE_METRIC_MODE_ORDER.slice(),
+      metrics: FIXTURE_METRIC_KEYS.slice(),
+      harmonyMin: FIXTURE_METRIC_HARMONY_MIN,
+      harmonyMax: FIXTURE_METRIC_HARMONY_MAX,
+      maxHzMin: FIXTURE_METRIC_MAX_HZ_MIN,
+      maxHzMax: FIXTURE_METRIC_MAX_HZ_MAX
+    }
+  };
+}
+
+function buildFixtureMetricOverrideSnapshotFromList(fixtures = []) {
+  const fixtureList = Array.isArray(fixtures) ? fixtures : [];
+  const fixtureById = new Map(
+    fixtureList
+      .map(fixture => [String(fixture?.id || "").trim(), fixture])
+      .filter(([id]) => Boolean(id))
+  );
+  const out = {};
+  for (const [fixtureId, rawConfig] of Object.entries(fixtureMetricRoutingRuntime.fixtures || {})) {
+    const fixture = fixtureById.get(fixtureId);
+    if (!fixture) continue;
+    const brand = normalizePaletteBrandKey(fixture.brand);
+    if (!brand) continue;
+    out[fixtureId] = {
+      ...normalizeFixtureMetricConfigSnapshot(rawConfig, getFixtureMetricConfigForBrand(brand)),
+      fixtureId,
+      brand
+    };
+  }
+  return out;
+}
+
+function isFixtureMetricConfigNeutral(config = {}, options = {}) {
+  const ignoreMaxHz = options && options.ignoreMaxHz === true;
+  const normalized = normalizeFixtureMetricConfigSnapshot(config, FIXTURE_METRIC_CONFIG_DEFAULT);
+  return (
+    normalized.mode === "manual" &&
+    normalized.metric === "baseline" &&
+    normalized.metaAutoFlip !== true &&
+    normalizeFixtureMetricHarmonySize(normalized.harmonySize, 1) === 1 &&
+    (
+      ignoreMaxHz ||
+      normalizeFixtureMetricMaxHz(normalized.maxHz, null) === null
+    )
+  );
+}
+
+function hasFixtureMetricRoutingActiveConfig(fixtureId, brandKey) {
+  const brand = normalizePaletteBrandKey(brandKey);
+  const id = String(fixtureId || "").trim();
+  if (!brand || !id) return false;
+
+  const globalConfig = getFixtureMetricGlobalConfig();
+  if (!isFixtureMetricConfigNeutral(globalConfig)) return true;
+
+  const brandOverrideRaw = fixtureMetricRoutingRuntime?.brands?.[brand];
+  if (brandOverrideRaw && typeof brandOverrideRaw === "object" && !Array.isArray(brandOverrideRaw)) {
+    const brandScoped = normalizeFixtureMetricConfigSnapshot(brandOverrideRaw, globalConfig);
+    if (!isFixtureMetricConfigNeutral(brandScoped)) {
+      return true;
+    }
+  }
+
+  const fixtureOverrideRaw = fixtureMetricRoutingRuntime?.fixtures?.[id];
+  if (fixtureOverrideRaw && typeof fixtureOverrideRaw === "object" && !Array.isArray(fixtureOverrideRaw)) {
+    const fixtureScoped = normalizeFixtureMetricConfigSnapshot(
+      fixtureOverrideRaw,
+      getFixtureMetricConfigForBrand(brand)
+    );
+    if (!isFixtureMetricConfigNeutral(fixtureScoped)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function resolveFixtureMetricLevel(metricId, telemetry = {}, intent = {}) {
+  const t = telemetry && typeof telemetry === "object" ? telemetry : {};
+  const i = intent && typeof intent === "object" ? intent : {};
+  const baseline = clamp01(t.audioSourceLevel, clamp01(t.rms, clamp01(i.audioSourceLevel, 0)));
+  const peaks = clamp01(Number(t.audioPeak || 0) / 1.5, 0);
+  const transients = clamp01(Number(t.audioTransient || 0) / 1.2, 0);
+  const flux = clamp01(t.audioFlux, clamp01(t.spectralFlux, 0));
+  switch (normalizeFixtureMetricKey(metricId, "baseline")) {
+    case "peaks":
+      return peaks;
+    case "transients":
+      return transients;
+    case "flux":
+      return flux;
+    case "baseline":
+    default:
+      return baseline;
+  }
+}
+
+function getFixtureMetricAutoPool(telemetry = {}) {
+  const t = telemetry && typeof telemetry === "object" ? telemetry : {};
+  const active = t.metaAutoTempoTrackersActive && typeof t.metaAutoTempoTrackersActive === "object"
+    ? t.metaAutoTempoTrackersActive
+    : (t.metaAutoTempoTrackers && typeof t.metaAutoTempoTrackers === "object" ? t.metaAutoTempoTrackers : {});
+  const pool = FIXTURE_METRIC_KEYS.filter(key => active[key] === true);
+  return pool.length ? pool : FIXTURE_METRIC_KEYS.slice();
+}
+
+function listMetricRoutedFixtureIds(brandKey, options = {}) {
+  const brand = normalizePaletteBrandKey(brandKey);
+  if (!brand) return [];
+  const metaAutoOnly = options?.metaAutoOnly === true;
+  const fixtures = fixtureRegistry.getFixtures?.() || [];
+  return fixtures
+    .filter(fixture => {
+      if (!fixture || typeof fixture !== "object") return false;
+      const fixtureBrand = normalizePaletteBrandKey(fixture.brand);
+      if (!fixtureBrand || fixtureBrand !== brand) return false;
+      const legacyMode = String(fixture.controlMode || "engine").trim().toLowerCase();
+      const engineEnabled = parseBoolean(fixture.engineEnabled, legacyMode === "engine");
+      if (fixture.enabled === false || !engineEnabled) return false;
+      const fixtureId = String(fixture.id || "").trim();
+      if (!fixtureId) return false;
+      if (!hasFixtureMetricRoutingActiveConfig(fixtureId, fixtureBrand)) return false;
+      if (!metaAutoOnly) return true;
+      const scoped = getScopedFixtureMetricConfig(fixtureId, fixtureBrand);
+      return normalizeFixtureMetricMode(scoped.mode, "manual") === "meta_auto";
+    })
+    .map(fixture => String(fixture.id || "").trim())
+    .filter(Boolean)
+    .sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function getFixtureMetricAutoState(scopeKey = "") {
+  const key = String(scopeKey || "global").trim().toLowerCase() || "global";
+  let state = fixtureMetricAutoStateByScope.get(key);
+  if (!state || typeof state !== "object") {
+    state = {
+      offset: 0,
+      lastAdvanceAt: 0,
+      lastDominantTracker: "baseline"
+    };
+    fixtureMetricAutoStateByScope.set(key, state);
+  }
+  return state;
+}
+
+function resolveFixtureMetricAutoScopeKey(fixtureId, brandKey) {
+  const brand = normalizePaletteBrandKey(brandKey);
+  const id = String(fixtureId || "").trim();
+  if (id) {
+    const fixtureOverrideRaw = fixtureMetricRoutingRuntime?.fixtures?.[id];
+    if (fixtureOverrideRaw && typeof fixtureOverrideRaw === "object" && !Array.isArray(fixtureOverrideRaw)) {
+      return `fixture:${id.toLowerCase()}`;
+    }
+  }
+  if (brand) return `brand:${brand}`;
+  return "global";
+}
+
+function maybeAdvanceFixtureMetricAutoOffset(config = {}, intent = {}, telemetry = {}, scopeKey = "") {
+  if (config.metaAutoFlip !== true) return;
+  const pool = getFixtureMetricAutoPool(telemetry);
+  if (!pool.length) return;
+  const autoState = getFixtureMetricAutoState(scopeKey);
+
+  const now = Date.now();
+  const beat = Boolean(intent?.beat);
+  const drop = Boolean(intent?.drop);
+  const dominant = String(telemetry?.metaAutoDominantTracker || "").trim().toLowerCase();
+  const dominantChanged = dominant && dominant !== autoState.lastDominantTracker;
+  const trigger = beat || drop || dominantChanged;
+  const gateMs = drop ? 120 : (beat ? 240 : 340);
+
+  if (dominant) {
+    autoState.lastDominantTracker = dominant;
+  }
+  if (!trigger) return;
+  if ((now - Number(autoState.lastAdvanceAt || 0)) < gateMs) return;
+
+  autoState.offset =
+    (Number(autoState.offset || 0) + 1) % Math.max(1, pool.length);
+  autoState.lastAdvanceAt = now;
+}
+
+function resolveFixtureMetricAssignment(fixtureId, brandKey, intent = {}, telemetry = {}) {
+  const brand = normalizePaletteBrandKey(brandKey);
+  const scopeKey = resolveFixtureMetricAutoScopeKey(fixtureId, brand);
+  const scoped = getScopedFixtureMetricConfig(fixtureId, brandKey);
+  const mode = normalizeFixtureMetricMode(scoped.mode, "manual");
+  if (mode !== "meta_auto") {
+    return {
+      config: scoped,
+      mode,
+      metric: normalizeFixtureMetricKey(scoped.metric, "baseline")
+    };
+  }
+
+  maybeAdvanceFixtureMetricAutoOffset(scoped, intent, telemetry, scopeKey);
+  const pool = getFixtureMetricAutoPool(telemetry);
+  if (!pool.length) {
+    return {
+      config: scoped,
+      mode,
+      metric: normalizeFixtureMetricKey(scoped.metric, "baseline")
+    };
+  }
+
+  let ids = listMetricRoutedFixtureIds(brand, { metaAutoOnly: true });
+  const fixtureIdKey = String(fixtureId || "").trim();
+  if (fixtureIdKey && !ids.includes(fixtureIdKey)) {
+    ids = ids.concat([fixtureIdKey]).sort((a, b) => String(a).localeCompare(String(b)));
+  }
+  const index = Math.max(0, ids.indexOf(String(fixtureId || "").trim()));
+  const harmonySize = normalizeFixtureMetricHarmonySize(scoped.harmonySize, 1);
+  const groupIndex = Math.floor(index / Math.max(1, harmonySize));
+  const offset = Number(getFixtureMetricAutoState(scopeKey).offset || 0) % pool.length;
+  const metric = pool[(groupIndex + offset) % pool.length] || pool[0];
+  return {
+    config: scoped,
+    mode,
+    metric: normalizeFixtureMetricKey(metric, "baseline")
+  };
+}
+
+function applyFixtureMetricToHueState(state = {}, fixture = null, intent = {}) {
+  const source = state && typeof state === "object" ? state : null;
+  if (!source || source.on === false) return source;
+  const fixtureId = String(fixture?.id || "").trim();
+  if (!fixtureId) return source;
+  if (!hasFixtureMetricRoutingActiveConfig(fixtureId, "hue")) return source;
+  const scoped = getScopedFixtureMetricConfig(fixtureId, "hue");
+  if (isFixtureMetricConfigNeutral(scoped, { ignoreMaxHz: true })) return source;
+
+  const telemetry = engine?.getTelemetry?.() || {};
+  const assigned = resolveFixtureMetricAssignment(fixtureId, "hue", intent, telemetry);
+  const level = resolveFixtureMetricLevel(assigned.metric, telemetry, intent);
+  const baseBri = clampNumber(source.bri, 1, 254, 160);
+  const floorBri = Math.max(2, Math.round(baseBri * 0.18));
+  const drive = clampNumber(0.34 + (level * 0.9), 0.22, 1.24, 0.72);
+  const nextBri = Math.max(1, Math.min(254, Math.round(floorBri + ((baseBri - floorBri) * drive))));
+
+  const satBase = clampNumber(source.sat, 1, 254, 180);
+  const satBoost = Math.round(level * 34);
+  return {
+    ...source,
+    bri: nextBri,
+    sat: Math.max(1, Math.min(254, satBase + satBoost))
+  };
+}
+
+function applyFixtureMetricToWizState(state = {}, fixtureId = "", intent = {}) {
+  const source = state && typeof state === "object" ? state : null;
+  if (!source || source.on === false) return source;
+  const id = String(fixtureId || "").trim();
+  if (!id) return source;
+  if (!hasFixtureMetricRoutingActiveConfig(id, "wiz")) return source;
+  const scoped = getScopedFixtureMetricConfig(id, "wiz");
+  if (isFixtureMetricConfigNeutral(scoped, { ignoreMaxHz: true })) return source;
+
+  const telemetry = engine?.getTelemetry?.() || {};
+  const assigned = resolveFixtureMetricAssignment(id, "wiz", intent, telemetry);
+  const level = resolveFixtureMetricLevel(assigned.metric, telemetry, intent);
+  const baseDimming = clampNumber(
+    source.dimming,
+    1,
+    100,
+    Math.round(clampNumber(source.brightness, 0.01, 1, 0.7) * 100)
+  );
+  const floor = Math.max(1, Math.round(baseDimming * 0.22));
+  const drive = clampNumber(0.34 + (level * 0.9), 0.22, 1.24, 0.72);
+  const dimming = Math.max(1, Math.min(100, Math.round(floor + ((baseDimming - floor) * drive))));
+  const next = {
+    ...source,
+    dimming
+  };
+  if (Object.prototype.hasOwnProperty.call(next, "brightness")) {
+    next.brightness = Math.max(0.01, Math.min(1, dimming / 100));
+  }
+  return next;
+}
+
+function setFixtureMetricOverrideConfig(patch = {}) {
+  const next = patch && typeof patch === "object" ? patch : {};
+  const fixtureId = String(next.fixtureId || "").trim();
+  if (!fixtureId) {
+    return { ok: false, status: 400, error: "missing fixtureId" };
+  }
+
+  const fixtures = fixtureRegistry.getFixtures?.() || [];
+  const fixture = fixtures.find(item => String(item?.id || "").trim() === fixtureId) || null;
+  if (!fixture) {
+    return { ok: false, status: 404, error: "fixture not found" };
+  }
+
+  const fixtureBrand = normalizePaletteBrandKey(fixture.brand);
+  if (!fixtureBrand) {
+    return {
+      ok: false,
+      status: 400,
+      error: `fixture brand '${String(fixture.brand || "unknown")}' does not support metric routing`
+    };
+  }
+
+  const requestedBrand = normalizePaletteBrandKey(next.brand);
+  if (requestedBrand && requestedBrand !== fixtureBrand) {
+    return {
+      ok: false,
+      status: 400,
+      error: `fixtureId '${fixtureId}' belongs to brand '${fixtureBrand}', not '${requestedBrand}'`
+    };
+  }
+
+  const clearRequested = parseBooleanLoose(next.clearOverride, false) === true;
+  if (clearRequested) {
+    if (fixtureMetricRoutingRuntime.fixtures[fixtureId]) {
+      const fixturesNext = { ...fixtureMetricRoutingRuntime.fixtures };
+      delete fixturesNext[fixtureId];
+      fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
+        ...fixtureMetricRoutingRuntime,
+        fixtures: fixturesNext
+      });
+    }
+    pruneFixtureMetricAutoStateScopes(Object.keys(fixtureMetricRoutingRuntime.fixtures || {}));
+    return {
+      ok: true,
+      fixtureId,
+      brand: fixtureBrand,
+      cleared: true
+    };
+  }
+
+  if (!hasFixtureMetricPatchFields(next)) {
+    return { ok: false, status: 400, error: "no valid metric fields" };
+  }
+
+  const base = getFixtureMetricConfigForBrand(fixtureBrand);
+  const currentRaw = fixtureMetricRoutingRuntime.fixtures?.[fixtureId] || {};
+  const current = normalizeFixtureMetricConfigSnapshot(currentRaw, base);
+  const updated = { ...current };
+
+  if (Object.prototype.hasOwnProperty.call(next, "mode")) {
+    updated.mode = normalizeFixtureMetricMode(next.mode, current.mode);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "metric")) {
+    updated.metric = normalizeFixtureMetricKey(next.metric, current.metric);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "metaAutoFlip")) {
+    updated.metaAutoFlip = Boolean(next.metaAutoFlip);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "harmonySize")) {
+    updated.harmonySize = normalizeFixtureMetricHarmonySize(next.harmonySize, current.harmonySize);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "maxHz")) {
+    updated.maxHz = normalizeFixtureMetricMaxHz(next.maxHz, current.maxHz);
+  }
+
+  const normalized = normalizeFixtureMetricConfigSnapshot(updated, base);
+  fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
+    ...fixtureMetricRoutingRuntime,
+    fixtures: {
+      ...fixtureMetricRoutingRuntime.fixtures,
+      [fixtureId]: normalized
+    }
+  });
+  pruneFixtureMetricAutoStateScopes(Object.keys(fixtureMetricRoutingRuntime.fixtures || {}));
+  return {
+    ok: true,
+    fixtureId,
+    brand: fixtureBrand,
+    cleared: false,
+    config: normalized
+  };
+}
+
+function patchFixtureMetricRoutingConfig(patch = {}) {
+  const next = patch && typeof patch === "object" ? patch : {};
+  const requestedBrand = normalizePaletteBrandKey(next.brand);
+  const fixtureId = String(next.fixtureId || "").trim();
+  const clearRequested = parseBooleanLoose(next.clearOverride, false) === true;
+  if (fixtureId) {
+    return setFixtureMetricOverrideConfig(next);
+  }
+
+  if (!requestedBrand && !hasFixtureMetricPatchFields(next)) {
+    return { ok: false, status: 400, error: "no valid metric fields" };
+  }
+
+  if (requestedBrand) {
+    if (clearRequested) {
+      const brands = {
+        ...(fixtureMetricRoutingRuntime.brands || {}),
+        [requestedBrand]: null
+      };
+      fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
+        ...fixtureMetricRoutingRuntime,
+        brands
+      });
+      pruneFixtureMetricAutoStateScopes(Object.keys(fixtureMetricRoutingRuntime.fixtures || {}));
+      return {
+        ok: true,
+        scope: "brand",
+        brand: requestedBrand,
+        cleared: true,
+        config: null
+      };
+    }
+
+    const base = getFixtureMetricConfigForBrand(requestedBrand);
+    const currentRaw = fixtureMetricRoutingRuntime.brands?.[requestedBrand] || {};
+    const current = normalizeFixtureMetricConfigSnapshot(currentRaw, base);
+    const updated = { ...current };
+    if (Object.prototype.hasOwnProperty.call(next, "mode")) {
+      updated.mode = normalizeFixtureMetricMode(next.mode, current.mode);
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "metric")) {
+      updated.metric = normalizeFixtureMetricKey(next.metric, current.metric);
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "metaAutoFlip")) {
+      updated.metaAutoFlip = Boolean(next.metaAutoFlip);
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "harmonySize")) {
+      updated.harmonySize = normalizeFixtureMetricHarmonySize(next.harmonySize, current.harmonySize);
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "maxHz")) {
+      updated.maxHz = normalizeFixtureMetricMaxHz(next.maxHz, current.maxHz);
+    }
+    const normalized = normalizeFixtureMetricConfigSnapshot(updated, base);
+    fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
+      ...fixtureMetricRoutingRuntime,
+      brands: {
+        ...(fixtureMetricRoutingRuntime.brands || {}),
+        [requestedBrand]: normalized
+      }
+    });
+    pruneFixtureMetricAutoStateScopes(Object.keys(fixtureMetricRoutingRuntime.fixtures || {}));
+    return {
+      ok: true,
+      scope: "brand",
+      brand: requestedBrand,
+      cleared: false,
+      config: normalized
+    };
+  }
+
+  if (clearRequested) {
+    fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig(FIXTURE_METRIC_ROUTING_DEFAULT);
+    pruneFixtureMetricAutoStateScopes(Object.keys(fixtureMetricRoutingRuntime.fixtures || {}));
+    return {
+      ok: true,
+      scope: "global",
+      cleared: true,
+      config: getFixtureMetricGlobalConfig()
+    };
+  }
+
+  const current = getFixtureMetricGlobalConfig();
+  const updated = { ...current };
+  if (Object.prototype.hasOwnProperty.call(next, "mode")) {
+    updated.mode = normalizeFixtureMetricMode(next.mode, current.mode);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "metric")) {
+    updated.metric = normalizeFixtureMetricKey(next.metric, current.metric);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "metaAutoFlip")) {
+    updated.metaAutoFlip = Boolean(next.metaAutoFlip);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "harmonySize")) {
+    updated.harmonySize = normalizeFixtureMetricHarmonySize(next.harmonySize, current.harmonySize);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "maxHz")) {
+    updated.maxHz = normalizeFixtureMetricMaxHz(next.maxHz, current.maxHz);
+  }
+  const normalized = normalizeFixtureMetricConfigSnapshot(updated, current);
+  fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
+    ...fixtureMetricRoutingRuntime,
+    config: normalized
+  });
+  pruneFixtureMetricAutoStateScopes(Object.keys(fixtureMetricRoutingRuntime.fixtures || {}));
+  return {
+    ok: true,
+    scope: "global",
+    cleared: false,
+    config: normalized
+  };
+}
+
+function clearFixtureRoutingOverridesAtomic(patch = {}) {
+  const next = patch && typeof patch === "object" ? patch : {};
+  const fixtureId = String(next.fixtureId || "").trim();
+  const requestedBrand = normalizePaletteBrandKey(next.brand);
+
+  if (!fixtureId && !requestedBrand) {
+    return {
+      ok: false,
+      status: 400,
+      error: "brand or fixtureId required"
+    };
+  }
+
+  const paletteOverridesBefore = sanitizePaletteFixtureOverridesConfig(paletteFixtureOverridesRuntime);
+  const metricRoutingBefore = sanitizeFixtureMetricRoutingConfig(fixtureMetricRoutingRuntime);
+  const sequenceStateBefore = new Map(fixturePaletteSequenceState);
+
+  let paletteBrandBefore = null;
+  let paletteBrandHadOverride = false;
+  if (!fixtureId && requestedBrand) {
+    const paletteSnapshot = engine.getPaletteConfig?.() || {};
+    const brandMap = (
+      paletteSnapshot &&
+      typeof paletteSnapshot === "object" &&
+      paletteSnapshot.brands &&
+      typeof paletteSnapshot.brands === "object"
+    )
+      ? paletteSnapshot.brands
+      : {};
+    paletteBrandHadOverride = Boolean(
+      brandMap[requestedBrand] &&
+      typeof brandMap[requestedBrand] === "object" &&
+      !Array.isArray(brandMap[requestedBrand])
+    );
+    const scoped = engine.getPaletteConfig?.(requestedBrand);
+    if (scoped && typeof scoped === "object" && !Array.isArray(scoped)) {
+      paletteBrandBefore = normalizePaletteConfigSnapshot(scoped, PALETTE_CONFIG_DEFAULT);
+    }
+  }
+
+  try {
+    if (fixtureId) {
+      const paletteResult = setFixturePaletteOverrideConfig({
+        fixtureId,
+        brand: requestedBrand || next.brand,
+        clearOverride: true
+      });
+      if (!paletteResult.ok) {
+        return {
+          ok: false,
+          status: paletteResult.status || 400,
+          error: paletteResult.error || "fixture palette clear failed"
+        };
+      }
+
+      const metricResult = setFixtureMetricOverrideConfig({
+        fixtureId,
+        brand: requestedBrand || next.brand,
+        clearOverride: true
+      });
+      if (!metricResult.ok) {
+        throw new Error(metricResult.error || "fixture metric clear failed");
+      }
+
+      return {
+        ok: true,
+        scope: "fixture",
+        fixtureId,
+        brand: metricResult.brand || paletteResult.brand
+      };
+    }
+
+    const paletteNext = engine.setPaletteConfig?.({
+      brand: requestedBrand,
+      clearOverride: true
+    });
+    if (!paletteNext) {
+      throw new Error("brand palette clear failed");
+    }
+
+    const metricResult = patchFixtureMetricRoutingConfig({
+      brand: requestedBrand,
+      clearOverride: true
+    });
+    if (!metricResult.ok) {
+      throw new Error(metricResult.error || "brand metric clear failed");
+    }
+
+    return {
+      ok: true,
+      scope: "brand",
+      brand: requestedBrand
+    };
+  } catch (err) {
+    try {
+      paletteFixtureOverridesRuntime = writePaletteFixtureOverridesConfig(paletteOverridesBefore);
+      fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig(metricRoutingBefore);
+
+      fixturePaletteSequenceState.clear();
+      for (const [id, state] of sequenceStateBefore.entries()) {
+        fixturePaletteSequenceState.set(id, state);
+      }
+
+      if (!fixtureId && requestedBrand) {
+        if (paletteBrandHadOverride && paletteBrandBefore) {
+          engine.setPaletteConfig?.({
+            brand: requestedBrand,
+            colorsPerFamily: paletteBrandBefore.colorsPerFamily,
+            families: paletteBrandBefore.families,
+            disorder: paletteBrandBefore.disorder,
+            disorderAggression: paletteBrandBefore.disorderAggression
+          });
+        } else {
+          engine.setPaletteConfig?.({
+            brand: requestedBrand,
+            clearOverride: true
+          });
+        }
+      }
+    } catch (rollbackErr) {
+      console.warn(`[RAVE] fixture routing rollback warning: ${rollbackErr.message || rollbackErr}`);
+    }
+    return {
+      ok: false,
+      status: 500,
+      error: err?.message || String(err || "fixture routing clear failed")
+    };
+  }
 }
 
 // ======================================================
@@ -2404,6 +4670,37 @@ function parseBoolean(value, fallback = false) {
     if (raw === "false" || raw === "off" || raw === "no") return false;
   }
   return fallback;
+}
+
+function getStandalonePersistedState(id) {
+  const fixtureId = String(id || "").trim();
+  if (!fixtureId) return null;
+  const raw = standaloneStateConfigRuntime.fixtures?.[fixtureId];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  return { ...raw };
+}
+
+function hasStandalonePersistedState(id) {
+  return Boolean(getStandalonePersistedState(id));
+}
+
+function persistStandaloneStateForFixture(id, state) {
+  const fixtureId = String(id || "").trim();
+  if (!fixtureId) return;
+
+  if (state && typeof state === "object" && !Array.isArray(state)) {
+    standaloneStateConfigRuntime.fixtures[fixtureId] = { ...state };
+  } else {
+    delete standaloneStateConfigRuntime.fixtures[fixtureId];
+  }
+
+  try {
+    const saved = writeStandaloneStateConfig(standaloneStateConfigRuntime);
+    standaloneStateConfigRuntime.version = saved.version;
+    standaloneStateConfigRuntime.fixtures = { ...saved.fixtures };
+  } catch (err) {
+    console.warn(`[STANDALONE] state persist failed for ${fixtureId}: ${err.message || err}`);
+  }
 }
 
 function isStandaloneFixture(fixture) {
@@ -2472,6 +4769,7 @@ function normalizeStandaloneState(input, previous, brand = "hue") {
     static: false,
     updateOnRaveStart: false,
     updateOnRaveStop: false,
+    raveStopBri: 100,
     speedMode: "fixed",
     speedHz: 1.2,
     speedHzMin: 0.6,
@@ -2535,6 +4833,9 @@ function normalizeStandaloneState(input, previous, brand = "hue") {
     updateOnRaveStop: has("updateOnRaveStop")
       ? parseBoolean(source.updateOnRaveStop, base.updateOnRaveStop)
       : base.updateOnRaveStop,
+    raveStopBri: has("raveStopBri")
+      ? clampNumber(source.raveStopBri, 1, 100, base.raveStopBri)
+      : base.raveStopBri,
     speedMode: has("speedMode")
       ? normalizeStandaloneSpeedMode(source.speedMode, base.speedMode)
       : normalizeStandaloneSpeedMode(base.speedMode, "fixed"),
@@ -2567,10 +4868,18 @@ function normalizeStandaloneState(input, previous, brand = "hue") {
       : (Number(base.motionDirection) < 0 ? -1 : 1)
   };
 
+  const modeExplicit = has("mode");
+  const animateExplicit = has("animate");
   const nextMode = next.mode === "rgb" || next.mode === "scene" || next.mode === "auto"
     ? next.mode
     : (next.animate ? "scene" : "rgb");
   next.mode = nextMode;
+  if (modeExplicit && (next.mode === "scene" || next.mode === "auto") && !animateExplicit) {
+    next.animate = true;
+  }
+  if (modeExplicit && (next.mode === "scene" || next.mode === "auto") && !has("static")) {
+    next.static = false;
+  }
   if (next.mode === "rgb") {
     next.animate = false;
   }
@@ -2587,6 +4896,7 @@ function normalizeStandaloneState(input, previous, brand = "hue") {
     static: Boolean(next.static),
     updateOnRaveStart: Boolean(next.updateOnRaveStart),
     updateOnRaveStop: Boolean(next.updateOnRaveStop),
+    raveStopBri: Math.round(next.raveStopBri),
     speedMode: next.speedMode,
     speedHz: Number(next.speedHz.toFixed(2)),
     speedHzMin: Number(next.speedHzMin.toFixed(2)),
@@ -2607,7 +4917,7 @@ function normalizeStandaloneState(input, previous, brand = "hue") {
 function getStandaloneReactiveEnergy() {
   const telemetry = engine?.getTelemetry?.() || {};
   const energy = clampNumber(Number(telemetry.energy), 0, 1, 0);
-  const rms = clampNumber(Number(telemetry.rms), 0, 1, 0);
+  const rms = clampNumber(Number(telemetry.audioSourceLevel ?? telemetry.rms), 0, 1, 0);
   const flux = clampNumber(Number(telemetry.audioFlux ?? telemetry.flux), 0, 1, 0);
   const fallback = clampNumber(Math.max(energy, rms, flux * 0.8), 0, 1, 0.25);
   const profile = getAudioReactivityDrive("other", telemetry);
@@ -2628,7 +4938,7 @@ function resolveStandaloneDynamicHz(state = {}) {
     const bpmHz = Number.isFinite(bpm) && bpm > 0
       ? clampNumber(bpm / 96, 0.35, 12, fixedHz)
       : fixedHz;
-    const rms = clampNumber(Number(telemetry.rms), 0, 1, 0);
+    const rms = clampNumber(Number(telemetry.audioSourceLevel ?? telemetry.rms), 0, 1, 0);
     const beat = clampNumber(Number(telemetry.beatConfidence), 0, 1, 0);
     const transient = clampNumber(Number(telemetry.audioTransient), 0, 1, 0);
     const flux = clampNumber(Number(telemetry.audioFlux ?? telemetry.flux), 0, 1, 0);
@@ -2827,6 +5137,12 @@ function stopStandaloneTimer(id) {
 function startStandaloneTimer(fixture, state) {
   const id = String(fixture?.id || "").trim();
   if (!id) return;
+  const legacyMode = String(fixture?.controlMode || "engine").trim().toLowerCase();
+  const engineEnabled = parseBoolean(fixture?.engineEnabled, legacyMode === "engine");
+  if (engineEnabled) {
+    stopStandaloneTimer(id);
+    return;
+  }
   if (!state?.animate || state?.static || fixture.enabled === false) {
     stopStandaloneTimer(id);
     return;
@@ -2857,6 +5173,12 @@ function startStandaloneTimer(fixture, state) {
 
     const liveFixture = getStandaloneFixtureById(id);
     if (!liveFixture || liveFixture.enabled === false) {
+      stopStandaloneTimer(id);
+      return;
+    }
+    const liveLegacyMode = String(liveFixture.controlMode || "engine").trim().toLowerCase();
+    const liveEngineEnabled = parseBoolean(liveFixture.engineEnabled, liveLegacyMode === "engine");
+    if (liveEngineEnabled) {
       stopStandaloneTimer(id);
       return;
     }
@@ -2948,7 +5270,8 @@ function syncStandaloneRuntime() {
     const id = String(fixture.id || "").trim();
     if (!id) continue;
     const current = standaloneStates.get(id);
-    const next = normalizeStandaloneState({}, current, fixture.brand);
+    const persisted = current ? null : getStandalonePersistedState(id);
+    const next = normalizeStandaloneState({}, current || persisted, fixture.brand);
     standaloneStates.set(id, next);
 
     if (fixture.brand === "wiz" && fixture.enabled !== false) {
@@ -3031,7 +5354,7 @@ async function sendStandaloneState(fixture, state) {
     const colorMode = String(state.colorMode || "").trim().toLowerCase();
     const wizState = {
       on: Boolean(state.on),
-      dimming: state.on ? clampNumber(Math.round(state.bri), 10, 100, 70) : 10
+      dimming: state.on ? clampNumber(Math.round(state.bri), 1, 100, 70) : 1
     };
 
     if (state.on && colorMode === "cct") {
@@ -3051,6 +5374,22 @@ async function sendStandaloneState(fixture, state) {
   }
 
   return { ok: false, error: "unsupported fixture brand" };
+}
+
+async function sendStandaloneStateWithRetry(fixture, state, options = {}) {
+  const attempts = Math.max(1, Math.min(3, Math.round(Number(options.attempts) || 1)));
+  const delayMs = Math.max(0, Math.round(Number(options.delayMs) || 0));
+  let last = { ok: false, error: "standalone send failed" };
+  for (let i = 0; i < attempts; i += 1) {
+    last = await sendStandaloneState(fixture, state);
+    if (last?.ok) {
+      return last;
+    }
+    if (i + 1 < attempts && delayMs > 0) {
+      await wait(delayMs);
+    }
+  }
+  return last;
 }
 
 async function applyStandaloneStateById(id, patch = {}) {
@@ -3074,6 +5413,8 @@ async function applyStandaloneStateById(id, patch = {}) {
     return { ok: false, status: 502, error: sent.error || "standalone send failed" };
   }
 
+  persistStandaloneStateForFixture(fixtureId, next);
+
   if (next.animate && !next.static) startStandaloneTimer(fixture, next);
   else stopStandaloneTimer(fixtureId);
 
@@ -3092,9 +5433,15 @@ async function applyStandaloneRaveStopUpdates() {
     if (!fixtureId) continue;
     const current = standaloneStates.get(fixtureId);
     if (!current || !current.updateOnRaveStop) continue;
-    try {
-      await sendStandaloneState(fixture, current);
-    } catch {}
+    const stopBrightness = clampNumber(current.raveStopBri, 1, 100, current.bri);
+    const sent = await sendStandaloneStateWithRetry(
+      fixture,
+      { ...current, bri: Math.round(stopBrightness) },
+      { attempts: 2, delayMs: 60 }
+    );
+    if (!sent.ok) {
+      console.warn(`[STANDALONE] rave-stop update skipped for ${fixtureId}: ${sent.error || "send failed"}`);
+    }
   }
 }
 
@@ -3103,9 +5450,134 @@ async function applyStandaloneRaveStopUpdates() {
 // ======================================================
 let engine = null;
 let audio = null;
-let audioRuntimeConfig = null;
+let audioRuntimeConfig = initialAudioRuntimeConfig || null;
 let midiManager = null;
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+const transportPressureFeedback = {
+  lastAt: 0,
+  lastHueSent: 0,
+  lastWizSent: 0,
+  lastHueRateSkipped: 0,
+  lastWizRateSkipped: 0,
+  lastHueInflightSkipped: 0,
+  ema: 0,
+  holdUntil: 0
+};
+const TRANSPORT_PRESSURE_UPDATE_MIN_MS = 80;
+const TRANSPORT_PRESSURE_HOLD_MS = 560;
+
+function getSchedulerRateSkipTotals(schedulers) {
+  let sent = 0;
+  let skippedRate = 0;
+  let skippedDelta = 0;
+  for (const scheduler of schedulers.values()) {
+    const t = scheduler?.getTelemetry?.();
+    if (!t || typeof t !== "object") continue;
+    sent += Number(t.sent || 0);
+    skippedRate += Number(t.skippedRate || 0);
+    skippedDelta += Number(t.skippedDelta || 0);
+  }
+  return { sent, skippedRate, skippedDelta };
+}
+
+function resetTransportPressureFeedback() {
+  transportPressureFeedback.lastAt = 0;
+  transportPressureFeedback.lastHueSent = 0;
+  transportPressureFeedback.lastWizSent = 0;
+  transportPressureFeedback.lastHueRateSkipped = 0;
+  transportPressureFeedback.lastWizRateSkipped = 0;
+  transportPressureFeedback.lastHueInflightSkipped = 0;
+  transportPressureFeedback.ema = 0;
+  transportPressureFeedback.holdUntil = 0;
+}
+
+function updateEngineTransportPressure(reason = "emit") {
+  if (!engine?.setTransportPressure) return;
+  const now = Date.now();
+  const hueSchedulerTotals = getSchedulerRateSkipTotals(hueSchedulers);
+  const wizSchedulerTotals = getSchedulerRateSkipTotals(wizSchedulers);
+  const hueSent = Number(hueTelemetry.sent || 0);
+  const wizSent = Number(wizTelemetry.sent || 0);
+  const hueInflightSkipped = Number(hueTelemetry.skippedInflight || 0) + Number(hueTelemetry.skippedSyncHold || 0);
+
+  if (!(transportPressureFeedback.lastAt > 0)) {
+    transportPressureFeedback.lastAt = now;
+    transportPressureFeedback.lastHueSent = hueSent;
+    transportPressureFeedback.lastWizSent = wizSent;
+    transportPressureFeedback.lastHueRateSkipped = Number(hueSchedulerTotals.skippedRate || 0);
+    transportPressureFeedback.lastWizRateSkipped = Number(wizSchedulerTotals.skippedRate || 0);
+    transportPressureFeedback.lastHueInflightSkipped = hueInflightSkipped;
+    engine.setTransportPressure({
+      now,
+      pressure: 0,
+      raw: 0,
+      reason,
+      sampleMs: 0
+    });
+    return;
+  }
+
+  const sampleMs = Math.max(1, now - transportPressureFeedback.lastAt);
+  if (sampleMs < TRANSPORT_PRESSURE_UPDATE_MIN_MS) return;
+
+  const hueRateSkippedTotal = Number(hueSchedulerTotals.skippedRate || 0);
+  const wizRateSkippedTotal = Number(wizSchedulerTotals.skippedRate || 0);
+  const hueSentDelta = Math.max(0, hueSent - transportPressureFeedback.lastHueSent);
+  const wizSentDelta = Math.max(0, wizSent - transportPressureFeedback.lastWizSent);
+  const rateSkippedDelta = Math.max(0, hueRateSkippedTotal - transportPressureFeedback.lastHueRateSkipped) +
+    Math.max(0, wizRateSkippedTotal - transportPressureFeedback.lastWizRateSkipped);
+  const inflightSkippedDelta = Math.max(0, hueInflightSkipped - transportPressureFeedback.lastHueInflightSkipped);
+  const sentDelta = hueSentDelta + wizSentDelta;
+
+  const demandTotal = sentDelta + rateSkippedDelta + inflightSkippedDelta;
+  const skipRatePerSec = (rateSkippedDelta * 1000) / Math.max(1, sampleMs);
+  let rawPressure = demandTotal > 0
+    ? ((rateSkippedDelta + (inflightSkippedDelta * 1.65)) / Math.max(1, demandTotal))
+    : 0;
+  rawPressure += clamp(skipRatePerSec / 7.5, 0, 0.6);
+  if (hueTelemetry.inflight === true) {
+    const inflightPenalty = clamp(
+      (Number(hueTelemetry.lastDurationMs || 0) - 110) / 320,
+      0,
+      0.42
+    );
+    rawPressure += inflightPenalty;
+  }
+  rawPressure = clamp(rawPressure, 0, 2.4);
+
+  const alpha = rawPressure >= transportPressureFeedback.ema ? 0.78 : 0.3;
+  transportPressureFeedback.ema = clamp(
+    transportPressureFeedback.ema + ((rawPressure - transportPressureFeedback.ema) * alpha),
+    0,
+    2.4
+  );
+  if (rawPressure >= 0.24 || inflightSkippedDelta > 0) {
+    transportPressureFeedback.holdUntil = now + TRANSPORT_PRESSURE_HOLD_MS;
+  }
+  const heldPressure = now < transportPressureFeedback.holdUntil
+    ? Math.max(transportPressureFeedback.ema, rawPressure * 0.96, 0.14)
+    : transportPressureFeedback.ema;
+  const engineTelemetry = engine?.getTelemetry?.() || {};
+  const autoHzControlActive = Boolean(engineTelemetry.metaAutoEnabled || engineTelemetry.overclockAutoEnabled);
+
+  engine.setTransportPressure({
+    now,
+    reason,
+    sampleMs,
+    sent: sentDelta,
+    skippedRate: rateSkippedDelta,
+    skippedInflight: inflightSkippedDelta,
+    raw: autoHzControlActive ? rawPressure : 0,
+    pressure: autoHzControlActive ? heldPressure : 0
+  });
+
+  transportPressureFeedback.lastAt = now;
+  transportPressureFeedback.lastHueSent = hueSent;
+  transportPressureFeedback.lastWizSent = wizSent;
+  transportPressureFeedback.lastHueRateSkipped = hueRateSkippedTotal;
+  transportPressureFeedback.lastWizRateSkipped = wizRateSkippedTotal;
+  transportPressureFeedback.lastHueInflightSkipped = hueInflightSkipped;
+}
 
 function getModsRuntimeSnapshot() {
   return {
@@ -3119,6 +5591,25 @@ function getModsRuntimeSnapshot() {
     audioReactivityMap: getAudioReactivityMapSnapshot(),
     modsDebug: modLoader.getDebugDiagnostics?.({ includeEvents: false }) || null
   };
+}
+
+async function applyStandaloneStartupUpdates() {
+  syncStandaloneRuntime();
+  const fixtures = listStandaloneFixtures().filter(f => f && f.enabled !== false);
+  for (const fixture of fixtures) {
+    const fixtureId = String(fixture.id || "").trim();
+    if (!fixtureId || !hasStandalonePersistedState(fixtureId)) continue;
+    const current = standaloneStates.get(fixtureId);
+    if (!current) continue;
+    const sent = await sendStandaloneStateWithRetry(
+      fixture,
+      current,
+      { attempts: 2, delayMs: 60 }
+    );
+    if (!sent.ok) {
+      console.warn(`[STANDALONE] startup reapply skipped for ${fixtureId}: ${sent.error || "send failed"}`);
+    }
+  }
 }
 
 const modLoader = createModLoader({
@@ -3224,6 +5715,7 @@ function bootEngine(reason = "boot") {
   midiManager?.dispose?.();
   midiManager = null;
   resetAudioReactivityEnvelopes();
+  resetTransportPressureFeedback();
 
   engine = createRaveEngine({
     emit(intent) {
@@ -3264,10 +5756,12 @@ function bootEngine(reason = "boot") {
                 forceDelta: Boolean(mappedIntent.forceRate || mappedIntent.forceDelta),
                 deltaScale: Number.isFinite(intentDeltaScale)
                   ? intentDeltaScale
-                  : (turboRate ? 0.5 : 1)
+                  : (turboRate ? 0.5 : 1),
+                paletteIntent: mappedIntent
               }
             );
           }
+          updateEngineTransportPressure("hue_emit");
           return;
         }
 
@@ -3290,8 +5784,8 @@ function bootEngine(reason = "boot") {
           if (!color) return;
 
           const dimming = Number.isFinite(color.dimming)
-            ? color.dimming
-            : Math.round(clamp((mappedIntent.brightness || 1) * 100, 10, 100));
+            ? Math.round(clamp(Number(color.dimming), 1, 100))
+            : Math.round(clamp((mappedIntent.brightness || 1) * 100, 1, 100));
           const dropActive = Boolean(
             audioReactivityMapRuntime.dropEnabled && mappedIntent.drop
           );
@@ -3311,10 +5805,11 @@ function bootEngine(reason = "boot") {
                 maxSilenceMs: requestedMaxSilenceMs > 0
                   ? requestedMaxSilenceMs
                   : wizRateProfile.maxSilenceMs,
-                forceDelta: Boolean(mappedIntent.forceRate || mappedIntent.forceDelta || dropActive),
+                forceDelta: Boolean(mappedIntent.forceRate || mappedIntent.forceDelta || dropActive || beatActive),
                 deltaScale: Number.isFinite(Number(mappedIntent.deltaScale))
                   ? Number(mappedIntent.deltaScale)
                   : (veryHighRate ? 0.5 : (highRate ? 0.62 : 0.92)),
+                paletteIntent: mappedIntent,
                 tx: {
                   // UDP is lossy; repeat key beats/drops for better visual lock.
                   repeats: dropActive ? (veryHighRate ? 2 : 3) : beatActive ? (veryHighRate ? 1 : 2) : 1,
@@ -3323,6 +5818,7 @@ function bootEngine(reason = "boot") {
               }
             );
           }
+          updateEngineTransportPressure("wiz_emit");
         }
       } catch (err) {
         console.error("[RAVE][EMIT ERROR]", err.stack || err);
@@ -3330,20 +5826,47 @@ function bootEngine(reason = "boot") {
     }
   });
 
-  audio = createAudio(level => {
-    engine.setAudioLevel(level);
-  });
+  audio = createAudio(() => {});
 
+  if (engine?.setLegacyComponentsEnabled) {
+    engine.setLegacyComponentsEnabled(Boolean(systemConfigRuntime?.legacyComponentsEnabled));
+  }
   engine.setDropDetectionEnabled?.(Boolean(audioReactivityMapRuntime.dropEnabled));
+  if (engine?.setMetaAutoTempoTrackers) {
+    engine.setMetaAutoTempoTrackers(
+      sanitizeMetaAutoTempoTrackersConfig(
+        audioReactivityMapRuntime.metaAutoTempoTrackers,
+        AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+      )
+    );
+  } else {
+    engine.setMetaAutoTempoBaselineBlend?.(
+      Boolean(audioReactivityMapRuntime.metaAutoHueWizBaselineBlend)
+    );
+  }
+  engine.setMetaAutoTempoTrackersAuto?.(
+    Boolean(audioReactivityMapRuntime.metaAutoTempoTrackersAuto)
+  );
 
   if (audioRuntimeConfig && audio.setConfig) {
     audio.setConfig(audioRuntimeConfig, { restart: false });
   }
   audioRuntimeConfig = audio.getConfig?.() || audioRuntimeConfig;
+  writeAudioRuntimeConfig(audioRuntimeConfig);
 
+  const audioStatsMinMs = clamp(
+    Math.round(Number(process.env.RAVE_AUDIO_STATS_MIN_MS || 6)),
+    1,
+    50
+  );
+  let lastAudioStatsForwardAt = 0;
   audio.onStats?.(stats => {
+    const now = Date.now();
+    if ((now - lastAudioStatsForwardAt) < audioStatsMinMs) return;
+    lastAudioStatsForwardAt = now;
     engine.setAudioLevel({
       level: stats.level,
+      rms: stats.rms,
       peak: stats.peak,
       transient: stats.transient,
       zcr: stats.zcr,
@@ -3356,6 +5879,9 @@ function bootEngine(reason = "boot") {
 
   refreshWizAdapters();
   syncStandaloneRuntime();
+  applyStandaloneStartupUpdates().catch(err => {
+    console.warn("[STANDALONE] startup reapply failed:", err.message || err);
+  });
   console.log(`[RAVE] engine + audio wired (WiZ targets: ${wizAdapters.size})`);
 
   midiManager = createMidiManager(engine);
@@ -3363,20 +5889,12 @@ function bootEngine(reason = "boot") {
   console.log("[RAVE] MIDI manager created and wired");
 
   const preferredHueMode = getPreferredHueTransportMode();
-  setHueTransportMode(preferredHueMode)
-    .then(result => {
-      if (
-        preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT &&
-        result.active !== HUE_TRANSPORT.ENTERTAINMENT
-      ) {
-        forceHueEntertainmentRecovery("boot_sync");
-      }
-    })
+  const bootHueMode = preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT
+    ? HUE_TRANSPORT.REST
+    : preferredHueMode;
+  setHueTransportMode(bootHueMode)
     .catch(err => {
       console.warn("[HUE] transport sync failed:", err.message || err);
-      if (preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT) {
-        forceHueEntertainmentRecovery("boot_sync");
-      }
     });
 
   fireModHook("onBoot", {
@@ -3406,10 +5924,14 @@ async function handleRaveOn(_, res) {
   const automationSeq = nextAutomationEventSeq();
   try {
     state.lock("rave");
+    cancelHueEntertainmentRecovery("rave_on_reset");
+    clearHueRecoveryTimeoutSuppression();
     const preferredHueMode = getPreferredHueTransportMode();
     const transport = await settleWithTimeout(
       setHueTransportMode(preferredHueMode),
-      preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT ? 3600 : 2200,
+      preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT
+        ? HUE_ENT_MODE_SWITCH_TIMEOUT_MS
+        : HUE_REST_MODE_SWITCH_TIMEOUT_MS,
       () => ({
         desired: hueTransport.desired,
         active: hueTransport.active,
@@ -3418,8 +5940,11 @@ async function handleRaveOn(_, res) {
           : "rest switch timeout"
       })
     );
+    const entertainmentNeedsRecovery =
+      preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT &&
+      transport.active !== HUE_TRANSPORT.ENTERTAINMENT;
     if (preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT) {
-      if (transport.active !== HUE_TRANSPORT.ENTERTAINMENT) {
+      if (entertainmentNeedsRecovery) {
         forceHueEntertainmentRecovery("rave_on_prestart");
       } else {
         scheduleHueEntertainmentRecovery("rave_on_prestart");
@@ -3427,7 +5952,10 @@ async function handleRaveOn(_, res) {
     }
     engine.start();
     audio.start();
-    if (preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT) {
+    if (
+      preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT &&
+      !entertainmentNeedsRecovery
+    ) {
       scheduleHueEntertainmentRecovery("rave_on");
     }
     fireModHook("onRaveStart", {
@@ -3450,9 +5978,10 @@ async function handleRaveOn(_, res) {
 
 async function handleRaveOff(_, res) {
   const automationSeq = nextAutomationEventSeq();
-  const keepEntertainmentWarm = getPreferredHueTransportMode() === HUE_TRANSPORT.ENTERTAINMENT;
   cancelHueEntertainmentRecovery("rave_off");
+  clearHueRecoveryTimeoutSuppression();
   state.unlock("rave");
+  let raveOffColorApplied = false;
 
   try {
     audio.stop();
@@ -3467,48 +5996,55 @@ async function handleRaveOff(_, res) {
   }
 
   try {
-    if (keepEntertainmentWarm) {
-      const transport = await settleWithTimeout(
-        setHueTransportMode(HUE_TRANSPORT.ENTERTAINMENT),
-        3200,
-        () => ({
-          desired: hueTransport.desired,
-          active: hueTransport.active,
-          fallbackReason: "entertainment keep-warm timeout"
-        })
-      );
-      if (transport.active !== HUE_TRANSPORT.ENTERTAINMENT) {
-        scheduleHueEntertainmentRecovery("rave_off_idle");
-      } else {
-        scheduleHueEntertainmentRecovery("rave_off_idle");
-      }
-    } else {
-      const transport = await settleWithTimeout(
-        setHueTransportMode(HUE_TRANSPORT.REST),
-        2200,
-        () => ({
-          desired: hueTransport.desired,
-          active: hueTransport.active,
-          fallbackReason: "rest switch timeout"
-        })
-      );
-      if (transport.active !== HUE_TRANSPORT.REST) {
-        hueTransport.active = HUE_TRANSPORT.REST;
-        hueTransport.fallbackReason = "rest switch timeout";
-        hueEntertainment.stop().catch(() => {});
-      }
+    const transport = await settleWithTimeout(
+      setHueTransportMode(HUE_TRANSPORT.REST),
+      HUE_REST_MODE_SWITCH_TIMEOUT_MS,
+      () => ({
+        desired: hueTransport.desired,
+        active: hueTransport.active,
+        fallbackReason: "rest switch timeout"
+      })
+    );
+    if (transport.active !== HUE_TRANSPORT.REST) {
+      hueTransport.active = HUE_TRANSPORT.REST;
+      hueTransport.fallbackReason = "rest switch timeout";
+      hueEntertainment.stop().catch(() => {});
     }
   } catch (err) {
     console.warn("[RAVE] transport stop warning:", err?.message || err);
+  }
+
+  try {
+    const result = await applyTwitchRaveOffColorProfile();
+    raveOffColorApplied = result?.applied === true;
+    if (raveOffColorApplied) {
+      console.log(
+        `[RAVE] stop color profile applied (assigned=${result.assigned || 0}, ` +
+        `hue=${result.hueTargets || 0}, wiz=${result.wizTargets || 0})`
+      );
+    }
+    if (Array.isArray(result?.warnings) && result.warnings.length) {
+      const first = result.warnings[0];
+      console.warn(
+        `[RAVE] stop color profile warning: ${first.fixtureId || "fixture"} ` +
+        `(${first.error || "invalid command"})`
+      );
+    }
+  } catch (err) {
+    console.warn("[RAVE] stop color profile warning:", err?.message || err);
   }
 
   fireModHook("onRaveStop", {
     source: "api",
     runtime: getModsRuntimeSnapshot()
   });
-  runAutomationEvent("stop", automationSeq).catch(err => {
-    console.warn("[AUTOMATION] stop action failed:", err.message || err);
-  });
+  if (raveOffColorApplied) {
+    console.log("[AUTOMATION] stop brightness skipped (rave-off color profile active)");
+  } else {
+    runAutomationEvent("stop", automationSeq).catch(err => {
+      console.warn("[AUTOMATION] stop action failed:", err.message || err);
+    });
+  }
   applyStandaloneRaveStopUpdates().catch(err => {
     console.warn("[STANDALONE] rave-stop update failed:", err.message || err);
   });
@@ -3551,6 +6087,8 @@ app.post("/rave/reload", async (_, res) => {
 
   delete require.cache[require.resolve("./core/rave-engine")];
   createRaveEngine = require("./core/rave-engine");
+  delete require.cache[require.resolve("./core/audio")];
+  createAudio = require("./core/audio");
 
   bootEngine("reload");
 
@@ -3649,7 +6187,7 @@ function xyBriToRgb(x, y, bri = 180) {
 }
 
 function hueStateToWizState(hueState = {}) {
-  const bri = Math.max(10, Math.min(100, Math.round((Number(hueState.bri || 180) / 254) * 100)));
+  const bri = Math.max(1, Math.min(100, Math.round((Number(hueState.bri || 180) / 254) * 100)));
   let rgb = { r: 255, g: 255, b: 255 };
 
   if (Array.isArray(hueState.xy) && hueState.xy.length >= 2) {
@@ -3680,9 +6218,105 @@ function sanitizeTwitchColorTarget(value, fallback = "hue") {
   return TWITCH_COLOR_TARGETS.has(safeFallback) ? safeFallback : "hue";
 }
 
+function sanitizeTwitchColorCommandText(value, fallback = "") {
+  const source = String(value || "").replace(/\s+/g, " ").trim();
+  if (!source) return String(fallback || "").replace(/\s+/g, " ").trim();
+  return source.slice(0, 96);
+}
+
+function sanitizeTwitchRaveOffGroupKey(value) {
+  const source = String(value || "").trim().toLowerCase();
+  if (!source) return "";
+  const [brandRaw, zoneRaw = ""] = source.split(":", 2);
+  const brand = brandRaw === "hue" || brandRaw === "wiz" ? brandRaw : "";
+  if (!brand) return "";
+  const zone = normalizeRouteZoneToken(zoneRaw, "");
+  if (!zone) return brand;
+  if (zone === "*" || zone === "all") return `${brand}:all`;
+  if (!/^[a-z0-9_-]{1,48}$/.test(zone)) return "";
+  return `${brand}:${zone}`;
+}
+
+function sanitizeTwitchRaveOffGroupMap(input = {}) {
+  const rawMap =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? input
+      : {};
+  const safe = {};
+  const entries = Object.entries(rawMap)
+    .map(([key, value]) => [sanitizeTwitchRaveOffGroupKey(key), sanitizeTwitchColorCommandText(value, "")])
+    .filter(([key, value]) => key && value)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [key, value] of entries) safe[key] = value;
+  return safe;
+}
+
+function sanitizeTwitchRaveOffFixtureMap(input = {}) {
+  const rawMap =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? input
+      : {};
+  const safe = {};
+  const entries = Object.entries(rawMap)
+    .map(([fixtureId, value]) => [String(fixtureId || "").trim(), sanitizeTwitchColorCommandText(value, "")])
+    .filter(([fixtureId, value]) => fixtureId && value)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [fixtureId, value] of entries) safe[fixtureId] = value;
+  return safe;
+}
+
+function sanitizeTwitchRaveOffConfig(input = {}, fallback = TWITCH_COLOR_CONFIG_DEFAULT.raveOff) {
+  const raw =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? input
+      : {};
+  const base =
+    fallback && typeof fallback === "object" && !Array.isArray(fallback)
+      ? fallback
+      : TWITCH_COLOR_CONFIG_DEFAULT.raveOff;
+  return {
+    enabled: parseBoolean(raw.enabled, base.enabled === true),
+    defaultText: sanitizeTwitchColorCommandText(raw.defaultText, base.defaultText || ""),
+    groups: sanitizeTwitchRaveOffGroupMap(raw.groups || base.groups || {}),
+    fixtures: sanitizeTwitchRaveOffFixtureMap(raw.fixtures || base.fixtures || {})
+  };
+}
+
+function sanitizeTwitchFixturePrefixMap(input = {}) {
+  const rawMap = input && typeof input === "object" ? input : {};
+  const safeMap = {};
+  const seenPrefixes = new Set();
+  const entries = Object.entries(rawMap)
+    .map(([fixtureId, prefix]) => [String(fixtureId || "").trim(), prefix])
+    .filter(([fixtureId]) => fixtureId)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+
+  for (const [fixtureId, prefix] of entries) {
+    const safePrefix = sanitizeTwitchColorPrefix(prefix, "");
+    if (!safePrefix) continue;
+    if (seenPrefixes.has(safePrefix)) continue;
+    safeMap[fixtureId] = safePrefix;
+    seenPrefixes.add(safePrefix);
+  }
+
+  return safeMap;
+}
+
 function sanitizeTwitchColorConfig(input = {}) {
   const raw = input && typeof input === "object" ? input : {};
   const rawPrefixes = raw.prefixes && typeof raw.prefixes === "object" ? raw.prefixes : {};
+  const rawFixturePrefixes =
+    raw.fixturePrefixes &&
+    typeof raw.fixturePrefixes === "object" &&
+    !Array.isArray(raw.fixturePrefixes)
+      ? raw.fixturePrefixes
+      : {};
+  const rawRaveOff =
+    raw.raveOff &&
+    typeof raw.raveOff === "object" &&
+    !Array.isArray(raw.raveOff)
+      ? raw.raveOff
+      : {};
   const hasHue = Object.prototype.hasOwnProperty.call(rawPrefixes, "hue");
   const hasWiz = Object.prototype.hasOwnProperty.call(rawPrefixes, "wiz");
   const hasOther = Object.prototype.hasOwnProperty.call(rawPrefixes, "other");
@@ -3696,22 +6330,55 @@ function sanitizeTwitchColorConfig(input = {}) {
   const otherPrefix = hasOther
     ? sanitizeTwitchColorPrefix(rawPrefixes.other, "")
     : sanitizeTwitchColorPrefix(TWITCH_COLOR_CONFIG_DEFAULT.prefixes.other, "");
+  const dedupedPrefixes = {
+    hue: "",
+    wiz: "",
+    other: ""
+  };
+  const seenBrandPrefixes = new Set();
+  for (const [brand, prefix] of [["hue", huePrefix], ["wiz", wizPrefix], ["other", otherPrefix]]) {
+    if (!prefix) continue;
+    if (seenBrandPrefixes.has(prefix)) continue;
+    dedupedPrefixes[brand] = prefix;
+    seenBrandPrefixes.add(prefix);
+  }
 
   return {
     version: 1,
     defaultTarget: sanitizeTwitchColorTarget(raw.defaultTarget, TWITCH_COLOR_CONFIG_DEFAULT.defaultTarget),
-    prefixes: {
-      hue: huePrefix,
-      wiz: wizPrefix,
-      other: otherPrefix
-    }
+    prefixes: dedupedPrefixes,
+    fixturePrefixes: sanitizeTwitchFixturePrefixMap(rawFixturePrefixes),
+    raveOff: sanitizeTwitchRaveOffConfig(rawRaveOff, TWITCH_COLOR_CONFIG_DEFAULT.raveOff)
   };
 }
 
 function readTwitchColorConfig() {
   try {
     const parsed = JSON.parse(fs.readFileSync(TWITCH_COLOR_CONFIG_PATH, "utf8"));
-    return sanitizeTwitchColorConfig(parsed);
+    const sanitized = sanitizeTwitchColorConfig(parsed);
+    const raveOff = sanitized.raveOff || {};
+    const legacyDefaultText = String(raveOff.defaultText || "").trim().toLowerCase();
+    const hasGroupOverrides = Object.keys(raveOff.groups || {}).length > 0;
+    const hasFixtureOverrides = Object.keys(raveOff.fixtures || {}).length > 0;
+    const shouldMigrateLegacyDefault =
+      legacyDefaultText === "dim blue" &&
+      !hasGroupOverrides &&
+      !hasFixtureOverrides;
+    if (!shouldMigrateLegacyDefault) return sanitized;
+    const migrated = sanitizeTwitchColorConfig({
+      ...sanitized,
+      raveOff: {
+        ...raveOff,
+        defaultText: "random"
+      }
+    });
+    try {
+      writeTwitchColorConfig(migrated);
+      console.log("[COLOR] migrated legacy rave-off default from 'dim blue' to 'random'");
+    } catch (err) {
+      console.warn("[COLOR] unable to persist rave-off default migration:", err?.message || err);
+    }
+    return migrated;
   } catch {
     return sanitizeTwitchColorConfig(TWITCH_COLOR_CONFIG_DEFAULT);
   }
@@ -3727,31 +6394,75 @@ function writeTwitchColorConfig(config) {
 const twitchColorConfigRuntime = readTwitchColorConfig();
 console.log(
   `[COLOR] twitch command config loaded (default=${twitchColorConfigRuntime.defaultTarget}, ` +
-  `prefixes=${JSON.stringify(twitchColorConfigRuntime.prefixes)})`
+  `prefixes=${JSON.stringify(twitchColorConfigRuntime.prefixes)}, ` +
+  `fixturePrefixes=${Object.keys(twitchColorConfigRuntime.fixturePrefixes || {}).length}, ` +
+  `raveOffEnabled=${twitchColorConfigRuntime.raveOff?.enabled === true})`
 );
 
 function getTwitchColorConfigSnapshot() {
   return {
     version: twitchColorConfigRuntime.version,
     defaultTarget: twitchColorConfigRuntime.defaultTarget,
-    prefixes: { ...twitchColorConfigRuntime.prefixes }
+    prefixes: { ...twitchColorConfigRuntime.prefixes },
+    fixturePrefixes: { ...(twitchColorConfigRuntime.fixturePrefixes || {}) },
+    raveOff: {
+      ...(twitchColorConfigRuntime.raveOff || {}),
+      groups: { ...(twitchColorConfigRuntime.raveOff?.groups || {}) },
+      fixtures: { ...(twitchColorConfigRuntime.raveOff?.fixtures || {}) }
+    }
   };
 }
 
 function patchTwitchColorConfig(patch = {}) {
   const rawPatch = patch && typeof patch === "object" ? patch : {};
+  const hasFixturePrefixes =
+    rawPatch.fixturePrefixes &&
+    typeof rawPatch.fixturePrefixes === "object" &&
+    !Array.isArray(rawPatch.fixturePrefixes);
+  const hasRaveOffPatch =
+    rawPatch.raveOff &&
+    typeof rawPatch.raveOff === "object" &&
+    !Array.isArray(rawPatch.raveOff);
+  const raveOffPatch = hasRaveOffPatch ? rawPatch.raveOff : {};
   const merged = {
     ...twitchColorConfigRuntime,
     ...rawPatch,
     prefixes: {
       ...twitchColorConfigRuntime.prefixes,
       ...(rawPatch.prefixes && typeof rawPatch.prefixes === "object" ? rawPatch.prefixes : {})
-    }
+    },
+    fixturePrefixes: hasFixturePrefixes
+      ? { ...rawPatch.fixturePrefixes }
+      : { ...(twitchColorConfigRuntime.fixturePrefixes || {}) },
+    raveOff: hasRaveOffPatch
+      ? {
+        ...(twitchColorConfigRuntime.raveOff || {}),
+        ...raveOffPatch,
+        groups:
+          raveOffPatch.groups && typeof raveOffPatch.groups === "object" && !Array.isArray(raveOffPatch.groups)
+            ? { ...raveOffPatch.groups }
+            : { ...(twitchColorConfigRuntime.raveOff?.groups || {}) },
+        fixtures:
+          raveOffPatch.fixtures && typeof raveOffPatch.fixtures === "object" && !Array.isArray(raveOffPatch.fixtures)
+            ? { ...raveOffPatch.fixtures }
+            : { ...(twitchColorConfigRuntime.raveOff?.fixtures || {}) }
+      }
+      : {
+        ...(twitchColorConfigRuntime.raveOff || {}),
+        groups: { ...(twitchColorConfigRuntime.raveOff?.groups || {}) },
+        fixtures: { ...(twitchColorConfigRuntime.raveOff?.fixtures || {}) }
+      }
   };
   const next = writeTwitchColorConfig(merged);
   twitchColorConfigRuntime.version = next.version;
   twitchColorConfigRuntime.defaultTarget = next.defaultTarget;
   twitchColorConfigRuntime.prefixes = { ...next.prefixes };
+  twitchColorConfigRuntime.fixturePrefixes = { ...next.fixturePrefixes };
+  twitchColorConfigRuntime.raveOff = {
+    ...next.raveOff,
+    groups: { ...(next.raveOff?.groups || {}) },
+    fixtures: { ...(next.raveOff?.fixtures || {}) }
+  };
   return getTwitchColorConfigSnapshot();
 }
 
@@ -3761,9 +6472,18 @@ const audioReactivityEnvelopeByTarget = {
   wiz: 1,
   other: 1
 };
+const wizReactiveDynamics = {
+  beatPulse: 0,
+  lastTickAt: 0,
+  brightnessEma: 0,
+  hueEma: null
+};
 console.log(
   `[AUDIO] reactivity map loaded (dropEnabled=${audioReactivityMapRuntime.dropEnabled}, ` +
   `hardwareRateLimitsEnabled=${audioReactivityMapRuntime.hardwareRateLimitsEnabled !== false}, ` +
+  `metaAutoHueWizBaselineBlend=${audioReactivityMapRuntime.metaAutoHueWizBaselineBlend === true}, ` +
+  `metaAutoTempoTrackersAuto=${audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true}, ` +
+  `metaAutoTempoTrackers=${summarizeMetaAutoTempoTrackers(audioReactivityMapRuntime.metaAutoTempoTrackers)}, ` +
   `hue=${audioReactivityMapRuntime.targets.hue.sources.join("+")}, ` +
   `wiz=${audioReactivityMapRuntime.targets.wiz.sources.join("+")}, ` +
   `other=${audioReactivityMapRuntime.targets.other.sources.join("+")})`
@@ -3773,6 +6493,10 @@ function resetAudioReactivityEnvelopes() {
   for (const key of Object.keys(audioReactivityEnvelopeByTarget)) {
     audioReactivityEnvelopeByTarget[key] = 1;
   }
+  wizReactiveDynamics.beatPulse = 0;
+  wizReactiveDynamics.lastTickAt = 0;
+  wizReactiveDynamics.brightnessEma = 0;
+  wizReactiveDynamics.hueEma = null;
 }
 
 function getAudioReactivitySourceCatalogSnapshot() {
@@ -3786,11 +6510,26 @@ function getAudioReactivitySourceCatalogSnapshot() {
   return catalog;
 }
 
+function summarizeMetaAutoTempoTrackers(trackers = {}) {
+  const safe = sanitizeMetaAutoTempoTrackersConfig(
+    trackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  const active = META_AUTO_TEMPO_TRACKER_KEYS.filter(key => safe[key] === true);
+  return active.length ? active.join("+") : "classic";
+}
+
 function getAudioReactivityMapSnapshot() {
   return {
     version: Number(audioReactivityMapRuntime.version || 1),
     dropEnabled: Boolean(audioReactivityMapRuntime.dropEnabled),
     hardwareRateLimitsEnabled: audioReactivityMapRuntime.hardwareRateLimitsEnabled !== false,
+    metaAutoHueWizBaselineBlend: audioReactivityMapRuntime.metaAutoHueWizBaselineBlend === true,
+    metaAutoTempoTrackersAuto: audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true,
+    metaAutoTempoTrackers: sanitizeMetaAutoTempoTrackersConfig(
+      audioReactivityMapRuntime.metaAutoTempoTrackers,
+      AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+    ),
     targets: {
       hue: {
         enabled: Boolean(audioReactivityMapRuntime.targets?.hue?.enabled),
@@ -3812,11 +6551,26 @@ function getAudioReactivityMapSnapshot() {
   };
 }
 
-function patchAudioReactivityMapConfig(patch = {}) {
-  const rawPatch = patch && typeof patch === "object" ? patch : {};
+function patchAudioReactivityMapConfig(patch = {}, options = {}) {
+  const rawPatchInput = patch && typeof patch === "object" ? patch : {};
+  const opts = options && typeof options === "object" ? options : {};
+  const preserveMetaControls = opts.preserveMetaControls === true;
+  const rawPatch = { ...rawPatchInput };
+  if (preserveMetaControls) {
+    delete rawPatch.metaAutoHueWizBaselineBlend;
+    delete rawPatch.metaAutoTempoTrackersAuto;
+    delete rawPatch.metaAutoTempoTrackers;
+  }
+  const rawPatchTrackers = rawPatch.metaAutoTempoTrackers && typeof rawPatch.metaAutoTempoTrackers === "object"
+    ? rawPatch.metaAutoTempoTrackers
+    : {};
   const merged = {
     ...audioReactivityMapRuntime,
     ...rawPatch,
+    metaAutoTempoTrackers: {
+      ...(audioReactivityMapRuntime.metaAutoTempoTrackers || {}),
+      ...rawPatchTrackers
+    },
     targets: {
       ...(audioReactivityMapRuntime.targets || {}),
       ...(rawPatch.targets && typeof rawPatch.targets === "object" ? rawPatch.targets : {})
@@ -3826,6 +6580,12 @@ function patchAudioReactivityMapConfig(patch = {}) {
   audioReactivityMapRuntime.version = next.version;
   audioReactivityMapRuntime.dropEnabled = next.dropEnabled;
   audioReactivityMapRuntime.hardwareRateLimitsEnabled = next.hardwareRateLimitsEnabled !== false;
+  audioReactivityMapRuntime.metaAutoHueWizBaselineBlend = next.metaAutoHueWizBaselineBlend === true;
+  audioReactivityMapRuntime.metaAutoTempoTrackersAuto = next.metaAutoTempoTrackersAuto === true;
+  audioReactivityMapRuntime.metaAutoTempoTrackers = sanitizeMetaAutoTempoTrackersConfig(
+    next.metaAutoTempoTrackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
   audioReactivityMapRuntime.targets = {
     hue: { ...next.targets.hue },
     wiz: { ...next.targets.wiz },
@@ -3834,6 +6594,19 @@ function patchAudioReactivityMapConfig(patch = {}) {
   resetAudioReactivityEnvelopes();
   if (engine?.setDropDetectionEnabled) {
     engine.setDropDetectionEnabled(Boolean(audioReactivityMapRuntime.dropEnabled));
+  }
+  if (engine?.setMetaAutoTempoBaselineBlend) {
+    engine.setMetaAutoTempoBaselineBlend(
+      Boolean(audioReactivityMapRuntime.metaAutoHueWizBaselineBlend)
+    );
+  }
+  if (engine?.setMetaAutoTempoTrackers) {
+    engine.setMetaAutoTempoTrackers(audioReactivityMapRuntime.metaAutoTempoTrackers);
+  }
+  if (engine?.setMetaAutoTempoTrackersAuto) {
+    engine.setMetaAutoTempoTrackersAuto(
+      Boolean(audioReactivityMapRuntime.metaAutoTempoTrackersAuto)
+    );
   }
   return getAudioReactivityMapSnapshot();
 }
@@ -3846,27 +6619,42 @@ function clamp01(value, fallback = 0) {
 
 function getAudioTelemetryMotionProfile(telemetry = {}) {
   const t = telemetry && typeof telemetry === "object" ? telemetry : {};
-  const rms = clamp01(t.rms, clamp01(t.level, 0));
+  const rms = clamp01(t.audioSourceLevel, clamp01(t.rms, clamp01(t.level, 0)));
   const energyValue = clamp01(t.energy, rms);
+  const low = clamp01(t.audioBandLow, rms);
+  const mid = clamp01(t.audioBandMid, rms);
+  const high = clamp01(t.audioBandHigh, rms);
   const transient = clamp01(t.audioTransient ?? t.transient, 0);
   const flux = clamp01(t.audioFlux, clamp01(t.spectralFlux, 0));
   const beat = clamp01(t.beatConfidence, t.beat ? 0.65 : 0);
+  const percussionSupport = clamp01(
+    (low * 0.46) +
+    (transient * 0.32) +
+    (beat * 0.22),
+    0
+  );
+  const vocalBias = clamp01(
+    ((mid * 0.58) + (high * 0.28) - (percussionSupport * 0.62)) * 1.35,
+    0
+  );
   const motion = clamp01(
     Math.max(
       energyValue,
-      rms * 0.94,
+      rms * (0.66 + (percussionSupport * 0.22)),
       transient * 0.9,
       flux * 0.82,
       beat * 0.72
     ),
     0
   );
-  const quietMix = clamp01((0.24 - motion) / 0.24, 0);
-  const hushMix = clamp01((0.14 - motion) / 0.14, 0);
+  const quietMix = clamp01(((0.34 - motion) / 0.34) + (vocalBias * 0.2), 0);
+  const hushMix = clamp01(((0.24 - motion) / 0.24) + (vocalBias * 0.26), 0);
   return {
     motion,
     quietMix,
-    hushMix
+    hushMix,
+    percussionSupport,
+    vocalBias
   };
 }
 
@@ -3874,7 +6662,7 @@ function boostRgbSaturation(color = {}, amount = 0) {
   const r = clampRgb255(color?.r);
   const g = clampRgb255(color?.g);
   const b = clampRgb255(color?.b);
-  const boost = clampNumber(amount, 0, 0.75, 0);
+  const boost = clampNumber(amount, 0, 1, 0);
   const maxChannel = Math.max(r, g, b);
   const minChannel = Math.min(r, g, b);
   if (boost <= 0 || maxChannel <= 0 || maxChannel - minChannel < 1) {
@@ -3886,17 +6674,83 @@ function boostRgbSaturation(color = {}, amount = 0) {
   const targetMin = maxChannel * (1 - targetSat);
   const spread = maxChannel - minChannel;
   const gain = spread > 0 ? (maxChannel - targetMin) / spread : 1;
-
-  return {
+  const boosted = {
     r: clampRgb255(maxChannel - ((maxChannel - r) * gain)),
     g: clampRgb255(maxChannel - ((maxChannel - g) * gain)),
     b: clampRgb255(maxChannel - ((maxChannel - b) * gain))
+  };
+  if (boost <= 0.5) return boosted;
+
+  const vivid = clampNumber((boost - 0.5) / 0.5, 0, 1, 0);
+  const luma =
+    boosted.r * 0.2126 +
+    boosted.g * 0.7152 +
+    boosted.b * 0.0722;
+  const chromaGain = 1 + (vivid * 1.28);
+  const valueGain = 1 + (vivid * 0.24);
+
+  return {
+    r: clampRgb255((luma + ((boosted.r - luma) * chromaGain)) * valueGain),
+    g: clampRgb255((luma + ((boosted.g - luma) * chromaGain)) * valueGain),
+    b: clampRgb255((luma + ((boosted.b - luma) * chromaGain)) * valueGain)
+  };
+}
+
+function rgbToHsv255(color = {}) {
+  const r = clampRgb255(color?.r) / 255;
+  const g = clampRgb255(color?.g) / 255;
+  const b = clampRgb255(color?.b) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let h = 0;
+  if (delta > 0) {
+    if (max === r) h = ((g - b) / delta) % 6;
+    else if (max === g) h = ((b - r) / delta) + 2;
+    else h = ((r - g) / delta) + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return {
+    h: clampNumber(h, 0, 360, 0),
+    s: max <= 0 ? 0 : clampNumber(delta / max, 0, 1, 0),
+    v: clampNumber(max, 0, 1, 0)
+  };
+}
+
+function hsvToRgb255(h, s = 1, v = 1) {
+  const hue = ((Number(h) || 0) % 360 + 360) % 360;
+  const sat = clampNumber(s, 0, 1, 1);
+  const val = clampNumber(v, 0, 1, 1);
+  const c = val * sat;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = val - c;
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
+  if (hue < 60) {
+    r1 = c; g1 = x; b1 = 0;
+  } else if (hue < 120) {
+    r1 = x; g1 = c; b1 = 0;
+  } else if (hue < 180) {
+    r1 = 0; g1 = c; b1 = x;
+  } else if (hue < 240) {
+    r1 = 0; g1 = x; b1 = c;
+  } else if (hue < 300) {
+    r1 = x; g1 = 0; b1 = c;
+  } else {
+    r1 = c; g1 = 0; b1 = x;
+  }
+  return {
+    r: clampRgb255((r1 + m) * 255),
+    g: clampRgb255((g1 + m) * 255),
+    b: clampRgb255((b1 + m) * 255)
   };
 }
 
 function resolveAudioReactivitySourceLevel(source, telemetry = {}) {
   const t = telemetry && typeof telemetry === "object" ? telemetry : {};
-  const rms = clamp01(t.rms, 0);
+  const rms = clamp01(t.audioSourceLevel, clamp01(t.rms, 0));
   const energyValue = clamp01(t.energy, rms);
   const low = clamp01(t.audioBandLow, rms);
   const mid = clamp01(t.audioBandMid, rms);
@@ -3905,6 +6759,12 @@ function resolveAudioReactivitySourceLevel(source, telemetry = {}) {
   const peak = clamp01(Number(t.audioPeak || 0) / 1.5, 0);
   const flux = clamp01(t.audioFlux, 0);
   const beat = clamp01(t.beatConfidence, t.beat ? 0.65 : 0);
+  const percussionSupport = clamp01(
+    (low * 0.46) +
+    (transient * 0.34) +
+    (beat * 0.2),
+    0
+  );
 
   switch (source) {
     case "baseline":
@@ -3924,7 +6784,11 @@ function resolveAudioReactivitySourceLevel(source, telemetry = {}) {
     case "drums":
       return clamp01(low * 0.42 + transient * 0.3 + flux * 0.18 + beat * 0.1, 0);
     case "vocals":
-      return clamp01(mid * 0.58 + high * 0.29 + flux * 0.13, 0);
+      return clamp01(
+        (mid * 0.52 + high * 0.28 + flux * 0.08) *
+          (0.72 + ((1 - percussionSupport) * 0.28)),
+        0
+      );
     case "beat":
       return beat;
     case "groove":
@@ -3933,11 +6797,11 @@ function resolveAudioReactivitySourceLevel(source, telemetry = {}) {
     default:
       return clamp01(
         energyValue * 0.34 +
-        transient * 0.22 +
-        flux * 0.16 +
-        low * 0.14 +
-        mid * 0.1 +
-        beat * 0.04,
+        transient * 0.28 +
+        flux * 0.18 +
+        low * 0.16 +
+        mid * 0.02 +
+        beat * 0.02,
         0
       );
   }
@@ -3963,7 +6827,19 @@ function getAudioReactivityDrive(target = "hue", telemetry = null) {
   const t = telemetry && typeof telemetry === "object"
     ? telemetry
     : (engine?.getTelemetry?.() || {});
-  const sources = sanitizeAudioReactivitySources(cfg.sources, ["smart"]);
+  const metaAutoEnabled = Boolean(
+    engine?.getMetaAutoEnabled?.() ??
+    engine?.getTelemetry?.()?.metaAutoEnabled
+  );
+  const metaAutoBlendActive =
+    audioReactivityMapRuntime.metaAutoHueWizBaselineBlend === true &&
+    metaAutoEnabled &&
+    (targetKey === "hue" || targetKey === "wiz");
+  let sources = sanitizeAudioReactivitySources(cfg.sources, ["smart"]);
+  if (metaAutoBlendActive) {
+    const blended = ["baseline", "drums", ...sources];
+    sources = [...new Set(blended)].slice(0, 6);
+  }
   const levels = sources.map(source => resolveAudioReactivitySourceLevel(source, t));
   const avgLevel = levels.reduce((sum, value) => sum + value, 0) / Math.max(1, levels.length);
   const sortedLevels = levels.slice().sort((a, b) => b - a);
@@ -3974,6 +6850,11 @@ function getAudioReactivityDrive(target = "hue", telemetry = null) {
   const peakLevel = resolveAudioReactivitySourceLevel("peaks", t);
   const beatLevel = resolveAudioReactivitySourceLevel("beat", t);
   const drumsLevel = resolveAudioReactivitySourceLevel("drums", t);
+  const vocalsLevel = resolveAudioReactivitySourceLevel("vocals", t);
+  const vocalOverhang = clamp01(
+    ((vocalsLevel * 0.86) - (drumsLevel * 0.62) - (beatLevel * 0.28)) * 1.25,
+    0
+  );
   const blendedLevel = clamp01(
     (avgLevel * 0.4) +
     (upperMean * 0.34) +
@@ -3981,7 +6862,7 @@ function getAudioReactivityDrive(target = "hue", telemetry = null) {
     (drumsLevel * 0.08),
     avgLevel
   );
-  const characterLevel = clamp01(
+  let characterLevel = clamp01(
     (transientLevel * 0.34) +
     (peakLevel * 0.3) +
     (beatLevel * 0.2) +
@@ -3989,23 +6870,25 @@ function getAudioReactivityDrive(target = "hue", telemetry = null) {
     0
   );
   const shapedBody = clamp01(Math.pow(Math.max(blendedLevel, 0), 0.78), blendedLevel);
+  characterLevel = clamp01(characterLevel * (1 - (vocalOverhang * 0.28)), 0);
+  const shapedBodyTuned = clamp01(shapedBody * (1 - (vocalOverhang * 0.2)), shapedBody * 0.75);
   const amount = clampAudioReactivityAmount(cfg.amount, 1);
-  const dynamicFloor = sources.length > 1 ? 0.44 : 0.4;
+  const dynamicFloor = sources.length > 1 ? 0.5 : 0.46;
   const expressiveDrive = Math.max(
     0.34,
     Math.min(
-      1.45,
+      1.58,
       dynamicFloor +
-      (shapedBody * 0.78) +
-      (characterLevel * 0.37)
+      (shapedBodyTuned * 0.88) +
+      (characterLevel * 0.44)
     )
   );
   const unsmoothedDrive = Math.max(
     0.34,
-    Math.min(1.45, (1 - amount) + (expressiveDrive * amount))
+    Math.min(1.58, (1 - amount) + (expressiveDrive * amount))
   );
-  const prevDrive = Math.max(0.34, Math.min(1.45, Number(audioReactivityEnvelopeByTarget[targetKey] || 1)));
-  const alpha = unsmoothedDrive >= prevDrive ? 0.64 : 0.34;
+  const prevDrive = Math.max(0.34, Math.min(1.58, Number(audioReactivityEnvelopeByTarget[targetKey] || 1)));
+  const alpha = unsmoothedDrive >= prevDrive ? 0.82 : 0.58;
   const drive = prevDrive + (unsmoothedDrive - prevDrive) * alpha;
   audioReactivityEnvelopeByTarget[targetKey] = drive;
 
@@ -4013,13 +6896,15 @@ function getAudioReactivityDrive(target = "hue", telemetry = null) {
     target: targetKey,
     enabled: true,
     drive,
-    level: shapedBody,
+    level: shapedBodyTuned,
     character: characterLevel,
     peak: peakLevel,
     transient: transientLevel,
     beat: beatLevel,
+    vocalOverhang,
     amount,
-    sources
+    sources,
+    metaAutoBlendActive
   };
 }
 
@@ -4044,7 +6929,10 @@ function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
   const floorBri = Math.max(3, Math.min(170, Math.round(baseBri * floorPercent)));
   const boundedDrive = Math.max(
     0.18,
-    Math.min(1.45, profile.drive - (motionProfile.quietMix * 0.12))
+    Math.min(
+      1.58,
+      profile.drive - (motionProfile.quietMix * 0.08) - (clamp01(profile.vocalOverhang, 0) * 0.1)
+    )
   );
   let nextBri = floorBri + ((baseBri - floorBri) * Math.min(1.04, boundedDrive));
   if (boundedDrive > 1.04) {
@@ -4057,24 +6945,34 @@ function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
   if (Number.isFinite(Number(statePatch.transitiontime))) {
     const flowMode = Boolean(intent.forceDelta);
     const baseTransition = clampNumber(statePatch.transitiontime, 0, 30, 3);
-    const trim = Math.max(0, Math.round(((boundedDrive - 0.4) * 3.2) + (profile.character * 1.3)));
+    const trim = Math.max(0, Math.round(((boundedDrive - 0.42) * 2.4) + (profile.character * 1.05)));
     const quietHold = Math.round(
       (motionProfile.quietMix * 2.4) +
-      (motionProfile.hushMix * 3.2)
+      (motionProfile.hushMix * 3.2) +
+      (clamp01(profile.vocalOverhang, 0) * 1.8)
     );
     const floor = flowMode ? 1 : 0;
     statePatch.transitiontime = Math.max(floor, Math.min(30, baseTransition - trim + quietHold));
   }
   if (Number.isFinite(Number(statePatch.sat)) && statePatch.on !== false) {
     const satBase = clampNumber(statePatch.sat, 1, 254, 180);
-    const satBoost = Math.round((profile.character * 20) + (Math.max(0, boundedDrive - 1) * 26));
+    const satBoost = Math.round(
+      (profile.character * 16) +
+      (Math.max(0, boundedDrive - 1) * 22) -
+      (clamp01(profile.vocalOverhang, 0) * 10)
+    );
     statePatch.sat = Math.max(1, Math.min(254, satBase + satBoost));
   }
-  const baseRateMs = clampNumber(intent.rateMs, 40, 1200, 0);
+  const baseRateMs = clampNumber(intent.rateMs, 55, 1200, 0);
   const quietRateBoost = Math.round(
-    (motionProfile.quietMix * 120) +
-    (motionProfile.hushMix * 140)
+    (motionProfile.quietMix * 64) +
+    (motionProfile.hushMix * 84) +
+    (clamp01(profile.vocalOverhang, 0) * 48)
   );
+  const beatRateTrim = Math.round(profile.beat * 24);
+  const nextRateMs = baseRateMs > 0
+    ? clampNumber(baseRateMs + quietRateBoost - beatRateTrim, 55, 1200, baseRateMs)
+    : intent.rateMs;
   const quietMaxSilenceMs = motionProfile.quietMix > 0.18
     ? Math.round(
       780 +
@@ -4086,7 +6984,7 @@ function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
   return {
     ...intent,
     drop: Boolean(audioReactivityMapRuntime.dropEnabled && intent.drop),
-    rateMs: baseRateMs > 0 ? baseRateMs + quietRateBoost : intent.rateMs,
+    rateMs: nextRateMs,
     ...(Number.isFinite(quietMaxSilenceMs) ? { maxSilenceMs: quietMaxSilenceMs } : {}),
     audioDrive: Number(profile.drive.toFixed(3)),
     audioSourceLevel: Number(profile.level.toFixed(3)),
@@ -4101,82 +6999,245 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   const profile = getAudioReactivityDrive("wiz", telemetry);
   if (!profile.enabled) return { ...intent, drop: false };
   const motionProfile = getAudioTelemetryMotionProfile(telemetry);
+  const sceneName = String(
+    intent.scene ||
+    telemetry?.wizScene ||
+    telemetry?.scene ||
+    ""
+  ).trim().toLowerCase();
+  const pulseScene = sceneName === "pulse_strobe";
+  const flowScene = sceneName.startsWith("flow_");
 
   const next = { ...intent };
   const dropActive = Boolean(audioReactivityMapRuntime.dropEnabled && intent.drop);
   const beatActive = Boolean(intent.beat);
+  const now = Date.now();
+  const elapsedMs = wizReactiveDynamics.lastTickAt > 0
+    ? clampNumber(now - wizReactiveDynamics.lastTickAt, 8, 280, 33)
+    : 33;
+  wizReactiveDynamics.lastTickAt = now;
+  const beatDecay = Math.pow(0.5, elapsedMs / 210);
+  wizReactiveDynamics.beatPulse *= beatDecay;
+  const beatAttack = clamp01(
+    (profile.beat * 0.56) +
+    (profile.transient * 0.28) +
+    (profile.peak * 0.16),
+    0
+  );
+  if (dropActive) {
+    wizReactiveDynamics.beatPulse = Math.max(wizReactiveDynamics.beatPulse, 1);
+  } else if (beatActive) {
+    wizReactiveDynamics.beatPulse = Math.max(
+      wizReactiveDynamics.beatPulse,
+      0.72 + (beatAttack * 0.24)
+    );
+  }
+  const beatPulse = clamp01(wizReactiveDynamics.beatPulse, 0);
   const baseBrightness = clampNumber(next.brightness, 0.06, 1, 0.65);
   const boundedDrive = Math.max(
-    0.16,
-    Math.min(1.45, profile.drive - (motionProfile.quietMix * 0.14))
+    0.18,
+    Math.min(
+      1.58,
+      profile.drive - (motionProfile.quietMix * 0.1) - (clamp01(profile.vocalOverhang, 0) * 0.12)
+    )
   );
-  const floorScale = clampNumber(
-    0.44 +
-      (profile.character * 0.16) -
-      (motionProfile.quietMix * 0.24) -
+  const driveNorm = clampNumber((boundedDrive - 0.34) / 1.06, 0, 1, 0);
+  const floorPercent = clampNumber(
+    0.36 +
+      (profile.character * 0.12) -
+      (motionProfile.quietMix * 0.22) -
       (motionProfile.hushMix * 0.12),
     0.08,
-    0.78,
-    0.2
+    0.62,
+    0.24
   );
-  const floor = Math.max(0.03, Math.min(0.72, baseBrightness * floorScale));
-  let brightness = floor + ((baseBrightness - floor) * Math.min(1.1, boundedDrive));
-  if (boundedDrive > 1.02) {
-    const extra = Math.min(1, (boundedDrive - 1.02) / 0.43);
+  const floor = Math.max(0.03, Math.min(0.62, baseBrightness * floorPercent));
+  let brightness = floor + ((baseBrightness - floor) * Math.min(1.04, boundedDrive));
+  brightness += beatPulse * (
+    pulseScene
+      ? (0.13 + (profile.character * 0.08))
+      : (0.074 + (profile.character * 0.05))
+  );
+  if (boundedDrive > 1.04) {
+    const extra = Math.min(1, (boundedDrive - 1.04) / 0.41);
     const headroom = Math.max(0, 1 - baseBrightness);
-    brightness = baseBrightness + (headroom * extra * (0.66 + (profile.character * 0.4)));
+    brightness = baseBrightness + (headroom * extra * (0.62 + (profile.character * 0.38)));
   }
+  const highEvidence = clampNumber(
+    (driveNorm * 0.58) +
+    (profile.peak * 0.22) +
+    (profile.beat * 0.2),
+    0,
+    1,
+    driveNorm
+  );
+  const lowEvidence = clampNumber(
+    (motionProfile.quietMix * 0.56) +
+    (motionProfile.hushMix * 0.44) +
+    ((1 - driveNorm) * 0.32),
+    0,
+    1,
+    0
+  );
   if (dropActive) {
     brightness = Math.max(
       brightness,
       baseBrightness * (1.12 + (profile.character * 0.06))
     );
-    if (boundedDrive >= 1.08 && brightness >= 0.93) {
+    if (highEvidence >= 0.68 || (boundedDrive >= 1.04 && brightness >= 0.88)) {
       brightness = 1;
+    } else if (highEvidence >= 0.58) {
+      brightness = Math.max(brightness, 0.95);
     }
-  } else if (beatActive && boundedDrive >= 1.1) {
+  } else if (beatActive && boundedDrive >= 1.04) {
     brightness = Math.max(
       brightness,
       baseBrightness * (1.05 + (profile.character * 0.04))
     );
-    if (boundedDrive >= 1.22 && brightness >= 0.97) {
+    if (highEvidence >= 0.78 || (boundedDrive >= 1.16 && brightness >= 0.9)) {
       brightness = 1;
+    } else if (highEvidence >= 0.66) {
+      brightness = Math.max(brightness, 0.92);
+    }
+  }
+  if (pulseScene) {
+    if (dropActive) {
+      brightness = Math.max(brightness, 0.92);
+    } else if (beatActive) {
+      brightness = Math.max(brightness, 0.82);
+    } else if (beatPulse > 0.54) {
+      brightness = Math.max(brightness, 0.62 + beatPulse * 0.22);
     }
   }
   if (!dropActive) {
     const quietDimmer = Math.max(
-      0.32,
-      1 - (motionProfile.quietMix * 0.22) - (motionProfile.hushMix * 0.28)
+      0.18,
+      pulseScene
+        ? 1 - (motionProfile.quietMix * 0.16) - (motionProfile.hushMix * 0.2) + (beatPulse * 0.16)
+        : 1 - (motionProfile.quietMix * 0.4) - (motionProfile.hushMix * 0.46) + (beatPulse * 0.08)
     );
     brightness *= quietDimmer;
+    if (!beatActive && lowEvidence > 0.8) {
+      const quietCap = 0.14 + ((1 - lowEvidence) * 0.18);
+      brightness = Math.min(brightness, quietCap);
+    }
+    if (highEvidence >= 0.9 && brightness >= 0.84) {
+      brightness = 1;
+    }
   }
-  next.brightness = Math.max(0.04, Math.min(1, brightness));
-  const baseRateMs = clampNumber(next.rateMs, 40, 1200, 0);
-  const quietRateBoost = Math.round(
-    (motionProfile.quietMix * 90) +
-    (motionProfile.hushMix * 120)
+  const brightnessTarget = Math.max(0.03, Math.min(1, brightness));
+  if (!(wizReactiveDynamics.brightnessEma > 0)) {
+    wizReactiveDynamics.brightnessEma = brightnessTarget;
+  }
+  const riseAlpha = clampNumber(
+    (pulseScene ? 0.36 : 0.24) + (beatPulse * (pulseScene ? 0.2 : 0.12)) + (dropActive ? (pulseScene ? 0.18 : 0.14) : 0),
+    0.16,
+    0.74,
+    0.32
   );
-  next.rateMs = baseRateMs > 0 ? baseRateMs + quietRateBoost : next.rateMs;
-  if (motionProfile.quietMix > 0.18) {
+  const fallAlpha = clampNumber(
+    (pulseScene ? 0.22 : 0.1) + ((1 - clamp01(motionProfile.motion, 0)) * (pulseScene ? 0.06 : 0.08)),
+    0.06,
+    0.28,
+    0.14
+  );
+  const brightnessAlpha = brightnessTarget >= wizReactiveDynamics.brightnessEma
+    ? riseAlpha
+    : fallAlpha;
+  wizReactiveDynamics.brightnessEma += (brightnessTarget - wizReactiveDynamics.brightnessEma) * brightnessAlpha;
+  next.brightness = Math.max(0.03, Math.min(1, wizReactiveDynamics.brightnessEma));
+  const minRateMs = pulseScene ? 68 : 55;
+  const baseRateMs = clampNumber(next.rateMs, minRateMs, 1200, 0);
+  const quietRateBoost = Math.round(
+    (motionProfile.quietMix * 56) +
+    (motionProfile.hushMix * 74) +
+    (clamp01(profile.vocalOverhang, 0) * 46)
+  );
+  const beatRateTrim = Math.round(beatPulse * (dropActive ? 42 : 28));
+  next.rateMs = baseRateMs > 0
+    ? clampNumber(baseRateMs + quietRateBoost - beatRateTrim, minRateMs, 1200, baseRateMs)
+    : next.rateMs;
+  if (motionProfile.quietMix > 0.18 && beatPulse < 0.2) {
     next.maxSilenceMs = Math.round(
       900 +
       (motionProfile.quietMix * 220) +
       (motionProfile.hushMix * 280)
     );
   }
-  const saturationBoost = clampNumber(
-    0.24 +
-      (profile.character * 0.22) +
-      (dropActive || beatActive ? 0.08 : 0),
-    0,
-    0.75,
-    0.28
-  );
+  const saturationBoost = 1;
   if (next.color && typeof next.color === "object") {
+    if (pulseScene || flowScene) {
+      if (flowScene) {
+        // Keep engine-generated flow hue motion intact instead of over-smoothing.
+        wizReactiveDynamics.hueEma = null;
+      }
+      next.color = {
+        ...boostRgbSaturation(
+          {
+            r: clampRgb255(next.color.r),
+            g: clampRgb255(next.color.g),
+            b: clampRgb255(next.color.b)
+          },
+          pulseScene ? 0.04 : 0.08
+        )
+      };
+    } else {
+    const currentHsv = rgbToHsv255(next.color);
+    const pulseHueNudge = dropActive
+      ? (6 + (profile.character * 4))
+      : beatActive
+        ? (2 + (beatPulse * 2))
+        : 0;
+    const rawTargetHue = ((currentHsv.h + pulseHueNudge) % 360 + 360) % 360;
+    if (!Number.isFinite(Number(wizReactiveDynamics.hueEma))) {
+      wizReactiveDynamics.hueEma = currentHsv.h;
+    }
+    const hueDelta = ((rawTargetHue - wizReactiveDynamics.hueEma + 540) % 360) - 180;
+    const hueAlpha = clampNumber(
+      pulseScene
+        ? (
+          dropActive
+            ? 0.22
+            : beatActive
+              ? (0.1 + (beatPulse * 0.08))
+              : 0.03
+        )
+        : (
+          dropActive
+            ? 0.13
+            : beatActive
+              ? (0.05 + (beatPulse * 0.04))
+              : 0.015
+        ),
+      0.015,
+      0.24,
+      0.06
+    );
+    wizReactiveDynamics.hueEma = ((wizReactiveDynamics.hueEma + (hueDelta * hueAlpha)) % 360 + 360) % 360;
+    const shiftedHue = wizReactiveDynamics.hueEma;
+    const satFloor = clampNumber(
+      0.9 + (profile.character * 0.08) + (beatPulse * 0.08),
+      0.88,
+      0.99,
+      0.92
+    );
+    const valueFloor = clampNumber(
+      Math.max(0.2, (next.brightness * 0.44)) + (beatPulse * 0.08),
+      0.16,
+      0.56,
+      0.24
+    );
     next.color = {
-      ...next.color,
-      ...boostRgbSaturation(next.color, saturationBoost)
+      ...boostRgbSaturation(
+        hsvToRgb255(
+          shiftedHue,
+          Math.max(currentHsv.s, satFloor),
+          Math.max(currentHsv.v, valueFloor)
+        ),
+        saturationBoost
+      )
     };
+    }
   }
   next.drop = dropActive;
   next.audioDrive = Number(profile.drive.toFixed(3));
@@ -4189,6 +7250,13 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
 function parseColorTarget(raw, fallback = "both") {
   return sanitizeTwitchColorTarget(raw, fallback);
 }
+
+const TWITCH_COLOR_BRIGHTNESS = Object.freeze({
+  hueBriBright: 254,
+  hueBriDim: 178,
+  wizDimmingBright: 100,
+  wizDimmingDim: 70
+});
 
 function getTwitchColorCapabilities() {
   const fixtures = typeof fixtureRegistry.listTwitchBy === "function"
@@ -4206,19 +7274,37 @@ function getTwitchColorCapabilities() {
   };
 }
 
-function splitPrefixedColorText(rawText, prefixes = {}) {
+function splitPrefixedColorText(rawText, prefixes = {}, fixturePrefixes = {}) {
   const source = String(rawText || "").trim();
   if (!source) {
-    return { target: null, prefix: "", text: "" };
+    return { target: null, prefix: "", text: "", fixtureId: "" };
   }
 
-  const candidates = [
+  const fixtureCandidates = Object.entries(fixturePrefixes && typeof fixturePrefixes === "object" ? fixturePrefixes : {})
+    .map(([fixtureId, prefix]) => ({
+      target: null,
+      fixtureId: String(fixtureId || "").trim(),
+      prefix: sanitizeTwitchColorPrefix(prefix, ""),
+      scope: "fixture"
+    }))
+    .filter(entry => entry.fixtureId && entry.prefix);
+  const brandCandidates = [
     { target: "hue", prefix: sanitizeTwitchColorPrefix(prefixes.hue, "") },
     { target: "wiz", prefix: sanitizeTwitchColorPrefix(prefixes.wiz, "") },
     { target: "other", prefix: sanitizeTwitchColorPrefix(prefixes.other, "") }
   ]
+    .map(entry => ({ ...entry, fixtureId: "", scope: "brand" }))
+    .filter(entry => entry.prefix);
+  const candidates = [...fixtureCandidates, ...brandCandidates]
     .filter(entry => entry.prefix)
-    .sort((a, b) => b.prefix.length - a.prefix.length);
+    .sort((a, b) => {
+      const byPrefixLength = b.prefix.length - a.prefix.length;
+      if (byPrefixLength !== 0) return byPrefixLength;
+      if (a.scope !== b.scope) return a.scope === "fixture" ? -1 : 1;
+      return a.scope === "fixture"
+        ? String(a.fixtureId).localeCompare(String(b.fixtureId))
+        : String(a.target).localeCompare(String(b.target));
+    });
 
   const lower = source.toLowerCase();
   for (const entry of candidates) {
@@ -4235,7 +7321,8 @@ function splitPrefixedColorText(rawText, prefixes = {}) {
       return {
         target: entry.target,
         prefix: token,
-        text: rest
+        text: rest,
+        fixtureId: entry.fixtureId || ""
       };
     }
   }
@@ -4243,7 +7330,118 @@ function splitPrefixedColorText(rawText, prefixes = {}) {
   return {
     target: null,
     prefix: "",
-    text: source
+    text: source,
+    fixtureId: ""
+  };
+}
+
+function resolveTwitchFixtureById(fixtureId) {
+  const targetId = String(fixtureId || "").trim();
+  if (!targetId) return null;
+  const fixtures = listTwitchFixtures("", "");
+  for (const fixture of fixtures) {
+    if (String(fixture?.id || "").trim() === targetId) return fixture;
+  }
+  return null;
+}
+
+function parseTwitchColorDirective(rawText) {
+  const source = sanitizeTwitchColorCommandText(rawText, "");
+  if (!source) {
+    return { ok: false, error: "missing color text" };
+  }
+
+  const words = source.split(/\s+/).filter(Boolean);
+  let brightnessToken = "";
+  const colorWords = [];
+  for (const word of words) {
+    const key = String(word || "").trim().toLowerCase();
+    if (key === "bright" || key === "dim") {
+      brightnessToken = key;
+      continue;
+    }
+    colorWords.push(word);
+  }
+
+  if (!colorWords.length) {
+    if (!brightnessToken) {
+      return { ok: false, error: "missing color text" };
+    }
+    const isDim = brightnessToken === "dim";
+    return {
+      ok: true,
+      type: "brightness_only",
+      brightness: brightnessToken,
+      hueState: {
+        on: true,
+        bri: isDim ? TWITCH_COLOR_BRIGHTNESS.hueBriDim : TWITCH_COLOR_BRIGHTNESS.hueBriBright,
+        transitiontime: 2
+      },
+      wizState: {
+        on: true,
+        dimming: isDim ? TWITCH_COLOR_BRIGHTNESS.wizDimmingDim : TWITCH_COLOR_BRIGHTNESS.wizDimmingBright
+      }
+    };
+  }
+
+  const colorText = colorWords.join(" ").trim();
+  const normalizedColorText = colorText.toLowerCase();
+  if (TWITCH_RANDOM_COLOR_TOKENS.has(normalizedColorText)) {
+    const hueDeg = Math.floor(Math.random() * 360);
+    const hueValue = Math.round((hueDeg / 360) * 65535) % 65535;
+    const rgb = hsvToRgb255(hueDeg, 1, 1);
+    const isDim = brightnessToken === "dim";
+    return {
+      ok: true,
+      type: "random",
+      brightness: brightnessToken || "bright",
+      colorText: "random",
+      hueState: {
+        on: true,
+        hue: hueValue < 0 ? hueValue + 65535 : hueValue,
+        sat: 254,
+        bri: isDim ? TWITCH_COLOR_BRIGHTNESS.hueBriDim : TWITCH_COLOR_BRIGHTNESS.hueBriBright,
+        transitiontime: 2
+      },
+      wizState: {
+        on: true,
+        r: rgb.r,
+        g: rgb.g,
+        b: rgb.b,
+        dimming: isDim ? TWITCH_COLOR_BRIGHTNESS.wizDimmingDim : TWITCH_COLOR_BRIGHTNESS.wizDimmingBright
+      }
+    };
+  }
+  const parseText = brightnessToken ? `${brightnessToken} ${colorText}` : colorText;
+  const parsed = colorEngine.parseColor(parseText);
+  if (!parsed) {
+    return { ok: false, error: "invalid color text" };
+  }
+
+  const hueState = {
+    ...parsed,
+    transitiontime: Number.isFinite(Number(parsed.transitiontime)) ? parsed.transitiontime : 2
+  };
+  if (brightnessToken === "dim") {
+    hueState.bri = TWITCH_COLOR_BRIGHTNESS.hueBriDim;
+  } else if (!Number.isFinite(Number(hueState.bri)) || brightnessToken === "bright") {
+    hueState.bri = TWITCH_COLOR_BRIGHTNESS.hueBriBright;
+  }
+
+  const wizState = hueStateToWizState(hueState);
+  if (brightnessToken === "dim") {
+    wizState.dimming = TWITCH_COLOR_BRIGHTNESS.wizDimmingDim;
+  } else if (!Number.isFinite(Number(wizState.dimming)) || brightnessToken === "bright") {
+    wizState.dimming = TWITCH_COLOR_BRIGHTNESS.wizDimmingBright;
+  }
+
+  return {
+    ok: true,
+    type: "color",
+    brightness: brightnessToken || "",
+    colorText,
+    hueState,
+    wizState
   };
 }
 
@@ -4313,9 +7511,14 @@ async function applyStandaloneRaveStartUpdates() {
     if (!fixtureId) continue;
     const current = standaloneStates.get(fixtureId);
     if (!current || !current.updateOnRaveStart) continue;
-    try {
-      await sendStandaloneState(fixture, current);
-    } catch {}
+    const sent = await sendStandaloneStateWithRetry(
+      fixture,
+      current,
+      { attempts: 2, delayMs: 60 }
+    );
+    if (!sent.ok) {
+      console.warn(`[STANDALONE] rave-start update skipped for ${fixtureId}: ${sent.error || "send failed"}`);
+    }
   }
 }
 
@@ -4335,9 +7538,18 @@ function sendWizStateToFixtures(fixtures = [], wizState = {}) {
 
 async function applyColorText(rawText, options = {}) {
   const commandConfig = getTwitchColorConfigSnapshot();
-  const prefixed = splitPrefixedColorText(rawText, commandConfig.prefixes);
+  const prefixed = splitPrefixedColorText(
+    rawText,
+    commandConfig.prefixes,
+    commandConfig.fixturePrefixes
+  );
+  const fixtureScopedTarget = !options.targetExplicit && prefixed.fixtureId
+    ? resolveTwitchFixtureById(prefixed.fixtureId)
+    : null;
   const target = options.targetExplicit
     ? parseColorTarget(options.target, commandConfig.defaultTarget)
+    : fixtureScopedTarget
+      ? parseColorTarget(fixtureScopedTarget.brand, commandConfig.defaultTarget)
     : parseColorTarget(prefixed.target || commandConfig.defaultTarget, commandConfig.defaultTarget);
   const colorText = String(prefixed.text || "").trim();
 
@@ -4346,9 +7558,22 @@ async function applyColorText(rawText, options = {}) {
       ok: false,
       target,
       usedPrefix: prefixed.prefix || null,
+      fixtureTargetId: prefixed.fixtureId || null,
       error: prefixed.target
         ? `missing color after ${prefixed.target} prefix`
+        : prefixed.fixtureId
+          ? "missing color after fixture prefix"
         : "missing color text"
+    };
+  }
+
+  if (!options.targetExplicit && prefixed.fixtureId && !fixtureScopedTarget) {
+    return {
+      ok: false,
+      target: null,
+      usedPrefix: prefixed.prefix || null,
+      fixtureTargetId: prefixed.fixtureId,
+      error: `fixture prefix target not found or not twitch-enabled: ${prefixed.fixtureId}`
     };
   }
 
@@ -4357,50 +7582,72 @@ async function applyColorText(rawText, options = {}) {
       ok: false,
       target,
       usedPrefix: prefixed.prefix || null,
+      fixtureTargetId: prefixed.fixtureId || null,
       error: "other target requires mod-brand color adapter support"
     };
   }
 
-  const parsed = colorEngine.parseColor(colorText);
-  if (!parsed) {
+  const directive = parseTwitchColorDirective(colorText);
+  if (!directive.ok) {
     return {
       ok: false,
       target,
       usedPrefix: prefixed.prefix || null,
-      error: "invalid color text"
+      fixtureTargetId: prefixed.fixtureId || null,
+      error: directive.error || "invalid color text"
     };
   }
 
+  const fixedFixture = fixtureScopedTarget || null;
   const response = {
     ok: true,
     target,
     usedPrefix: prefixed.prefix || null,
+    fixtureTargetId: fixedFixture ? String(fixedFixture.id || "") : null,
     hueZones: [],
     wizZones: [],
     hueTargets: 0,
-    wizTargets: 0
+    wizTargets: 0,
+    directiveType: directive.type
   };
 
   if (target === "hue" || target === "both") {
-    const hueZoneSeed = options.hueZone || options.zone || fixtureRegistry.resolveZone("TWITCH_HUE") || "hue";
-    const hueZones = resolveZonesFromRoute(hueZoneSeed, "hue", "hue", listTwitchFixtures, { mode: "twitch" });
+    const hueZones = fixedFixture
+      ? [String(getFixtureDispatchZoneForMode(fixedFixture, "twitch") || "hue").trim() || "hue"]
+      : resolveZonesFromRoute(
+        options.hueZone || options.zone || fixtureRegistry.resolveZone("TWITCH_HUE") || "hue",
+        "hue",
+        "hue",
+        listTwitchFixtures,
+        { mode: "twitch" }
+      );
     response.hueZones = hueZones;
-    const hueFixtures = collectFixturesByZones(listTwitchFixtures, "hue", hueZones);
+    const hueFixtures = fixedFixture
+      ? (String(fixedFixture.brand || "").trim().toLowerCase() === "hue" ? [fixedFixture] : [])
+      : collectFixturesByZones(listTwitchFixtures, "hue", hueZones);
     response.hueTargets = hueFixtures.length;
     if (hueFixtures.length) {
-      await sendHueStateToFixtures(hueFixtures, parsed);
+      await sendHueStateToFixtures(hueFixtures, directive.hueState);
     }
   }
 
   if (target === "wiz" || target === "both") {
-    const wizZoneSeed = options.wizZone || options.zone || fixtureRegistry.resolveZone("TWITCH_WIZ") || "wiz";
-    const wizZones = resolveZonesFromRoute(wizZoneSeed, "wiz", "wiz", listTwitchFixtures, { mode: "twitch" });
+    const wizZones = fixedFixture
+      ? [String(getFixtureDispatchZoneForMode(fixedFixture, "twitch") || "wiz").trim() || "wiz"]
+      : resolveZonesFromRoute(
+        options.wizZone || options.zone || fixtureRegistry.resolveZone("TWITCH_WIZ") || "wiz",
+        "wiz",
+        "wiz",
+        listTwitchFixtures,
+        { mode: "twitch" }
+      );
     response.wizZones = wizZones;
-    const wizFixtures = collectFixturesByZones(listTwitchFixtures, "wiz", wizZones);
+    const wizFixtures = fixedFixture
+      ? (String(fixedFixture.brand || "").trim().toLowerCase() === "wiz" ? [fixedFixture] : [])
+      : collectFixturesByZones(listTwitchFixtures, "wiz", wizZones);
     response.wizTargets = wizFixtures.length;
-    const wizState = hueStateToWizState(parsed);
     if (wizFixtures.length) {
-      sendWizStateToFixtures(wizFixtures, wizState);
+      sendWizStateToFixtures(wizFixtures, directive.wizState);
     }
   }
 
@@ -4410,6 +7657,120 @@ async function applyColorText(rawText, options = {}) {
   }
 
   return response;
+}
+
+function resolveTwitchRaveOffCommandForFixture(fixture, raveOffConfig = {}) {
+  const fixtureId = String(fixture?.id || "").trim();
+  const brand = String(fixture?.brand || "").trim().toLowerCase();
+  const zone = normalizeRouteZoneToken(
+    getFixtureDispatchZoneForMode(fixture, "engine"),
+    normalizeRouteZoneToken(fixture?.zone, getCanonicalZoneFallback(brand, brand))
+  );
+  const fixtureMap = raveOffConfig.fixtures && typeof raveOffConfig.fixtures === "object"
+    ? raveOffConfig.fixtures
+    : {};
+  const groupMap = raveOffConfig.groups && typeof raveOffConfig.groups === "object"
+    ? raveOffConfig.groups
+    : {};
+
+  if (fixtureId && fixtureMap[fixtureId]) {
+    return sanitizeTwitchColorCommandText(fixtureMap[fixtureId], "");
+  }
+  const zoneKey = sanitizeTwitchRaveOffGroupKey(`${brand}:${zone}`);
+  if (zoneKey && groupMap[zoneKey]) {
+    return sanitizeTwitchColorCommandText(groupMap[zoneKey], "");
+  }
+  if (brand && groupMap[brand]) {
+    return sanitizeTwitchColorCommandText(groupMap[brand], "");
+  }
+  return sanitizeTwitchColorCommandText(raveOffConfig.defaultText, "");
+}
+
+async function applyTwitchRaveOffColorProfile() {
+  const config = sanitizeTwitchRaveOffConfig(
+    twitchColorConfigRuntime?.raveOff,
+    TWITCH_COLOR_CONFIG_DEFAULT.raveOff
+  );
+  if (config.enabled !== true) {
+    return { ok: true, applied: false, reason: "disabled", targets: 0 };
+  }
+
+  const fixturesById = new Map();
+  for (const fixture of listEngineFixtures("hue")) {
+    const fixtureId = String(fixture?.id || "").trim();
+    if (fixtureId) fixturesById.set(fixtureId, fixture);
+  }
+  for (const fixture of listEngineFixtures("wiz")) {
+    const fixtureId = String(fixture?.id || "").trim();
+    if (fixtureId) fixturesById.set(fixtureId, fixture);
+  }
+  const fixtures = [...fixturesById.values()];
+  if (!fixtures.length) {
+    return { ok: true, applied: false, reason: "no_engine_targets", targets: 0 };
+  }
+
+  const assignments = [];
+  const warnings = [];
+  for (const fixture of fixtures) {
+    const commandText = resolveTwitchRaveOffCommandForFixture(fixture, config);
+    if (!commandText) continue;
+    const directive = parseTwitchColorDirective(commandText);
+    if (!directive.ok) {
+      warnings.push({
+        fixtureId: String(fixture?.id || "").trim(),
+        commandText,
+        error: directive.error || "invalid color text"
+      });
+      continue;
+    }
+    assignments.push({ fixture, directive, commandText });
+  }
+
+  if (!assignments.length) {
+    return {
+      ok: true,
+      applied: false,
+      reason: warnings.length ? "invalid_commands" : "empty_profile",
+      targets: fixtures.length,
+      warnings
+    };
+  }
+
+  const hueBatches = new Map();
+  const wizBatches = new Map();
+  for (const item of assignments) {
+    const fixture = item.fixture;
+    const brand = String(fixture?.brand || "").trim().toLowerCase();
+    if (brand === "hue") {
+      const key = JSON.stringify(item.directive.hueState);
+      const batch = hueBatches.get(key) || { state: item.directive.hueState, fixtures: [] };
+      batch.fixtures.push(fixture);
+      hueBatches.set(key, batch);
+    } else if (brand === "wiz") {
+      const key = JSON.stringify(item.directive.wizState);
+      const batch = wizBatches.get(key) || { state: item.directive.wizState, fixtures: [] };
+      batch.fixtures.push(fixture);
+      wizBatches.set(key, batch);
+    }
+  }
+
+  for (const batch of hueBatches.values()) {
+    // RAVE is already stopping; enforce REST hue writes.
+    await sendHueStateToFixtures(batch.fixtures, batch.state);
+  }
+  for (const batch of wizBatches.values()) {
+    sendWizStateToFixtures(batch.fixtures, batch.state);
+  }
+
+  return {
+    ok: true,
+    applied: true,
+    targets: fixtures.length,
+    assigned: assignments.length,
+    hueTargets: [...hueBatches.values()].reduce((sum, batch) => sum + batch.fixtures.length, 0),
+    wizTargets: [...wizBatches.values()].reduce((sum, batch) => sum + batch.fixtures.length, 0),
+    warnings
+  };
 }
 
 function teachColor(rawText) {
@@ -4476,6 +7837,14 @@ app.post("/color/prefixes", (req, res) => {
     patch.prefixes = { ...body.prefixes };
   }
 
+  if (body.fixturePrefixes && typeof body.fixturePrefixes === "object" && !Array.isArray(body.fixturePrefixes)) {
+    patch.fixturePrefixes = { ...body.fixturePrefixes };
+  }
+
+  if (body.raveOff && typeof body.raveOff === "object" && !Array.isArray(body.raveOff)) {
+    patch.raveOff = { ...body.raveOff };
+  }
+
   if (Object.prototype.hasOwnProperty.call(body, "huePrefix")) {
     patch.prefixes = {
       ...(patch.prefixes || {}),
@@ -4504,6 +7873,61 @@ app.post("/color/prefixes", (req, res) => {
     };
   }
 
+  if (body.clearFixturePrefixes === true || body.reset === true) {
+    patch.fixturePrefixes = {};
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "raveOffEnabled")) {
+    patch.raveOff = {
+      ...(patch.raveOff || {}),
+      enabled: body.raveOffEnabled
+    };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "raveOffDefaultText")) {
+    patch.raveOff = {
+      ...(patch.raveOff || {}),
+      defaultText: body.raveOffDefaultText
+    };
+  }
+
+  if (body.raveOffGroups && typeof body.raveOffGroups === "object" && !Array.isArray(body.raveOffGroups)) {
+    patch.raveOff = {
+      ...(patch.raveOff || {}),
+      groups: { ...body.raveOffGroups }
+    };
+  }
+
+  if (body.raveOffFixtures && typeof body.raveOffFixtures === "object" && !Array.isArray(body.raveOffFixtures)) {
+    patch.raveOff = {
+      ...(patch.raveOff || {}),
+      fixtures: { ...body.raveOffFixtures }
+    };
+  }
+
+  if (body.clearRaveOffGroups === true || body.reset === true) {
+    patch.raveOff = {
+      ...(patch.raveOff || {}),
+      groups: {}
+    };
+  }
+
+  if (body.clearRaveOffFixtures === true || body.reset === true) {
+    patch.raveOff = {
+      ...(patch.raveOff || {}),
+      fixtures: {}
+    };
+  }
+
+  if (body.reset === true) {
+    patch.raveOff = {
+      enabled: TWITCH_COLOR_CONFIG_DEFAULT.raveOff.enabled,
+      defaultText: TWITCH_COLOR_CONFIG_DEFAULT.raveOff.defaultText,
+      groups: {},
+      fixtures: {}
+    };
+  }
+
   const config = patchTwitchColorConfig(patch);
   res.json({
     ok: true,
@@ -4512,16 +7936,26 @@ app.post("/color/prefixes", (req, res) => {
   });
 });
 
-app.get("/color", (req, res) => {
-  const text = getCompatText(req);
-  applyColorText(text, getColorRequestOptions(req))
-    .then(result => {
-      res.json({ ok: result.ok, text, ...result });
-    })
-    .catch(err => {
-      res.status(500).json({ ok: false, text, error: err.message || String(err) });
+if (ALLOW_LEGACY_MUTATING_GET_RUNTIME) {
+  app.get("/color", (req, res) => {
+    const text = getCompatText(req);
+    applyColorText(text, getColorRequestOptions(req))
+      .then(result => {
+        res.json({ ok: result.ok, text, ...result });
+      })
+      .catch(err => {
+        res.status(500).json({ ok: false, text, error: err.message || String(err) });
+      });
+  });
+} else {
+  app.get("/color", (_, res) => {
+    res.status(405).json({
+      ok: false,
+      error: "method_not_allowed",
+      detail: "Use POST /color. Legacy mutating GET routes are disabled by default."
     });
-});
+  });
+}
 
 app.post("/color", (req, res) => {
   const text = getCompatText(req);
@@ -4534,79 +7968,285 @@ app.post("/color", (req, res) => {
     });
 });
 
-app.post("/rave/genre", (req, res) => {
-  const requested = String(req.query.name || "edm");
-  const normalized = engine.normalizeGenre?.(requested);
+function parsePaletteFamiliesInput(raw) {
+  if (Array.isArray(raw)) {
+    return raw
+      .map(item => String(item || "").trim().toLowerCase())
+      .filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    return raw
+      .split(",")
+      .map(item => String(item || "").trim().toLowerCase())
+      .filter(Boolean);
+  }
+  return null;
+}
 
-  if (!normalized) {
-    res.status(400).json({
-      ok: false,
-      error: "invalid genre",
-      requested,
-      allowed: engine.getSupportedGenres?.() || []
-    });
-    return;
+function collectPalettePatch(req) {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const query = req.query && typeof req.query === "object" ? req.query : {};
+  const patch = {};
+  const read = key => {
+    if (Object.prototype.hasOwnProperty.call(body, key)) return body[key];
+    if (Object.prototype.hasOwnProperty.call(query, key)) return query[key];
+    return undefined;
+  };
+
+  const colorsPerFamilyRaw = read("colorsPerFamily");
+  if (colorsPerFamilyRaw !== undefined) {
+    patch.colorsPerFamily = Number(colorsPerFamilyRaw);
   }
 
-  const applied = engine.setGenre?.(normalized) || normalized;
-  genreState.set(applied);
-  res.json({ ok: true, requested, applied });
+  const familiesRaw = read("families");
+  const families = parsePaletteFamiliesInput(familiesRaw);
+  if (families && families.length) {
+    patch.families = families;
+  }
+
+  const disorderRaw = read("disorder");
+  if (disorderRaw !== undefined) {
+    const parsed = parseBoolean(disorderRaw, null);
+    if (parsed !== null) patch.disorder = parsed;
+  }
+
+  const disorderAggressionRaw = read("disorderAggression");
+  if (disorderAggressionRaw !== undefined) {
+    patch.disorderAggression = Number(disorderAggressionRaw);
+  }
+
+  const brandRaw = read("brand");
+  if (brandRaw !== undefined) {
+    const normalized = normalizePaletteBrandKey(brandRaw);
+    patch.brand = normalized || String(brandRaw || "").trim().toLowerCase();
+  }
+
+  const fixtureIdRaw = read("fixtureId");
+  if (fixtureIdRaw !== undefined) {
+    patch.fixtureId = String(fixtureIdRaw || "").trim();
+  }
+
+  const clearOverrideRaw = read("clearOverride");
+  if (clearOverrideRaw !== undefined) {
+    const parsed = parseBoolean(clearOverrideRaw, null);
+    if (parsed !== null) patch.clearOverride = parsed;
+  }
+
+  return patch;
+}
+
+function collectFixtureMetricPatch(req) {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const query = req.query && typeof req.query === "object" ? req.query : {};
+  const patch = {};
+  const read = key => {
+    if (Object.prototype.hasOwnProperty.call(body, key)) return body[key];
+    if (Object.prototype.hasOwnProperty.call(query, key)) return query[key];
+    return undefined;
+  };
+
+  const modeRaw = read("mode");
+  if (modeRaw !== undefined) {
+    const rawMode = String(modeRaw || "").trim().toLowerCase();
+    if (!rawMode || !FIXTURE_METRIC_MODE_ORDER.includes(rawMode)) {
+      patch.__invalidMode = rawMode || String(modeRaw || "");
+    } else {
+      patch.mode = rawMode;
+    }
+  }
+
+  const metricRaw = read("metric");
+  if (metricRaw !== undefined) {
+    const rawMetric = String(metricRaw || "").trim().toLowerCase();
+    if (!rawMetric || !FIXTURE_METRIC_KEYS.includes(rawMetric)) {
+      patch.__invalidMetric = rawMetric || String(metricRaw || "");
+    } else {
+      patch.metric = rawMetric;
+    }
+  }
+
+  const flipRaw = read("metaAutoFlip");
+  if (flipRaw !== undefined) {
+    const parsed = parseBoolean(flipRaw, null);
+    if (parsed !== null) patch.metaAutoFlip = parsed;
+  }
+
+  const harmonyRaw = read("harmonySize");
+  if (harmonyRaw !== undefined) {
+    const harmonyNum = Number(harmonyRaw);
+    if (!Number.isFinite(harmonyNum)) {
+      patch.__invalidHarmonySize = String(harmonyRaw || "");
+    } else {
+      patch.harmonySize = normalizeFixtureMetricHarmonySize(
+        harmonyNum,
+        FIXTURE_METRIC_CONFIG_DEFAULT.harmonySize
+      );
+    }
+  }
+
+  const maxHzRaw = read("maxHz");
+  if (maxHzRaw !== undefined) {
+    if (maxHzRaw === null) {
+      patch.maxHz = null;
+    } else {
+      const isString = typeof maxHzRaw === "string";
+      const rawText = isString
+        ? maxHzRaw.trim().toLowerCase()
+        : "";
+      if (
+        isString &&
+        (
+          rawText === "" ||
+          rawText === "off" ||
+          rawText === "none" ||
+          rawText === "null" ||
+          rawText === "unclamped" ||
+          rawText === "unclamp" ||
+          rawText === "disabled"
+        )
+      ) {
+        patch.maxHz = null;
+      } else {
+        const maxHzNum = Number(maxHzRaw);
+        if (!Number.isFinite(maxHzNum)) {
+          patch.__invalidMaxHz = String(maxHzRaw);
+        } else if (maxHzNum <= 0) {
+          patch.maxHz = null;
+        } else {
+          patch.maxHz = normalizeFixtureMetricMaxHz(
+            maxHzNum,
+            FIXTURE_METRIC_CONFIG_DEFAULT.maxHz
+          );
+        }
+      }
+    }
+  }
+
+  const brandRaw = read("brand");
+  if (brandRaw !== undefined) {
+    const normalized = normalizePaletteBrandKey(brandRaw);
+    patch.brand = normalized || String(brandRaw || "").trim().toLowerCase();
+  }
+
+  const fixtureIdRaw = read("fixtureId");
+  if (fixtureIdRaw !== undefined) {
+    patch.fixtureId = String(fixtureIdRaw || "").trim();
+  }
+
+  const clearOverrideRaw = read("clearOverride");
+  if (clearOverrideRaw !== undefined) {
+    const parsed = parseBoolean(clearOverrideRaw, null);
+    if (parsed !== null) patch.clearOverride = parsed;
+  }
+
+  return patch;
+}
+
+function collectFixtureRoutingClearPatch(req) {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const query = req.query && typeof req.query === "object" ? req.query : {};
+  const patch = {};
+  const read = key => {
+    if (Object.prototype.hasOwnProperty.call(body, key)) return body[key];
+    if (Object.prototype.hasOwnProperty.call(query, key)) return query[key];
+    return undefined;
+  };
+
+  const brandRaw = read("brand");
+  if (brandRaw !== undefined) {
+    const normalized = normalizePaletteBrandKey(brandRaw);
+    patch.brand = normalized || String(brandRaw || "").trim().toLowerCase();
+  }
+
+  const fixtureIdRaw = read("fixtureId");
+  if (fixtureIdRaw !== undefined) {
+    patch.fixtureId = String(fixtureIdRaw || "").trim();
+  }
+
+  return patch;
+}
+
+function buildPaletteRuntimeSnapshot(configOverride = null) {
+  const fixtures = fixtureRegistry.getFixtures?.() || [];
+  prunePaletteFixtureOverrides(fixtures);
+  return {
+    ok: true,
+    config: configOverride || engine.getPaletteConfig?.() || {
+      colorsPerFamily: 3,
+      families: ["blue", "purple"],
+      disorder: false,
+      disorderAggression: 0.35
+    },
+    catalog: engine.getPaletteCatalog?.() || [],
+    options: {
+      colorsPerFamily: [1, 3, 5],
+      families: PALETTE_FAMILY_ORDER.slice(),
+      brands: PALETTE_SUPPORTED_BRANDS.slice()
+    },
+    metricRouting: buildFixtureMetricRoutingSnapshot(fixtures),
+    brandFixtures: buildPaletteBrandFixtureCatalog(fixtures),
+    fixtureOverrides: buildPaletteFixtureOverrideSnapshot()
+  };
+}
+
+registerRavePaletteMetricRoutes(app, {
+  collectPalettePatch,
+  collectFixtureMetricPatch,
+  collectFixtureRoutingClearPatch,
+  normalizePaletteBrandKey,
+  parseBooleanLoose,
+  hasPalettePatchFields,
+  hasFixtureMetricPatchFields,
+  PALETTE_SUPPORTED_BRANDS,
+  PALETTE_PATCH_FIELDS,
+  FIXTURE_METRIC_MODE_ORDER,
+  FIXTURE_METRIC_KEYS,
+  FIXTURE_METRIC_HARMONY_MIN,
+  FIXTURE_METRIC_HARMONY_MAX,
+  FIXTURE_METRIC_MAX_HZ_MIN,
+  FIXTURE_METRIC_MAX_HZ_MAX,
+  setFixturePaletteOverrideConfig,
+  patchFixtureMetricRoutingConfig,
+  clearFixtureRoutingOverridesAtomic,
+  buildPaletteRuntimeSnapshot,
+  buildFixtureMetricRoutingSnapshot,
+  buildPaletteBrandFixtureCatalog,
+  fixtureRegistry,
+  getEngine: () => engine
 });
 
-app.post("/rave/genre/decade", (req, res) => {
-  const requested = String(
-    req.query.mode ?? req.query.name ?? req.query.decade ?? "auto"
-  ).toLowerCase().trim();
-  const next = engine.setGenreDecadeMode?.(requested);
-
-  if (!next) {
-    res.status(400).json({
-      ok: false,
-      error: "invalid decade mode",
-      requested,
-      allowed: ["auto", ...(engine.getSupportedGenreDecades?.() || [])]
-    });
-    return;
-  }
-
-  console.log(`[RAVE] genre decade = ${next.mode} (resolved ${next.resolved})`);
-  res.json({
-    ok: true,
-    mode: next.mode,
-    resolved: next.resolved
+function respondLegacyPaletteRouteRemoved(res, routePath) {
+  res.status(410).json({
+    ok: false,
+    removed: true,
+    route: routePath,
+    replacement: "/rave/palette",
+    detail: "Legacy genre/decade routes were removed. Use /rave/palette with explicit palette controls."
   });
+}
+
+app.post("/rave/genre", (_, res) => {
+  respondLegacyPaletteRouteRemoved(res, "/rave/genre");
+});
+
+app.post("/rave/genre/decade", (_, res) => {
+  respondLegacyPaletteRouteRemoved(res, "/rave/genre/decade");
 });
 
 app.get("/rave/genre/decade", (_, res) => {
-  res.json({
-    ok: true,
-    mode: engine.getGenreDecadeMode?.() || "auto",
-    resolved: engine.getResolvedGenreDecade?.() || "10s",
-    allowed: ["auto", ...(engine.getSupportedGenreDecades?.() || [])]
-  });
+  respondLegacyPaletteRouteRemoved(res, "/rave/genre/decade");
 });
 
 app.post("/rave/mode", (req, res) => {
-  const { name } = req.query;
-
-  switch (name) {
-    case "game":
-      engine.setBehavior?.("clamp");
-      break;
-
-    case "bpm":
-      engine.setBehavior?.("interpret");
-      break;
-
-    case "auto":
-      engine.setBehavior?.("auto");
-      break;
-
-    default:
-      engine.setBehavior?.("auto");
-      break;
+  const requested = String(req.query.name || "bpm").trim().toLowerCase();
+  if (requested && requested !== "bpm" && requested !== "interpret") {
+    return res.status(410).json({
+      ok: false,
+      error: "mode removed",
+      replacement: "/rave/mode?name=bpm"
+    });
   }
-
+  engine.setBehavior?.("interpret");
   res.sendStatus(200);
 });
 
@@ -4636,15 +8276,19 @@ app.post("/rave/scene/auto", (_, res) => {
    MODE — COMPETITIVE / INTERPRET (EXPLICIT)
    ====================================================== */
 app.post("/rave/mode/competitive/on", (_, res) => {
-  engine.setBehavior?.("clamp");
-  console.log("[RAVE] mode = COMPETITIVE (clamp)");
-  res.sendStatus(200);
+  res.status(410).json({
+    ok: false,
+    error: "competitive mode removed",
+    replacement: "/rave/mode?name=bpm"
+  });
 });
 
 app.post("/rave/mode/competitive/off", (_, res) => {
-  engine.setBehavior?.("auto");
-  console.log("[RAVE] mode = AUTO");
-  res.sendStatus(200);
+  res.status(410).json({
+    ok: false,
+    error: "competitive mode removed",
+    replacement: "/rave/mode?name=bpm"
+  });
 });
 
 /* ======================================================
@@ -5093,17 +8737,24 @@ function setWizSceneSyncRoute(req, res, enabledFallback = null) {
     return;
   }
 
-  const next = engine.setWizSceneSync?.(enabled);
-  console.log(`[RAVE] WiZ scene sync ${next ? "ON" : "OFF"}`);
+  engine.setWizSceneSync?.(enabled);
+  const next = getWizSceneSyncEnabled();
+  console.log(
+    next
+      ? "[RAVE] WiZ scene sync enabled (Hue-linked scenes)"
+      : "[RAVE] WiZ standalone scene mode enabled"
+  );
   res.json({
     ok: true,
     enabled: Boolean(next),
-    strategy: "hue_wiz_link"
+    strategy: next ? "linked" : "standalone",
+    enforced: false,
+    requested: Boolean(enabled)
   });
 }
 
 function getWizSceneSyncEnabled() {
-  return Boolean(engine.getWizSceneSync?.() ?? engine.getTelemetry?.()?.wizSceneSync ?? true);
+  return Boolean(engine.getWizSceneSync?.() ?? engine.getTelemetry?.()?.wizSceneSync ?? false);
 }
 
 app.post("/rave/wiz/sync", (req, res) => setWizSceneSyncRoute(req, res));
@@ -5114,7 +8765,8 @@ app.get("/rave/wiz/sync", (_, res) => {
   res.json({
     ok: true,
     enabled,
-    strategy: "hue_wiz_link"
+    strategy: enabled ? "linked" : "standalone",
+    enforced: false
   });
 });
 
@@ -5127,7 +8779,8 @@ app.get("/rave/scene/sync", (_, res) => {
   res.json({
     ok: true,
     enabled,
-    strategy: "hue_wiz_link",
+    strategy: enabled ? "linked" : "standalone",
+    enforced: false,
     brands: ["hue", "wiz"]
   });
 });
@@ -5154,6 +8807,435 @@ app.post("/rave/meta/auto", (req, res) => {
   res.json({
     ok: true,
     enabled: Boolean(next)
+  });
+});
+
+function getMetaAutoTempoTrackersRuntimeSnapshot() {
+  const safe = sanitizeMetaAutoTempoTrackersConfig(
+    audioReactivityMapRuntime.metaAutoTempoTrackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  safe.baseline = audioReactivityMapRuntime.metaAutoHueWizBaselineBlend === true;
+  return safe;
+}
+
+function hasAnyMetaAutoTempoTrackerEnabled(trackers = {}) {
+  const safe = sanitizeMetaAutoTempoTrackersConfig(
+    trackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  return META_AUTO_TEMPO_TRACKER_KEYS.some(key => safe[key] === true);
+}
+
+function sameMetaAutoTempoTrackersConfig(a = {}, b = {}) {
+  const aa = sanitizeMetaAutoTempoTrackersConfig(
+    a,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  const bb = sanitizeMetaAutoTempoTrackersConfig(
+    b,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  for (const key of META_AUTO_TEMPO_TRACKER_KEYS) {
+    if (aa[key] !== bb[key]) return false;
+  }
+  return true;
+}
+
+function recommendMetaAutoTempoTrackers(trackers = {}, telemetry = {}) {
+  const safeCurrent = sanitizeMetaAutoTempoTrackersConfig(
+    trackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  const t = telemetry && typeof telemetry === "object" ? telemetry : {};
+  const bpm = clamp(Number(t.bpm || 0), 0, 220);
+  const beatConfidence = clamp(Number(t.beatConfidence || 0), 0, 1);
+  const transient = clamp(Number(t.audioTransient || 0), 0, 1.4);
+  const flux = clamp(Number(t.audioFlux || 0), 0, 1.2);
+  const lowBand = clamp(Number(t.audioBandLow || 0), 0, 1.2);
+  const energy = clamp(Number(t.energy || 0), 0, 1.4);
+  const motion = clamp(
+    Math.max(
+      transient * 0.86,
+      flux * 0.82,
+      beatConfidence * 0.9,
+      Math.min(1, energy * 0.74),
+      Math.min(1, bpm / 172)
+    ),
+    0,
+    1
+  );
+  const calmState = motion < 0.28 && energy < 0.24 && transient < 0.16 && flux < 0.14;
+
+  const recommended = {
+    baseline: true,
+    peaks: false,
+    transients: false,
+    flux: false
+  };
+
+  if (motion >= 0.42 || bpm >= 136 || transient >= 0.24 || flux >= 0.22 || energy >= 0.4) {
+    recommended.transients = true;
+    recommended.flux = true;
+  }
+  if (bpm >= 152 || beatConfidence >= 0.56 || transient >= 0.34 || motion >= 0.58) {
+    recommended.peaks = true;
+  }
+  if (calmState) {
+    recommended.flux = true;
+    recommended.transients = recommended.transients && (transient >= 0.2 || beatConfidence >= 0.3);
+    recommended.peaks = false;
+  }
+  if (lowBand >= 0.24 || beatConfidence >= 0.24) {
+    recommended.baseline = true;
+  }
+
+  if (!recommended.peaks && !recommended.transients && !recommended.flux) {
+    recommended.transients = true;
+  }
+
+  // Keep existing hard-ON toggles unless force is requested by caller.
+  return sanitizeMetaAutoTempoTrackersConfig(
+    {
+      ...recommended,
+      baseline: recommended.baseline || safeCurrent.baseline
+    },
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+}
+
+function applyMetaAutoTempoTrackerCandidates(options = {}) {
+  const opts = options && typeof options === "object" ? options : {};
+  const force = Boolean(opts.force);
+  const currentAutoEnabled = audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true;
+  const autoEnabled = Object.prototype.hasOwnProperty.call(opts, "autoEnabled")
+    ? Boolean(opts.autoEnabled)
+    : currentAutoEnabled;
+  const current = getMetaAutoTempoTrackersRuntimeSnapshot();
+  if (!force && hasAnyMetaAutoTempoTrackerEnabled(current)) {
+    let existing = sanitizeMetaAutoTempoTrackersConfig(
+      current,
+      AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+    );
+    if (currentAutoEnabled !== autoEnabled) {
+      const toggled = patchAudioReactivityMapConfig({
+        metaAutoTempoTrackersAuto: autoEnabled
+      });
+      existing = sanitizeMetaAutoTempoTrackersConfig(
+        toggled.metaAutoTempoTrackers,
+        AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+      );
+    }
+    return {
+      trackers: existing,
+      autoEnabled,
+      changed: currentAutoEnabled !== autoEnabled,
+      reason: currentAutoEnabled !== autoEnabled ? "auto-updated" : "already-configured"
+    };
+  }
+
+  const telemetry = engine?.getTelemetry?.() || {};
+  const recommended = recommendMetaAutoTempoTrackers(current, telemetry);
+  const merged = force
+    ? recommended
+    : sanitizeMetaAutoTempoTrackersConfig(
+      { ...current, ...recommended },
+      AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+    );
+  const next = patchAudioReactivityMapConfig({
+    metaAutoTempoTrackersAuto: autoEnabled,
+    metaAutoTempoTrackers: merged,
+    metaAutoHueWizBaselineBlend: merged.baseline === true
+  });
+  const safeTrackers = sanitizeMetaAutoTempoTrackersConfig(
+    next.metaAutoTempoTrackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  const changed = !sameMetaAutoTempoTrackersConfig(current, safeTrackers) ||
+    currentAutoEnabled !== (next.metaAutoTempoTrackersAuto === true);
+  return {
+    trackers: safeTrackers,
+    autoEnabled: next.metaAutoTempoTrackersAuto === true,
+    changed,
+    reason: changed ? "generated" : "unchanged"
+  };
+}
+
+function parseMetaAutoTempoTrackerPatchFromRequest(req) {
+  const autoRaw = req.query.auto
+    ?? req.query.autoEnabled
+    ?? req.body?.auto
+    ?? req.body?.autoEnabled;
+  const autoEnabled = parseBoolean(autoRaw, null);
+  const modeRaw = String(req.query.mode ?? req.body?.mode ?? "").trim().toLowerCase();
+  if (modeRaw) {
+    if (!META_AUTO_TEMPO_TRACKER_KEYS.includes(modeRaw)) {
+      return { ok: false, error: "invalid mode", allowedModes: META_AUTO_TEMPO_TRACKER_KEYS };
+    }
+    const rawEnabled = req.query.enabled
+      ?? req.query.on
+      ?? req.query.value
+      ?? req.body?.enabled
+      ?? req.body?.on
+      ?? req.body?.value;
+    const enabled = parseBoolean(rawEnabled, null);
+    if (enabled === null) {
+      return { ok: false, error: "invalid enabled flag", allowed: ["true", "false"] };
+    }
+    return {
+      ok: true,
+      patch: { [modeRaw]: Boolean(enabled) },
+      autoEnabled
+    };
+  }
+
+  const bodyRoot = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+    ? req.body
+    : {};
+  const bodyTrackers = bodyRoot.trackers && typeof bodyRoot.trackers === "object" && !Array.isArray(bodyRoot.trackers)
+    ? bodyRoot.trackers
+    : bodyRoot;
+  const patch = {};
+
+  for (const key of META_AUTO_TEMPO_TRACKER_KEYS) {
+    const fromBody = parseBoolean(bodyTrackers[key], null);
+    if (fromBody !== null) {
+      patch[key] = Boolean(fromBody);
+      continue;
+    }
+    const fromQuery = parseBoolean(req.query[key], null);
+    if (fromQuery !== null) {
+      patch[key] = Boolean(fromQuery);
+    }
+  }
+
+  if (!Object.keys(patch).length) {
+    if (autoEnabled === null) {
+      return {
+        ok: false,
+        error: "missing tracker patch",
+        detail: "Provide one or more tracker booleans, mode+enabled, or auto toggle.",
+        allowedModes: META_AUTO_TEMPO_TRACKER_KEYS
+      };
+    }
+  }
+
+  return { ok: true, patch, autoEnabled };
+}
+
+app.get("/rave/meta/auto/hz-trackers", (_, res) => {
+  const trackers = getMetaAutoTempoTrackersRuntimeSnapshot();
+  res.json({
+    ok: true,
+    trackers,
+    autoEnabled: audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true,
+    active: META_AUTO_TEMPO_TRACKER_KEYS.filter(key => trackers[key] === true),
+    summary: summarizeMetaAutoTempoTrackers(trackers),
+    scope: "meta-auto-only",
+    brands: ["hue", "wiz"]
+  });
+});
+
+app.post("/rave/meta/auto/hz-trackers", (req, res) => {
+  const parsed = parseMetaAutoTempoTrackerPatchFromRequest(req);
+  if (!parsed.ok) {
+    res.status(400).json({
+      ok: false,
+      error: parsed.error,
+      detail: parsed.detail,
+      allowed: parsed.allowed || ["true", "false"],
+      allowedModes: parsed.allowedModes || META_AUTO_TEMPO_TRACKER_KEYS
+    });
+    return;
+  }
+
+  const current = getMetaAutoTempoTrackersRuntimeSnapshot();
+  const mergedTrackers = sanitizeMetaAutoTempoTrackersConfig(
+    { ...current, ...parsed.patch },
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  const nextAutoEnabled = parsed.autoEnabled === null
+    ? audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true
+    : Boolean(parsed.autoEnabled);
+  const next = patchAudioReactivityMapConfig({
+    metaAutoTempoTrackersAuto: nextAutoEnabled,
+    metaAutoTempoTrackers: mergedTrackers,
+    metaAutoHueWizBaselineBlend: mergedTrackers.baseline === true
+  });
+  const safeTrackers = sanitizeMetaAutoTempoTrackersConfig(
+    next.metaAutoTempoTrackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  console.log(`[RAVE] meta auto hz trackers ${summarizeMetaAutoTempoTrackers(safeTrackers)}`);
+  res.json({
+    ok: true,
+    trackers: safeTrackers,
+    autoEnabled: next.metaAutoTempoTrackersAuto === true,
+    active: META_AUTO_TEMPO_TRACKER_KEYS.filter(key => safeTrackers[key] === true),
+    summary: summarizeMetaAutoTempoTrackers(safeTrackers),
+    scope: "meta-auto-only",
+    brands: ["hue", "wiz"]
+  });
+});
+
+app.get("/rave/meta/auto/hz-trackers/auto", (_, res) => {
+  res.json({
+    ok: true,
+    enabled: audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true,
+    scope: "meta-auto-only",
+    brands: ["hue", "wiz"]
+  });
+});
+
+app.post("/rave/meta/auto/hz-trackers/auto", (req, res) => {
+  const raw = req.query.enabled
+    ?? req.query.on
+    ?? req.query.value
+    ?? req.body?.enabled
+    ?? req.body?.on
+    ?? req.body?.value;
+  const enabled = parseBoolean(raw, null);
+  if (enabled === null) {
+    res.status(400).json({
+      ok: false,
+      error: "invalid enabled flag",
+      allowed: ["true", "false"]
+    });
+    return;
+  }
+
+  let nextEnabled = Boolean(enabled);
+  let safeTrackers = getMetaAutoTempoTrackersRuntimeSnapshot();
+  let seededCandidates = false;
+  if (nextEnabled) {
+    const seeded = applyMetaAutoTempoTrackerCandidates({
+      force: false,
+      autoEnabled: true
+    });
+    nextEnabled = seeded.autoEnabled === true;
+    safeTrackers = sanitizeMetaAutoTempoTrackersConfig(
+      seeded.trackers,
+      AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+    );
+    seededCandidates = seeded.changed === true && seeded.reason === "generated";
+  } else {
+    const next = patchAudioReactivityMapConfig({
+      metaAutoTempoTrackersAuto: false
+    });
+    nextEnabled = next.metaAutoTempoTrackersAuto === true;
+    safeTrackers = sanitizeMetaAutoTempoTrackersConfig(
+      next.metaAutoTempoTrackers,
+      AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+    );
+  }
+  console.log(
+    `[RAVE] meta auto hz tracker auto ${nextEnabled ? "ON" : "OFF"} ` +
+    `(trackers=${summarizeMetaAutoTempoTrackers(safeTrackers)}${seededCandidates ? ", seeded" : ""})`
+  );
+  res.json({
+    ok: true,
+    enabled: nextEnabled === true,
+    trackers: safeTrackers,
+    seededCandidates,
+    scope: "meta-auto-only",
+    brands: ["hue", "wiz"]
+  });
+});
+
+app.post("/rave/meta/auto/hz-trackers/candidates", (req, res) => {
+  const forceRaw = req.query.force ?? req.body?.force;
+  const autoRaw = req.query.autoEnabled ?? req.query.auto ?? req.body?.autoEnabled ?? req.body?.auto;
+  const force = forceRaw === undefined ? true : Boolean(parseBoolean(forceRaw, true));
+  const autoEnabledParsed = parseBoolean(autoRaw, null);
+  const autoEnabled = autoEnabledParsed === null
+    ? (audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true)
+    : Boolean(autoEnabledParsed);
+  const next = applyMetaAutoTempoTrackerCandidates({
+    force,
+    autoEnabled
+  });
+  const safeTrackers = sanitizeMetaAutoTempoTrackersConfig(
+    next.trackers,
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  console.log(
+    `[RAVE] meta auto hz tracker candidates ${next.changed ? "APPLIED" : "UNCHANGED"} ` +
+    `(trackers=${summarizeMetaAutoTempoTrackers(safeTrackers)}, auto=${next.autoEnabled ? "ON" : "OFF"})`
+  );
+  res.json({
+    ok: true,
+    changed: next.changed === true,
+    reason: String(next.reason || (next.changed ? "generated" : "unchanged")),
+    trackers: safeTrackers,
+    autoEnabled: next.autoEnabled === true,
+    active: META_AUTO_TEMPO_TRACKER_KEYS.filter(key => safeTrackers[key] === true),
+    summary: summarizeMetaAutoTempoTrackers(safeTrackers),
+    scope: "meta-auto-only",
+    brands: ["hue", "wiz"]
+  });
+});
+
+app.get("/rave/meta/auto/hue-wiz-baseline-blend", (_, res) => {
+  const trackers = getMetaAutoTempoTrackersRuntimeSnapshot();
+  res.json({
+    ok: true,
+    enabled: trackers.baseline === true,
+    trackers,
+    autoEnabled: audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true,
+    scope: "meta-auto-only",
+    brands: ["hue", "wiz"]
+  });
+});
+
+app.post("/rave/meta/auto/hue-wiz-baseline-blend", (req, res) => {
+  const raw = req.query.enabled
+    ?? req.query.on
+    ?? req.query.value
+    ?? req.body?.enabled
+    ?? req.body?.on
+    ?? req.body?.value;
+  const hasInput = raw !== null && raw !== undefined && String(raw).trim() !== "";
+  if (!hasInput) {
+    res.status(400).json({
+      ok: false,
+      error: "missing enabled flag",
+      allowed: ["true", "false"]
+    });
+    return;
+  }
+
+  const enabled = parseBoolean(raw, null);
+  if (enabled === null) {
+    res.status(400).json({
+      ok: false,
+      error: "invalid enabled flag",
+      allowed: ["true", "false"]
+    });
+    return;
+  }
+
+  const trackers = getMetaAutoTempoTrackersRuntimeSnapshot();
+  const mergedTrackers = sanitizeMetaAutoTempoTrackersConfig(
+    { ...trackers, baseline: Boolean(enabled) },
+    AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+  );
+  const next = patchAudioReactivityMapConfig({
+    metaAutoTempoTrackers: mergedTrackers,
+    metaAutoHueWizBaselineBlend: mergedTrackers.baseline === true
+  });
+  console.log(
+    `[RAVE] meta auto hue/wiz baseline blend ${next.metaAutoHueWizBaselineBlend ? "ON" : "OFF"}`
+  );
+  res.json({
+    ok: true,
+    enabled: next.metaAutoHueWizBaselineBlend === true,
+    trackers: sanitizeMetaAutoTempoTrackersConfig(
+      next.metaAutoTempoTrackers,
+      AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+    ),
+    autoEnabled: next.metaAutoTempoTrackersAuto === true,
+    scope: "meta-auto-only",
+    brands: ["hue", "wiz"]
   });
 });
 
@@ -5215,11 +9297,7 @@ app.post("/rave/meta/auto/off", (_, res) => {
 });
 
 app.get("/rave/genres", (_, res) => {
-  const genres = engine.getGenreCatalog?.() || [];
-  res.json({
-    ok: true,
-    genres
-  });
+  respondLegacyPaletteRouteRemoved(res, "/rave/genres");
 });
 
 app.get("/rave/telemetry", (_, res) => {
@@ -5833,6 +9911,14 @@ app.post("/mods/reload", modsReloadRateLimit, async (_, res) => {
 });
 
 async function handleModHttpRoute(req, res) {
+  if (!(ALLOW_REMOTE_WRITE_RUNTIME || isLoopbackRequest(req))) {
+    res.status(403).json({
+      ok: false,
+      error: "forbidden",
+      detail: "mod HTTP routes are restricted to local loopback requests"
+    });
+    return;
+  }
   try {
     const result = await modLoader.handleHttp({
       modId: req.params.modId,
@@ -6326,6 +10412,7 @@ app.post("/audio/config", (req, res) => {
   const patch = req.body && typeof req.body === "object" ? req.body : {};
   const result = audio.setConfig(patch, { restart: true });
   audioRuntimeConfig = result.config || audioRuntimeConfig;
+  scheduleAudioRuntimeConfigWrite(audioRuntimeConfig, { delayMs: 180 });
   res.json(result);
 });
 
@@ -6344,6 +10431,12 @@ app.post("/audio/reactivity-map", (req, res) => {
     ? {
       dropEnabled: AUDIO_REACTIVITY_MAP_DEFAULT.dropEnabled,
       hardwareRateLimitsEnabled: AUDIO_REACTIVITY_MAP_DEFAULT.hardwareRateLimitsEnabled,
+      metaAutoHueWizBaselineBlend: audioReactivityMapRuntime.metaAutoHueWizBaselineBlend === true,
+      metaAutoTempoTrackersAuto: audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true,
+      metaAutoTempoTrackers: sanitizeMetaAutoTempoTrackersConfig(
+        audioReactivityMapRuntime.metaAutoTempoTrackers,
+        AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
+      ),
       targets: {
         hue: { ...AUDIO_REACTIVITY_MAP_DEFAULT.targets.hue },
         wiz: { ...AUDIO_REACTIVITY_MAP_DEFAULT.targets.wiz },
@@ -6352,7 +10445,7 @@ app.post("/audio/reactivity-map", (req, res) => {
     }
     : body;
 
-  const config = patchAudioReactivityMapConfig(patch);
+  const config = patchAudioReactivityMapConfig(patch, { preserveMetaControls: true });
   res.json({
     ok: true,
     config,
@@ -6389,10 +10482,78 @@ app.get("/audio/devices", audioDevicesRateLimit, (_, res) => {
   }
 });
 
+app.get("/audio/apps", audioAppsRateLimit, async (_, res) => {
+  if (!audio?.listRunningApps) {
+    res.status(503).json({ ok: false, error: "audio app scan unavailable" });
+    return;
+  }
+
+  try {
+    const result = await audio.listRunningApps();
+    if (!result?.ok) {
+      res.status(500).json({
+        ok: false,
+        error: result?.error || "audio app scan failed",
+        apps: []
+      });
+      return;
+    }
+    res.json({
+      ok: true,
+      apps: Array.isArray(result.apps) ? result.apps : [],
+      scannedAt: Number(result.scannedAt || Date.now()),
+      telemetry: audio.getTelemetry?.() || null
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err.message || String(err),
+      apps: []
+    });
+  }
+});
+
+app.post("/audio/ffmpeg/app-isolation/scan", audioAppScanRateLimit, async (_, res) => {
+  if (!audio?.scanFfmpegAppIsolation) {
+    res.status(503).json({ ok: false, error: "audio app isolation scan unavailable" });
+    return;
+  }
+
+  try {
+    const result = await audio.scanFfmpegAppIsolation({ reason: "api_force", force: true, apply: true });
+    audioRuntimeConfig = audio.getConfig?.() || audioRuntimeConfig;
+    if (!result?.ok) {
+      res.status(500).json({
+        ok: false,
+        error: result?.error || "audio app isolation scan failed",
+        config: audioRuntimeConfig,
+        telemetry: audio.getTelemetry?.() || null
+      });
+      return;
+    }
+
+    res.json({
+      ok: true,
+      ...result,
+      config: audioRuntimeConfig,
+      telemetry: audio.getTelemetry?.() || null
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err.message || String(err),
+      config: audioRuntimeConfig,
+      telemetry: audio.getTelemetry?.() || null
+    });
+  }
+});
+
 app.get("/fixtures", fixturesReadRateLimit, (_, res) => {
   refreshWizAdapters();
   syncStandaloneRuntime();
   const fixtures = fixtureRegistry.getFixtures();
+  prunePaletteFixtureOverrides(fixtures);
+  pruneFixtureMetricRoutingOverrides(fixtures);
   pruneConnectivityCache(fixtures);
   for (const fixture of fixtures) {
     queueFixtureConnectivityProbe(fixture, { force: false, logChanges: true }).catch(() => {});
@@ -6588,6 +10749,12 @@ app.get("/fixtures/config", (_, res) => {
   });
 });
 
+app.get("/fixtures/modes/verify", (req, res) => {
+  const verbose = String(req.query.verbose || "").trim() === "1";
+  const report = buildFixtureModeInteroperabilityReport({ verbose });
+  res.status(report.ok ? 200 : 409).json(report);
+});
+
 app.post("/fixtures/fixture", async (req, res) => {
   const payload = req.body && typeof req.body === "object" ? req.body : {};
   const replaceId = String(payload.replaceId ?? payload.originalId ?? "").trim();
@@ -6697,6 +10864,7 @@ function getSystemConfigSnapshot() {
     autoLaunchBrowser: systemConfigRuntime?.autoLaunchBrowser !== false,
     browserLaunchDelayMs: clampSystemBrowserLaunchDelayMs(systemConfigRuntime?.browserLaunchDelayMs),
     unsafeExposeSensitiveLogs: systemConfigRuntime?.unsafeExposeSensitiveLogs === true,
+    legacyComponentsEnabled: systemConfigRuntime?.legacyComponentsEnabled === true,
     hueTransportPreference: sanitizeHueTransportPreference(
       systemConfigRuntime?.hueTransportPreference,
       SYSTEM_CONFIG_DEFAULT.hueTransportPreference
@@ -6731,12 +10899,21 @@ function patchSystemConfig(patch = {}) {
     }
     merged.unsafeExposeSensitiveLogs = requested;
   }
+  if (Object.prototype.hasOwnProperty.call(rawPatch, "legacyComponentsEnabled")) {
+    merged.legacyComponentsEnabled = rawPatch.legacyComponentsEnabled;
+  }
   if (Object.prototype.hasOwnProperty.call(rawPatch, "hueTransportPreference")) {
     merged.hueTransportPreference = rawPatch.hueTransportPreference;
   }
 
   systemConfigRuntime = writeSystemConfig(merged);
   setUnsafeExposeSensitiveLogsRuntime(Boolean(systemConfigRuntime?.unsafeExposeSensitiveLogs));
+  if (engine?.setLegacyComponentsEnabled) {
+    engine.setLegacyComponentsEnabled(Boolean(systemConfigRuntime?.legacyComponentsEnabled));
+  }
+  if (systemConfigRuntime?.legacyComponentsEnabled !== true) {
+    engine.setBehavior?.("interpret");
+  }
   return { ok: true, config: getSystemConfigSnapshot() };
 }
 
@@ -6777,7 +10954,9 @@ app.post("/system/config", async (req, res) => {
     const preferredHueMode = getPreferredHueTransportMode();
     transport = await settleWithTimeout(
       setHueTransportMode(preferredHueMode),
-      preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT ? 3200 : 2200,
+      preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT
+        ? HUE_ENT_MODE_SWITCH_TIMEOUT_MS
+        : HUE_REST_MODE_SWITCH_TIMEOUT_MS,
       () => ({
         desired: hueTransport.desired,
         active: hueTransport.active,
@@ -6827,6 +11006,40 @@ let httpServer = null;
 let shutdownPromise = null;
 let shutdownTimer = null;
 let browserLaunchTimer = null;
+let parentWatchTimer = null;
+const parentWatchEnabled = String(process.env.RAVELINK_WATCH_PARENT || "").trim() === "1";
+const parentPidAtBoot = Number(process.ppid || 0);
+
+function isProcessAlive(pid) {
+  if (!Number.isFinite(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    const code = String(err?.code || "").toUpperCase();
+    if (code === "EPERM" || code === "EACCES") return true;
+    return false;
+  }
+}
+
+function stopParentWatchdog() {
+  if (!parentWatchTimer) return;
+  clearInterval(parentWatchTimer);
+  parentWatchTimer = null;
+}
+
+function startParentWatchdog() {
+  if (!parentWatchEnabled) return;
+  if (!Number.isFinite(parentPidAtBoot) || parentPidAtBoot <= 1 || parentPidAtBoot === process.pid) return;
+  if (parentWatchTimer) return;
+  parentWatchTimer = setInterval(() => {
+    if (shutdownPromise) return;
+    if (isProcessAlive(parentPidAtBoot)) return;
+    console.warn(`[SYS] parent process ${parentPidAtBoot} exited; shutting down`);
+    shutdown("parent_exit", 0).catch(() => process.exit(1));
+  }, 1500);
+  parentWatchTimer.unref?.();
+}
 
 function getBridgeBaseUrl() {
   return `http://${HOST}:${PORT}`;
@@ -7009,6 +11222,7 @@ async function shutdown(reason = "signal", exitCode = 0) {
 
   shutdownPromise = (async () => {
     console.log(`[SYS] shutdown requested (${reason})`);
+    stopParentWatchdog();
     if (browserLaunchTimer) {
       clearTimeout(browserLaunchTimer);
       browserLaunchTimer = null;
@@ -7059,6 +11273,10 @@ async function shutdown(reason = "signal", exitCode = 0) {
     } catch {}
 
     try {
+      flushScheduledAudioRuntimeConfigWriteSync();
+    } catch {}
+
+    try {
       await Promise.resolve(engine?.stop?.());
     } catch {}
 
@@ -7092,14 +11310,28 @@ async function shutdown(reason = "signal", exitCode = 0) {
   return shutdownPromise;
 }
 
+let shutdownSignalCount = 0;
+function handleShutdownSignal(signalName) {
+  shutdownSignalCount += 1;
+  if (shutdownSignalCount >= 2) {
+    console.error(`[SYS] ${signalName} received again during shutdown; forcing exit`);
+    try {
+      removePidFile();
+    } catch {}
+    process.exit(1);
+    return;
+  }
+  shutdown(signalName, 0).catch(() => process.exit(1));
+}
+
 process.on("SIGINT", () => {
-  shutdown("SIGINT", 0).catch(() => process.exit(1));
+  handleShutdownSignal("SIGINT");
 });
 process.on("SIGTERM", () => {
-  shutdown("SIGTERM", 0).catch(() => process.exit(1));
+  handleShutdownSignal("SIGTERM");
 });
 process.on("SIGBREAK", () => {
-  shutdown("SIGBREAK", 0).catch(() => process.exit(1));
+  handleShutdownSignal("SIGBREAK");
 });
 process.on("exit", () => {
   removePidFile();
@@ -7108,6 +11340,7 @@ process.on("exit", () => {
 // ======================================================
 httpServer = app.listen(PORT, HOST, () => {
   writePidFile();
+  startParentWatchdog();
   console.log(`Hue bridge running on ${getBridgeBaseUrl()}`);
   scheduleBrowserAutoLaunch();
 });

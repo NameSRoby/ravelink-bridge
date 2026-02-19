@@ -1,7 +1,25 @@
-# Mods Guide (v1.3.0)
+# Mods Guide (v1.5.0)
 
 This document is the developer reference for the local mod system shipped in this distro.
 If you are building adapters, custom brands, or runtime behavior overrides, start here.
+
+## Version Delta (v1.5.0)
+
+Key behavior changes relevant to mod authors:
+
+- Legacy genre/decade tuning paths are retired from active runtime behavior.
+- Palette sequencing + fixture metric routing are now first-class controls in LIVE.
+- Per-brand/per-fixture target menus map to runtime overrides (global -> brand -> fixture).
+- Scene-link sync between Hue and WiZ is explicit (`/rave/scene/sync`) and no longer hard-forced standalone.
+
+New routing endpoints frequently used by tooling/mods:
+
+- `GET /rave/palette`
+- `POST /rave/palette`
+- `GET /rave/palettes`
+- `GET /rave/fixture-metrics`
+- `POST /rave/fixture-metrics`
+- `POST /rave/fixture-routing/clear`
 
 ## 1. Trust Model And Scope
 

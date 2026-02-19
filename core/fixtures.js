@@ -481,9 +481,7 @@ function getDerivedIntentZones(fixtures, binding) {
       continue;
     }
     if (brand === "wiz") {
-      if (mode === "twitch" && modeFlags.customEnabled) {
-        zones.push("custom");
-      } else if (mode === "custom") {
+      if (mode === "custom") {
         zones.push("custom");
       } else {
         zones.push("wiz");

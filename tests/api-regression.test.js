@@ -1,0 +1,165 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { spawn } = require("node:child_process");
+const path = require("node:path");
+const fs = require("node:fs");
+
+const ROOT = path.resolve(__dirname, "..");
+const AUDIO_CONFIG_PATH = path.join(ROOT, "core", "audio.config.json");
+const TEST_PORT = String(5500 + Math.floor(Math.random() * 300));
+const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
+
+let serverProc = null;
+let audioConfigBackup = null;
+let audioConfigExisted = false;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => null);
+  return { response, data };
+}
+
+async function waitForServerReady(timeoutMs = 25000) {
+  const startedAt = Date.now();
+  while ((Date.now() - startedAt) < timeoutMs) {
+    try {
+      const r = await fetch(`${BASE_URL}/audio/telemetry`, { method: "GET" });
+      if (r.ok) return;
+    } catch {}
+    await sleep(220);
+  }
+  throw new Error("server did not become ready in time");
+}
+
+async function stopServer() {
+  if (!serverProc) return;
+  const proc = serverProc;
+  serverProc = null;
+  if (proc.exitCode !== null) return;
+  proc.kill("SIGTERM");
+  await new Promise(resolve => {
+    const timer = setTimeout(() => {
+      try { proc.kill("SIGKILL"); } catch {}
+      resolve();
+    }, 4000);
+    proc.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
+test.before(async () => {
+  if (fs.existsSync(AUDIO_CONFIG_PATH)) {
+    audioConfigExisted = true;
+    audioConfigBackup = fs.readFileSync(AUDIO_CONFIG_PATH, "utf8");
+  }
+
+  serverProc = spawn(process.execPath, ["server.js"], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      PORT: TEST_PORT,
+      RAVELINK_NO_BROWSER: "1"
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  let bootError = "";
+  serverProc.stderr.on("data", chunk => {
+    bootError += String(chunk || "");
+  });
+  serverProc.on("exit", code => {
+    if (code !== 0 && !bootError) {
+      bootError = `server exited with code ${code}`;
+    }
+  });
+
+  await waitForServerReady();
+});
+
+test.after(async () => {
+  await stopServer();
+  if (audioConfigExisted) {
+    fs.writeFileSync(AUDIO_CONFIG_PATH, audioConfigBackup, "utf8");
+  } else {
+    try { fs.unlinkSync(AUDIO_CONFIG_PATH); } catch {}
+  }
+});
+
+test("palette + fixture metric routing endpoints stay consistent", { concurrency: false }, async () => {
+  const palettePatch = await requestJson(`${BASE_URL}/rave/palette`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      brand: "hue",
+      families: ["blue", "purple"],
+      colorsPerFamily: 3,
+      disorder: false
+    })
+  });
+  assert.equal(palettePatch.response.status, 200);
+  assert.equal(Boolean(palettePatch.data?.ok), true);
+
+  const metricPatch = await requestJson(`${BASE_URL}/rave/fixture-metrics`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      brand: "hue",
+      mode: "meta_auto",
+      metaAutoFlip: true,
+      harmonySize: 2,
+      maxHz: 7.5
+    })
+  });
+  assert.equal(metricPatch.response.status, 200);
+  assert.equal(Boolean(metricPatch.data?.ok), true);
+  assert.equal(Number(metricPatch.data?.brands?.hue?.maxHz), 7.5);
+
+  const clear = await requestJson(`${BASE_URL}/rave/fixture-routing/clear`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ brand: "hue" })
+  });
+  assert.equal(clear.response.status, 200);
+  assert.equal(Boolean(clear.data?.ok), true);
+  assert.equal(clear.data?.scope, "brand");
+});
+
+test("legacy genre route contract stays removed", { concurrency: false }, async () => {
+  const removed = await requestJson(`${BASE_URL}/rave/genres`, { method: "GET" });
+  assert.equal(removed.response.status, 410);
+  assert.equal(Boolean(removed.data?.ok), false);
+  assert.equal(Boolean(removed.data?.removed), true);
+  assert.equal(String(removed.data?.replacement || ""), "/rave/palette");
+});
+
+test("audio config supports strict app isolation + custom check interval", { concurrency: false }, async () => {
+  const patch = await requestJson(`${BASE_URL}/audio/config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      inputBackend: "ffmpeg",
+      ffmpegAppIsolationEnabled: true,
+      ffmpegAppIsolationStrict: true,
+      ffmpegAppIsolationCheckMs: 120000
+    })
+  });
+  assert.equal(patch.response.status, 200);
+  assert.equal(Boolean(patch.data?.ok), true);
+  assert.equal(Boolean(patch.data?.config?.ffmpegAppIsolationStrict), true);
+  assert.equal(Number(patch.data?.config?.ffmpegAppIsolationCheckMs), 120000);
+
+  await sleep(320);
+
+  const readBack = await requestJson(`${BASE_URL}/audio/config`, { method: "GET" });
+  assert.equal(readBack.response.status, 200);
+  assert.equal(Boolean(readBack.data?.ok), true);
+  assert.equal(Boolean(readBack.data?.config?.ffmpegAppIsolationStrict), true);
+  assert.equal(Number(readBack.data?.config?.ffmpegAppIsolationCheckMs), 120000);
+});

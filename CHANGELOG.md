@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.5.0 - Sanitized Baseline + Startup Bootstrap (2026-02-19)
+
+### Startup Bootstrap
+- Added first-launch dependency bootstrap state tracking for new systems.
+- Startup now performs full dependency sync on first launch (and when dependency manifests change).
+- Added Windows dependency preflight checks/install attempts for `ffmpeg`, `Python 3.13`, `proc-tap`, and `psutil`.
+
+### Security + Hygiene
+- Expanded sanitization workflow to reset runtime configs, wipe local runtime artifacts, and remove archived sensitive backups.
+- Added full-template resets for fixture/audio/reactivity/system/palette/metric runtime JSON config files.
+- Sanitization now also covers `.pushrepo` mirror content.
+
+### UI + Docs
+- Bumped UI storage migration target to force a clean browser memory baseline for this release.
+- Updated onboarding flow text/steps to current priority controls and fixture palette/metric routing workflow.
+- Updated mod developer guide to `v1.4.2-dev` runtime behavior model and endpoint set.
+
 ## v1.4.2 - Behavior Tuning + Stability Hotfix (2026-02-14)
 
 ### Meta Auto Song Learning
@@ -76,7 +93,7 @@
 
 1. Open releases:
    - `https://github.com/NameSRoby/ravelink-bridge/releases`
-2. Download the latest `RaveLink-Bridge-Windows-v1.4.2.zip`.
+2. Download the latest `RaveLink-Bridge-Windows-v1.5.0.zip`.
 3. Extract the zip.
 4. Install dependencies if needed:
    - `npm install`
