@@ -1,7 +1,7 @@
 # RaveLink Bridge Redistributable Notes
 
 This file mirrors high-level usage guidance for packaged/source redistribution.
-Release note: `v1.5.0` continues the v1.4.2 behavior baseline with hardened startup/bootstrap flow.
+Release note: `v1.5.1` continues the v1.5 baseline with additional security hardening and reactivity polish.
 
 Primary docs:
 - `README.md` (full setup + runtime usage)
@@ -10,7 +10,7 @@ Primary docs:
 ## Beginner Install Guide (Windows)
 
 1. Download the release zip:
-- `RaveLink-Bridge-Windows-v1.5.0.zip`
+- `RaveLink-Bridge-Windows-v1.5.1.zip`
 2. Extract the zip to a normal folder (for example `Desktop\RaveLink-Bridge`).
 3. Install Node.js LTS from:
 - `https://nodejs.org`

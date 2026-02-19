@@ -1,12 +1,20 @@
-# Mods Guide (v1.5.0)
+# Mods Guide (v1.5.1)
 
 This document is the developer reference for the local mod system shipped in this distro.
 If you are building adapters, custom brands, or runtime behavior overrides, start here.
 
-## Version Delta (v1.5.0)
+## Version Delta (v1.5.1)
 
 Key behavior changes relevant to mod authors:
 
+- Mod import path sanitization is stricter:
+  - Windows drive-style and ADS-like paths are blocked.
+  - Overlong path/segment entries are rejected.
+- Mod import base64 validation is stricter (malformed payload data is rejected).
+- `POST /mods/config` now keeps only valid mod IDs (`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`) in `enabled/order/disabled`.
+- Redistributable export skips symlink/junction entries to avoid accidentally packaging files outside the project tree.
+
+Existing v1.5 behavior retained:
 - Legacy genre/decade tuning paths are retired from active runtime behavior.
 - Palette sequencing + fixture metric routing are now first-class controls in LIVE.
 - Per-brand/per-fixture target menus map to runtime overrides (global -> brand -> fixture).
@@ -335,6 +343,7 @@ Request body keys:
 
 Behavior:
 - Writes `mods/mods.config.json`
+- Invalid IDs are ignored (valid format: `^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`).
 - If `reload !== false`, performs full mod reload
 - If reloaded, server triggers `onBoot` with `reason: "mods_reload"`
 

@@ -224,7 +224,7 @@ module.exports = function createAudio(onLevel) {
     procTapCaptureLocks: readProcessLoopbackLocks()
   };
 
-  function syncLegacyFfmpegDeviceFields() {
+  function normalizeFfmpegDeviceFields() {
     const list = normalizeFfmpegDeviceList(cfg.ffmpegInputDevices, []);
     const single = String(cfg.ffmpegInputDevice || "").trim();
     if (list.length) {
@@ -242,7 +242,7 @@ module.exports = function createAudio(onLevel) {
     cfg.ffmpegInputDevice = "";
   }
 
-  syncLegacyFfmpegDeviceFields();
+  normalizeFfmpegDeviceFields();
 
   const appIsolationRuntime = {
     lastScanAt: 0,
@@ -270,7 +270,7 @@ module.exports = function createAudio(onLevel) {
   };
 
   function getConfiguredDefaultFfmpegDevices() {
-    syncLegacyFfmpegDeviceFields();
+    normalizeFfmpegDeviceFields();
     return normalizeFfmpegDeviceList(cfg.ffmpegInputDevices, []);
   }
 
@@ -509,7 +509,7 @@ module.exports = function createAudio(onLevel) {
   }
 
   function getConfig() {
-    syncLegacyFfmpegDeviceFields();
+    normalizeFfmpegDeviceFields();
     return {
       ...cfg,
       ffmpegInputDevices: normalizeFfmpegDeviceList(cfg.ffmpegInputDevices, []),
@@ -1249,7 +1249,7 @@ function summarizeRunningProcessTokens(rawList = []) {
       for (const key of keys) {
         cfg[key] = normalized[key];
       }
-      syncLegacyFfmpegDeviceFields();
+      normalizeFfmpegDeviceFields();
       startAppIsolationTimer();
       if (cfg.ffmpegAppIsolationEnabled) {
         runAppIsolationScan({ reason: "config", apply: false, force: true }).catch(() => {});
@@ -1761,7 +1761,7 @@ function summarizeRunningProcessTokens(rawList = []) {
       );
     }
 
-    // Backward compatible output
+    // Primary level callback
     onLevel(level);
 
     // Existing hooks
@@ -2224,7 +2224,7 @@ function summarizeRunningProcessTokens(rawList = []) {
         if (restartKeys.has(key)) needsRestart = true;
       }
     }
-    syncLegacyFfmpegDeviceFields();
+    normalizeFfmpegDeviceFields();
     startAppIsolationTimer();
     const shouldRestart = options.restart !== false && needsRestart && running;
     if (cfg.ffmpegAppIsolationEnabled && !shouldRestart) {

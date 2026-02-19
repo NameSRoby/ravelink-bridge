@@ -227,11 +227,17 @@ function sanitizeRelativeFilePath(value) {
   const raw = String(value || "").replace(/\\/g, "/").trim();
   if (!raw) return "";
   if (raw.includes("\0")) return "";
+  // Block Windows ADS and drive-letter style paths.
+  if (raw.includes(":")) return "";
+  if (raw.length > 240) return "";
 
   const normalized = path.posix.normalize(raw);
   if (!normalized || normalized === "." || normalized === "..") return "";
   if (path.posix.isAbsolute(normalized)) return "";
   if (normalized.startsWith("../") || normalized.includes("/../")) return "";
+  if (/^[a-zA-Z]:/.test(normalized)) return "";
+  const parts = normalized.split("/");
+  if (parts.some(part => !part || part.length > 100)) return "";
   return normalized;
 }
 

@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 
 const DEFAULT_ROOT = path.join(__dirname, "..");
-const LEGACY_ARCHIVE_DIRNAME = "RaveLink-Bridge-Windows-v1.4.1-EXTRACT-FIRST.BAK-20260214-0139";
+const ARCHIVE_DIRNAME = "RaveLink-Bridge-Windows-v1.4.1-EXTRACT-FIRST.BAK-20260214-0139";
 
 const FIXTURES_TEMPLATE = {
   intentRoutes: {
@@ -137,8 +137,7 @@ const SYSTEM_CONFIG_TEMPLATE = {
   autoLaunchBrowser: true,
   browserLaunchDelayMs: 1200,
   unsafeExposeSensitiveLogs: false,
-  hueTransportPreference: "auto",
-  legacyComponentsEnabled: false
+  hueTransportPreference: "auto"
 };
 
 const FIXTURE_METRIC_ROUTING_TEMPLATE = {
@@ -188,10 +187,11 @@ function deleteFile(filePath) {
 function sanitizeRoot(rootDir = DEFAULT_ROOT) {
   const root = path.resolve(String(rootDir || DEFAULT_ROOT));
   wipeFolder(path.join(root, ".runtime"));
+  wipeFolder(path.join(root, "backup"));
   wipeFolder(path.join(root, "backups"));
   wipeFolder(path.join(root, "core", "backups"));
   wipeFolder(path.join(root, "release"));
-  wipeFolder(path.join(root, LEGACY_ARCHIVE_DIRNAME));
+  wipeFolder(path.join(root, ARCHIVE_DIRNAME));
   deleteFile(path.join(root, "core", ".core-lock.key"));
   deleteFile(path.join(root, "core", "audio.process-locks.json"));
 

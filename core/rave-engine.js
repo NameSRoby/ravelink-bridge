@@ -3,7 +3,7 @@
 
 /**
  * ======================================================
- * RAVE CORE ENGINE v2.9 — HYBRID + NEURAL + MIDI/OSC
+ * RAVE CORE ENGINE v2.9 â€” HYBRID + NEURAL + MIDI/OSC
  * ======================================================
  * - Hue ALWAYS emits (time-based)
  * - BPM optional, never required
@@ -298,6 +298,43 @@ module.exports = function createRaveEngine(controls) {
       b: clamp255((luma + ((boosted.b - luma) * chromaGain)) * valueGain)
     };
   };
+  const tunePaletteVibrancy = (color = {}, options = {}) => {
+    const base = {
+      r: clamp255(color?.r),
+      g: clamp255(color?.g),
+      b: clamp255(color?.b)
+    };
+    const baseHsv = rgbToHsv(base);
+    const preserveNeutralBelow = clamp(Number(options.preserveNeutralBelow) || 0, 0, 0.3);
+    if (baseHsv.s <= preserveNeutralBelow) {
+      return base;
+    }
+    const satBoost = clamp(Number(options.satBoost) || 0, 0, 1);
+    const minSat = clamp(Number(options.minSat) || 0, 0, 1);
+    const minValue = clamp(Number(options.minValue) || 0, 0, 1);
+    const maxValue = clamp(Number(options.maxValue) || 1, minValue, 1);
+    const boosted = boostColorSaturation(base, satBoost);
+    const hsv = rgbToHsv(boosted);
+    return hsvToRgb255(
+      hsv.h,
+      Math.max(hsv.s, minSat),
+      clamp(Math.max(hsv.v, minValue), minValue, maxValue)
+    );
+  };
+  const tunePaletteArrayVibrancy = (palette = [], options = {}) => {
+    const src = Array.isArray(palette) ? palette : [];
+    const softEvery = Math.max(0, Math.round(Number(options.softEvery) || 0));
+    return src.map((color, index) => {
+      const softTone = softEvery > 0 && ((index + 1) % softEvery === 0);
+      return tunePaletteVibrancy(color, {
+        satBoost: softTone ? options.softSatBoost : options.satBoost,
+        minSat: softTone ? options.softMinSat : options.minSat,
+        minValue: softTone ? options.softMinValue : options.minValue,
+        maxValue: options.maxValue,
+        preserveNeutralBelow: options.preserveNeutralBelow
+      });
+    });
+  };
   const MAX_OVERCLOCK_LEVEL = 12;
   const DEFAULT_OVERCLOCK_LEVEL = clamp(
     Number(process.env.RAVE_DEFAULT_OVERCLOCK_LEVEL ?? 2),
@@ -458,7 +495,6 @@ module.exports = function createRaveEngine(controls) {
     FLOW_INTENSITY_MAX
   );
   let wizSceneSync = parseBool(process.env.RAVE_WIZ_SCENE_SYNC, true);
-  let legacyComponentsEnabled = parseBool(process.env.RAVE_LEGACY_COMPONENTS_ENABLED, false);
 
   /* =========================
      TELEMETRY
@@ -472,6 +508,14 @@ module.exports = function createRaveEngine(controls) {
     beatConfidence: 0,
     beatIntervalMs: 0,
     bpm: 0,
+    brightnessTier: "silent",
+    brightnessPercent: 0.05,
+    brightnessSourceLevel: 0,
+    hueBrightnessOut: 0,
+    wizBrightnessOut: 0,
+    onsetTempoBpm: 0,
+    onsetTempoConfidence: 0,
+    beatHintBpm: 0,
     phase: 0,
     behavior: "idle",
     scene: "idle_soft",
@@ -481,9 +525,15 @@ module.exports = function createRaveEngine(controls) {
     paletteColorsPerFamily: 3,
     paletteDisorder: false,
     paletteDisorderAggression: 0.35,
+    paletteCycleMode: "on_trigger",
+    paletteTimedIntervalSec: 5,
+    paletteBeatLock: false,
+    paletteBeatLockGraceSec: 2,
+    paletteReactiveMargin: 28,
+    paletteSpectrumMapMode: "auto",
+    paletteSpectrumFeatureMap: ["lows", "mids", "highs", "rms", "flux"],
     mode: "interpret",
     modeLock: "interpret",
-    legacyComponentsEnabled: legacyComponentsEnabled,
     overclockLevel: DEFAULT_OVERCLOCK_LEVEL,
     phrase: "neutral",
     drop: false,
@@ -2100,80 +2150,153 @@ module.exports = function createRaveEngine(controls) {
       { r: 170, g: 80,  b: 255 }
     ]
   };
+  const SOFT_WIZ_SCENE_KEYS = Object.freeze(new Set([
+    "idle_soft",
+    "flow_ambient",
+    "flow_sunset",
+    "flow_glacier",
+    "flow_media"
+  ]));
+  for (const [sceneKey, palette] of Object.entries(WIZ_PALETTES)) {
+    const softScene = SOFT_WIZ_SCENE_KEYS.has(sceneKey);
+    WIZ_PALETTES[sceneKey] = tunePaletteArrayVibrancy(palette, {
+      satBoost: softScene ? 0.34 : 0.44,
+      minSat: softScene ? 0.7 : 0.78,
+      minValue: 0.24,
+      maxValue: 1,
+      softEvery: softScene ? 3 : 4,
+      softSatBoost: 0.16,
+      softMinSat: 0.58,
+      softMinValue: 0.2,
+      preserveNeutralBelow: 0.1
+    });
+  }
+  for (const key of Object.keys(WIZ_PULSE_PALETTES)) {
+    WIZ_PULSE_PALETTES[key] = tunePaletteArrayVibrancy(WIZ_PULSE_PALETTES[key], {
+      satBoost: 0.52,
+      minSat: 0.84,
+      minValue: 0.28,
+      maxValue: 1,
+      softEvery: 0,
+      preserveNeutralBelow: 0.08
+    });
+  }
 
-  const MANUAL_PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5]);
+  const MANUAL_PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5, 8, 12]);
   const MANUAL_PALETTE_FAMILY_DEFS = Object.freeze({
-    blue: Object.freeze({
-      id: "blue",
-      label: "BLUE",
-      description: "Cool and stable spectrum from deep navy to icy cyan.",
-      colors: Object.freeze([
-        Object.freeze({ r: 6, g: 18, b: 96 }),
-        Object.freeze({ r: 8, g: 52, b: 156 }),
-        Object.freeze({ r: 16, g: 104, b: 224 }),
-        Object.freeze({ r: 34, g: 176, b: 255 }),
-        Object.freeze({ r: 132, g: 244, b: 255 })
-      ])
-    }),
-    purple: Object.freeze({
-      id: "purple",
-      label: "PURPLE",
-      description: "Distinct purple spectrum from deep indigo to electric violet.",
-      colors: Object.freeze([
-        Object.freeze({ r: 28, g: 8, b: 90 }),
-        Object.freeze({ r: 58, g: 16, b: 140 }),
-        Object.freeze({ r: 102, g: 28, b: 196 }),
-        Object.freeze({ r: 160, g: 58, b: 244 }),
-        Object.freeze({ r: 220, g: 120, b: 255 })
-      ])
-    }),
     red: Object.freeze({
       id: "red",
       label: "RED",
-      description: "Deep-to-hot red spectrum with no yellow drift.",
+      description: "Red-centered spectrum that expands into pink/magenta/purple at higher color counts.",
       colors: Object.freeze([
-        Object.freeze({ r: 70, g: 0, b: 8 }),
-        Object.freeze({ r: 126, g: 0, b: 16 }),
-        Object.freeze({ r: 186, g: 8, b: 26 }),
-        Object.freeze({ r: 236, g: 22, b: 44 }),
-        Object.freeze({ r: 255, g: 58, b: 96 })
+        Object.freeze({ r: 110, g: 0, b: 10 }),
+        Object.freeze({ r: 154, g: 0, b: 18 }),
+        Object.freeze({ r: 196, g: 8, b: 24 }),
+        Object.freeze({ r: 236, g: 22, b: 30 }),
+        Object.freeze({ r: 255, g: 52, b: 42 }),
+        Object.freeze({ r: 255, g: 84, b: 88 }),
+        Object.freeze({ r: 255, g: 74, b: 132 }),
+        Object.freeze({ r: 246, g: 58, b: 174 }),
+        Object.freeze({ r: 220, g: 50, b: 214 }),
+        Object.freeze({ r: 186, g: 56, b: 242 }),
+        Object.freeze({ r: 150, g: 58, b: 252 }),
+        Object.freeze({ r: 120, g: 46, b: 224 })
       ])
     }),
     green: Object.freeze({
       id: "green",
       label: "GREEN",
-      description: "Forest-to-neon green range for energetic rhythmic sweeps.",
+      description: "Green-centered spectrum that expands into lime/chartreuse and teal at higher color counts.",
       colors: Object.freeze([
-        Object.freeze({ r: 6, g: 56, b: 12 }),
-        Object.freeze({ r: 8, g: 104, b: 20 }),
-        Object.freeze({ r: 14, g: 156, b: 34 }),
-        Object.freeze({ r: 34, g: 214, b: 58 }),
-        Object.freeze({ r: 110, g: 255, b: 86 })
+        Object.freeze({ r: 6, g: 66, b: 10 }),
+        Object.freeze({ r: 8, g: 106, b: 14 }),
+        Object.freeze({ r: 14, g: 146, b: 22 }),
+        Object.freeze({ r: 28, g: 186, b: 30 }),
+        Object.freeze({ r: 56, g: 222, b: 42 }),
+        Object.freeze({ r: 96, g: 242, b: 38 }),
+        Object.freeze({ r: 142, g: 250, b: 30 }),
+        Object.freeze({ r: 190, g: 248, b: 24 }),
+        Object.freeze({ r: 136, g: 255, b: 86 }),
+        Object.freeze({ r: 74, g: 252, b: 138 }),
+        Object.freeze({ r: 30, g: 236, b: 186 }),
+        Object.freeze({ r: 18, g: 214, b: 220 })
       ])
     }),
-    yellow: Object.freeze({
-      id: "yellow",
-      label: "YELLOW",
-      description: "Gold-to-lemon yellow spectrum for clean warm contrast.",
+    blue: Object.freeze({
+      id: "blue",
+      label: "BLUE",
+      description: "Blue-centered spectrum that expands into cyan/indigo/violet at higher color counts.",
       colors: Object.freeze([
-        Object.freeze({ r: 86, g: 64, b: 0 }),
-        Object.freeze({ r: 146, g: 106, b: 0 }),
-        Object.freeze({ r: 206, g: 154, b: 0 }),
-        Object.freeze({ r: 250, g: 205, b: 14 }),
-        Object.freeze({ r: 255, g: 242, b: 70 })
+        Object.freeze({ r: 6, g: 14, b: 106 }),
+        Object.freeze({ r: 10, g: 36, b: 156 }),
+        Object.freeze({ r: 18, g: 72, b: 206 }),
+        Object.freeze({ r: 22, g: 114, b: 246 }),
+        Object.freeze({ r: 16, g: 156, b: 255 }),
+        Object.freeze({ r: 20, g: 198, b: 255 }),
+        Object.freeze({ r: 86, g: 236, b: 255 }),
+        Object.freeze({ r: 72, g: 126, b: 255 }),
+        Object.freeze({ r: 96, g: 110, b: 255 }),
+        Object.freeze({ r: 118, g: 98, b: 255 }),
+        Object.freeze({ r: 140, g: 86, b: 255 }),
+        Object.freeze({ r: 162, g: 76, b: 248 })
       ])
     })
   });
   const MANUAL_PALETTE_FAMILY_ALIASES = Object.freeze({
-    magenta: "purple",
-    amber: "yellow"
+    magenta: "red",
+    purple: "red",
+    pink: "red",
+    amber: "green",
+    yellow: "green",
+    lime: "green",
+    cyan: "blue",
+    aqua: "blue",
+    teal: "blue"
   });
   const MANUAL_PALETTE_FAMILY_IDS = Object.freeze(Object.keys(MANUAL_PALETTE_FAMILY_DEFS));
+  const MANUAL_PALETTE_CYCLE_MODE_ORDER = Object.freeze([
+    "on_trigger",
+    "timed_cycle",
+    "reactive_shift",
+    "spectrum_mapper"
+  ]);
+  const MANUAL_PALETTE_SPECTRUM_MAP_MODE_ORDER = Object.freeze(["auto", "manual"]);
+  const MANUAL_PALETTE_AUDIO_FEATURE_KEYS = Object.freeze([
+    "lows",
+    "mids",
+    "highs",
+    "rms",
+    "energy",
+    "flux",
+    "peaks",
+    "transients",
+    "beat"
+  ]);
+  const MANUAL_PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP = Object.freeze([
+    "lows",
+    "mids",
+    "highs",
+    "rms",
+    "flux"
+  ]);
+  const MANUAL_PALETTE_TIMED_INTERVAL_MIN_SEC = 2;
+  const MANUAL_PALETTE_TIMED_INTERVAL_MAX_SEC = 60;
+  const MANUAL_PALETTE_BEAT_LOCK_GRACE_MIN_SEC = 0;
+  const MANUAL_PALETTE_BEAT_LOCK_GRACE_MAX_SEC = 8;
+  const MANUAL_PALETTE_REACTIVE_MARGIN_MIN = 5;
+  const MANUAL_PALETTE_REACTIVE_MARGIN_MAX = 100;
   const DEFAULT_MANUAL_PALETTE_CONFIG = Object.freeze({
     colorsPerFamily: 3,
-    families: Object.freeze(["blue", "purple"]),
+    families: Object.freeze(["red", "green", "blue"]),
     disorder: false,
-    disorderAggression: 0.35
+    disorderAggression: 0.35,
+    cycleMode: "on_trigger",
+    timedIntervalSec: 5,
+    beatLock: false,
+    beatLockGraceSec: 2,
+    reactiveMargin: 28,
+    spectrumMapMode: "auto",
+    spectrumFeatureMap: MANUAL_PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
   });
   const MANUAL_PALETTE_SUPPORTED_BRANDS = Object.freeze(["hue", "wiz"]);
 
@@ -2186,7 +2309,9 @@ module.exports = function createRaveEngine(controls) {
   function normalizeManualPaletteColorCount(value, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily) {
     const parsed = Number(value);
     if (MANUAL_PALETTE_COLOR_COUNT_OPTIONS.includes(parsed)) return parsed;
-    return fallback;
+    const fallbackParsed = Number(fallback);
+    if (MANUAL_PALETTE_COLOR_COUNT_OPTIONS.includes(fallbackParsed)) return fallbackParsed;
+    return DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily;
   }
 
   function normalizeManualPaletteDisorderAggression(value, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.disorderAggression) {
@@ -2194,6 +2319,115 @@ module.exports = function createRaveEngine(controls) {
     if (!Number.isFinite(parsed)) return fallback;
     const normalized = parsed > 1 ? (parsed / 100) : parsed;
     return clamp(normalized, 0, 1);
+  }
+
+  function normalizeManualPaletteCycleMode(value, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.cycleMode) {
+    const key = String(value || "").trim().toLowerCase();
+    if (MANUAL_PALETTE_CYCLE_MODE_ORDER.includes(key)) return key;
+    const fallbackKey = String(fallback || "").trim().toLowerCase();
+    return MANUAL_PALETTE_CYCLE_MODE_ORDER.includes(fallbackKey)
+      ? fallbackKey
+      : DEFAULT_MANUAL_PALETTE_CONFIG.cycleMode;
+  }
+
+  function normalizeManualPaletteTimedIntervalSec(value, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.timedIntervalSec) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return clamp(
+        Math.round(parsed),
+        MANUAL_PALETTE_TIMED_INTERVAL_MIN_SEC,
+        MANUAL_PALETTE_TIMED_INTERVAL_MAX_SEC
+      );
+    }
+    const fallbackNum = Number(fallback);
+    if (Number.isFinite(fallbackNum)) {
+      return clamp(
+        Math.round(fallbackNum),
+        MANUAL_PALETTE_TIMED_INTERVAL_MIN_SEC,
+        MANUAL_PALETTE_TIMED_INTERVAL_MAX_SEC
+      );
+    }
+    return DEFAULT_MANUAL_PALETTE_CONFIG.timedIntervalSec;
+  }
+
+  function normalizeManualPaletteBeatLockGraceSec(value, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.beatLockGraceSec) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return clamp(
+        Math.round(parsed),
+        MANUAL_PALETTE_BEAT_LOCK_GRACE_MIN_SEC,
+        MANUAL_PALETTE_BEAT_LOCK_GRACE_MAX_SEC
+      );
+    }
+    const fallbackNum = Number(fallback);
+    if (Number.isFinite(fallbackNum)) {
+      return clamp(
+        Math.round(fallbackNum),
+        MANUAL_PALETTE_BEAT_LOCK_GRACE_MIN_SEC,
+        MANUAL_PALETTE_BEAT_LOCK_GRACE_MAX_SEC
+      );
+    }
+    return DEFAULT_MANUAL_PALETTE_CONFIG.beatLockGraceSec;
+  }
+
+  function normalizeManualPaletteReactiveMargin(value, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.reactiveMargin) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return clamp(
+        Math.round(parsed),
+        MANUAL_PALETTE_REACTIVE_MARGIN_MIN,
+        MANUAL_PALETTE_REACTIVE_MARGIN_MAX
+      );
+    }
+    const fallbackNum = Number(fallback);
+    if (Number.isFinite(fallbackNum)) {
+      return clamp(
+        Math.round(fallbackNum),
+        MANUAL_PALETTE_REACTIVE_MARGIN_MIN,
+        MANUAL_PALETTE_REACTIVE_MARGIN_MAX
+      );
+    }
+    return DEFAULT_MANUAL_PALETTE_CONFIG.reactiveMargin;
+  }
+
+  function normalizeManualPaletteSpectrumMapMode(value, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.spectrumMapMode) {
+    const key = String(value || "").trim().toLowerCase();
+    if (MANUAL_PALETTE_SPECTRUM_MAP_MODE_ORDER.includes(key)) return key;
+    const fallbackKey = String(fallback || "").trim().toLowerCase();
+    return MANUAL_PALETTE_SPECTRUM_MAP_MODE_ORDER.includes(fallbackKey)
+      ? fallbackKey
+      : DEFAULT_MANUAL_PALETTE_CONFIG.spectrumMapMode;
+  }
+
+  function normalizeManualPaletteAudioFeatureKey(value, fallback = MANUAL_PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP[0]) {
+    const key = String(value || "").trim().toLowerCase();
+    if (MANUAL_PALETTE_AUDIO_FEATURE_KEYS.includes(key)) return key;
+    const fallbackKey = String(fallback || "").trim().toLowerCase();
+    return MANUAL_PALETTE_AUDIO_FEATURE_KEYS.includes(fallbackKey)
+      ? fallbackKey
+      : MANUAL_PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP[0];
+  }
+
+  function normalizeManualPaletteSpectrumFeatureMap(value, fallback = MANUAL_PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP) {
+    const list = Array.isArray(value)
+      ? value
+      : String(value || "")
+        .split(",")
+        .map(part => part.trim())
+        .filter(Boolean);
+    const fallbackList = Array.isArray(fallback) && fallback.length
+      ? fallback
+      : MANUAL_PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP;
+    const out = [];
+    for (let i = 0; i < 5; i += 1) {
+      const raw = Object.prototype.hasOwnProperty.call(list, i)
+        ? list[i]
+        : fallbackList[i % fallbackList.length];
+      out.push(
+        normalizeManualPaletteAudioFeatureKey(raw, fallbackList[i % fallbackList.length])
+      );
+    }
+    return out;
   }
 
   function normalizeManualPaletteFamilies(rawFamilies, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.families) {
@@ -2214,7 +2448,7 @@ module.exports = function createRaveEngine(controls) {
     if (normalized.length > 0) return normalized;
     return Array.isArray(fallback) && fallback.length
       ? normalizeManualPaletteFamilies(fallback, MANUAL_PALETTE_FAMILY_IDS)
-      : ["blue"];
+      : ["red"];
   }
 
   function buildManualPaletteColorsForFamily(familyId, colorsPerFamily) {
@@ -2222,17 +2456,42 @@ module.exports = function createRaveEngine(controls) {
     if (!family) return [];
     const colors = Array.isArray(family.colors) ? family.colors.slice() : [];
     if (!colors.length) return [];
-    if (colorsPerFamily === 1) {
-      return [colors[Math.floor(colors.length / 2)]];
-    }
-    if (colorsPerFamily === 3) {
-      return [
-        colors[0],
-        colors[Math.floor(colors.length / 2)],
-        colors[Math.min(colors.length - 1, 4)]
-      ];
-    }
-    return colors.slice(0, 5);
+    const targetCount = normalizeManualPaletteColorCount(colorsPerFamily, DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily);
+    const pickEvenly = (pool, count) => {
+      if (!Array.isArray(pool) || !pool.length || count <= 0) return [];
+      if (count >= pool.length) return pool.slice();
+      if (count === 1) return [pool[Math.floor((pool.length - 1) / 2)]];
+      const out = [];
+      const used = new Set();
+      for (let i = 0; i < count; i += 1) {
+        const pos = (i * (pool.length - 1)) / (count - 1);
+        let idx = Math.round(pos);
+        idx = clamp(idx, 0, pool.length - 1);
+        while (used.has(idx) && idx < pool.length - 1) idx += 1;
+        while (used.has(idx) && idx > 0) idx -= 1;
+        if (used.has(idx)) continue;
+        used.add(idx);
+        out.push(pool[idx]);
+      }
+      return out.length ? out : pool.slice(0, count);
+    };
+    const corePalette = colors.slice(0, Math.min(5, colors.length));
+    const picked = targetCount <= corePalette.length
+      ? pickEvenly(corePalette, targetCount)
+      : pickEvenly(colors, Math.min(targetCount, colors.length));
+    const highDensity = targetCount >= 8;
+    const mediumDensity = targetCount >= 5 && targetCount < 8;
+    return tunePaletteArrayVibrancy(picked, {
+      satBoost: highDensity ? 0.46 : (mediumDensity ? 0.4 : 0.34),
+      minSat: highDensity ? 0.8 : (mediumDensity ? 0.76 : 0.72),
+      minValue: 0.26,
+      maxValue: 1,
+      softEvery: highDensity ? 5 : (mediumDensity ? 4 : 0),
+      softSatBoost: 0.14,
+      softMinSat: 0.56,
+      softMinValue: 0.22,
+      preserveNeutralBelow: 0.08
+    });
   }
 
   let manualPaletteColorsPerFamily = normalizeManualPaletteColorCount(
@@ -2251,10 +2510,40 @@ module.exports = function createRaveEngine(controls) {
     process.env.RAVE_MANUAL_PALETTE_DISORDER_AGGRESSION,
     DEFAULT_MANUAL_PALETTE_CONFIG.disorderAggression
   );
+  let manualPaletteCycleMode = normalizeManualPaletteCycleMode(
+    process.env.RAVE_MANUAL_PALETTE_CYCLE_MODE,
+    DEFAULT_MANUAL_PALETTE_CONFIG.cycleMode
+  );
+  let manualPaletteTimedIntervalSec = normalizeManualPaletteTimedIntervalSec(
+    process.env.RAVE_MANUAL_PALETTE_TIMED_INTERVAL_SEC,
+    DEFAULT_MANUAL_PALETTE_CONFIG.timedIntervalSec
+  );
+  let manualPaletteBeatLock = parseBool(
+    process.env.RAVE_MANUAL_PALETTE_BEAT_LOCK,
+    DEFAULT_MANUAL_PALETTE_CONFIG.beatLock
+  );
+  let manualPaletteBeatLockGraceSec = normalizeManualPaletteBeatLockGraceSec(
+    process.env.RAVE_MANUAL_PALETTE_BEAT_LOCK_GRACE_SEC,
+    DEFAULT_MANUAL_PALETTE_CONFIG.beatLockGraceSec
+  );
+  let manualPaletteReactiveMargin = normalizeManualPaletteReactiveMargin(
+    process.env.RAVE_MANUAL_PALETTE_REACTIVE_MARGIN,
+    DEFAULT_MANUAL_PALETTE_CONFIG.reactiveMargin
+  );
+  let manualPaletteSpectrumMapMode = normalizeManualPaletteSpectrumMapMode(
+    process.env.RAVE_MANUAL_PALETTE_SPECTRUM_MAP_MODE,
+    DEFAULT_MANUAL_PALETTE_CONFIG.spectrumMapMode
+  );
+  let manualPaletteSpectrumFeatureMap = normalizeManualPaletteSpectrumFeatureMap(
+    process.env.RAVE_MANUAL_PALETTE_SPECTRUM_FEATURE_MAP,
+    DEFAULT_MANUAL_PALETTE_CONFIG.spectrumFeatureMap
+  );
   const manualPaletteBrandOverrides = {
     hue: null,
     wiz: null
   };
+  const MANUAL_PALETTE_SEQUENCE_CACHE_MAX = 96;
+  const manualPaletteSequenceCache = new Map();
 
   function getManualPaletteCatalog() {
     return MANUAL_PALETTE_FAMILY_IDS.map(id => {
@@ -2272,7 +2561,14 @@ module.exports = function createRaveEngine(controls) {
       colorsPerFamily: manualPaletteColorsPerFamily,
       families: manualPaletteFamilies.slice(),
       disorder: Boolean(manualPaletteDisorder),
-      disorderAggression: manualPaletteDisorderAggression
+      disorderAggression: manualPaletteDisorderAggression,
+      cycleMode: manualPaletteCycleMode,
+      timedIntervalSec: manualPaletteTimedIntervalSec,
+      beatLock: Boolean(manualPaletteBeatLock),
+      beatLockGraceSec: manualPaletteBeatLockGraceSec,
+      reactiveMargin: manualPaletteReactiveMargin,
+      spectrumMapMode: manualPaletteSpectrumMapMode,
+      spectrumFeatureMap: manualPaletteSpectrumFeatureMap.slice()
     };
   }
 
@@ -2296,6 +2592,42 @@ module.exports = function createRaveEngine(controls) {
       disorderAggression: normalizeManualPaletteDisorderAggression(
         raw.disorderAggression,
         normalizeManualPaletteDisorderAggression(safeFallback.disorderAggression, DEFAULT_MANUAL_PALETTE_CONFIG.disorderAggression)
+      ),
+      cycleMode: normalizeManualPaletteCycleMode(raw.cycleMode, safeFallback.cycleMode),
+      timedIntervalSec: normalizeManualPaletteTimedIntervalSec(
+        raw.timedIntervalSec,
+        normalizeManualPaletteTimedIntervalSec(
+          safeFallback.timedIntervalSec,
+          DEFAULT_MANUAL_PALETTE_CONFIG.timedIntervalSec
+        )
+      ),
+      beatLock: Object.prototype.hasOwnProperty.call(raw, "beatLock")
+        ? parseBool(raw.beatLock, Boolean(safeFallback.beatLock))
+        : Boolean(safeFallback.beatLock),
+      beatLockGraceSec: normalizeManualPaletteBeatLockGraceSec(
+        raw.beatLockGraceSec,
+        normalizeManualPaletteBeatLockGraceSec(
+          safeFallback.beatLockGraceSec,
+          DEFAULT_MANUAL_PALETTE_CONFIG.beatLockGraceSec
+        )
+      ),
+      reactiveMargin: normalizeManualPaletteReactiveMargin(
+        raw.reactiveMargin,
+        normalizeManualPaletteReactiveMargin(
+          safeFallback.reactiveMargin,
+          DEFAULT_MANUAL_PALETTE_CONFIG.reactiveMargin
+        )
+      ),
+      spectrumMapMode: normalizeManualPaletteSpectrumMapMode(
+        raw.spectrumMapMode,
+        safeFallback.spectrumMapMode
+      ),
+      spectrumFeatureMap: normalizeManualPaletteSpectrumFeatureMap(
+        raw.spectrumFeatureMap,
+        normalizeManualPaletteSpectrumFeatureMap(
+          safeFallback.spectrumFeatureMap,
+          DEFAULT_MANUAL_PALETTE_CONFIG.spectrumFeatureMap
+        )
       )
     };
   }
@@ -2342,6 +2674,13 @@ module.exports = function createRaveEngine(controls) {
     telemetry.paletteColorsPerFamily = manualPaletteColorsPerFamily;
     telemetry.paletteDisorder = Boolean(manualPaletteDisorder);
     telemetry.paletteDisorderAggression = manualPaletteDisorderAggression;
+    telemetry.paletteCycleMode = manualPaletteCycleMode;
+    telemetry.paletteTimedIntervalSec = manualPaletteTimedIntervalSec;
+    telemetry.paletteBeatLock = Boolean(manualPaletteBeatLock);
+    telemetry.paletteBeatLockGraceSec = manualPaletteBeatLockGraceSec;
+    telemetry.paletteReactiveMargin = manualPaletteReactiveMargin;
+    telemetry.paletteSpectrumMapMode = manualPaletteSpectrumMapMode;
+    telemetry.paletteSpectrumFeatureMap = manualPaletteSpectrumFeatureMap.slice();
   }
 
   function setManualPaletteConfig(patch = {}) {
@@ -2378,6 +2717,42 @@ module.exports = function createRaveEngine(controls) {
           base.disorderAggression
         );
       }
+      if (Object.prototype.hasOwnProperty.call(next, "cycleMode")) {
+        updated.cycleMode = normalizeManualPaletteCycleMode(next.cycleMode, base.cycleMode);
+      }
+      if (Object.prototype.hasOwnProperty.call(next, "timedIntervalSec")) {
+        updated.timedIntervalSec = normalizeManualPaletteTimedIntervalSec(
+          next.timedIntervalSec,
+          base.timedIntervalSec
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(next, "beatLock")) {
+        updated.beatLock = parseBool(next.beatLock, Boolean(base.beatLock));
+      }
+      if (Object.prototype.hasOwnProperty.call(next, "beatLockGraceSec")) {
+        updated.beatLockGraceSec = normalizeManualPaletteBeatLockGraceSec(
+          next.beatLockGraceSec,
+          base.beatLockGraceSec
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(next, "reactiveMargin")) {
+        updated.reactiveMargin = normalizeManualPaletteReactiveMargin(
+          next.reactiveMargin,
+          base.reactiveMargin
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(next, "spectrumMapMode")) {
+        updated.spectrumMapMode = normalizeManualPaletteSpectrumMapMode(
+          next.spectrumMapMode,
+          base.spectrumMapMode
+        );
+      }
+      if (Object.prototype.hasOwnProperty.call(next, "spectrumFeatureMap")) {
+        updated.spectrumFeatureMap = normalizeManualPaletteSpectrumFeatureMap(
+          next.spectrumFeatureMap,
+          base.spectrumFeatureMap
+        );
+      }
       manualPaletteBrandOverrides[brandKey] = normalizeManualPaletteConfigSnapshot(
         updated,
         base
@@ -2407,8 +2782,165 @@ module.exports = function createRaveEngine(controls) {
         manualPaletteDisorderAggression
       );
     }
+    if (Object.prototype.hasOwnProperty.call(next, "cycleMode")) {
+      manualPaletteCycleMode = normalizeManualPaletteCycleMode(
+        next.cycleMode,
+        manualPaletteCycleMode
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "timedIntervalSec")) {
+      manualPaletteTimedIntervalSec = normalizeManualPaletteTimedIntervalSec(
+        next.timedIntervalSec,
+        manualPaletteTimedIntervalSec
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "beatLock")) {
+      manualPaletteBeatLock = parseBool(next.beatLock, manualPaletteBeatLock);
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "beatLockGraceSec")) {
+      manualPaletteBeatLockGraceSec = normalizeManualPaletteBeatLockGraceSec(
+        next.beatLockGraceSec,
+        manualPaletteBeatLockGraceSec
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "reactiveMargin")) {
+      manualPaletteReactiveMargin = normalizeManualPaletteReactiveMargin(
+        next.reactiveMargin,
+        manualPaletteReactiveMargin
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "spectrumMapMode")) {
+      manualPaletteSpectrumMapMode = normalizeManualPaletteSpectrumMapMode(
+        next.spectrumMapMode,
+        manualPaletteSpectrumMapMode
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "spectrumFeatureMap")) {
+      manualPaletteSpectrumFeatureMap = normalizeManualPaletteSpectrumFeatureMap(
+        next.spectrumFeatureMap,
+        manualPaletteSpectrumFeatureMap
+      );
+    }
     applyManualPaletteTelemetry();
     return getManualPaletteConfig();
+  }
+
+  function normalizeManualPaletteHueDeg(value) {
+    const hue = Number(value);
+    if (!Number.isFinite(hue)) return 0;
+    return ((hue % 360) + 360) % 360;
+  }
+
+  function hueDistanceCircularDeg(a, b) {
+    const aa = normalizeManualPaletteHueDeg(a);
+    const bb = normalizeManualPaletteHueDeg(b);
+    const delta = Math.abs(aa - bb);
+    return delta > 180 ? (360 - delta) : delta;
+  }
+
+  function rotateManualPaletteColors(colors = [], shift = 0) {
+    const list = Array.isArray(colors) ? colors.slice() : [];
+    const len = list.length;
+    if (len <= 1) return list;
+    const offset = ((Math.round(Number(shift) || 0) % len) + len) % len;
+    if (offset === 0) return list;
+    return list.slice(offset).concat(list.slice(0, offset));
+  }
+
+  function buildManualPaletteFamilyVariants(colors = []) {
+    const base = Array.isArray(colors) ? colors : [];
+    if (!base.length) return [];
+    const variants = [];
+    const seen = new Set();
+    const directions = [base.slice(), base.slice().reverse()];
+
+    const pushVariant = candidate => {
+      const normalized = candidate.map(color => ({
+        r: clamp255(color?.r),
+        g: clamp255(color?.g),
+        b: clamp255(color?.b)
+      }));
+      const fingerprint = normalized
+        .map(color => `${color.r},${color.g},${color.b}`)
+        .join("|");
+      if (!fingerprint || seen.has(fingerprint)) return;
+      const hues = normalized.map(color => normalizeManualPaletteHueDeg(rgbToHsv(color).h));
+      let internalScore = 0;
+      for (let i = 0; i < hues.length - 1; i += 1) {
+        internalScore += hueDistanceCircularDeg(hues[i], hues[i + 1]);
+      }
+      variants.push({
+        colors: normalized,
+        startHue: hues[0] || 0,
+        endHue: hues[hues.length - 1] || 0,
+        internalScore
+      });
+      seen.add(fingerprint);
+    };
+
+    for (const direction of directions) {
+      for (let offset = 0; offset < direction.length; offset += 1) {
+        pushVariant(rotateManualPaletteColors(direction, offset));
+      }
+    }
+
+    if (!variants.length) {
+      pushVariant(base);
+    }
+    return variants;
+  }
+
+  function orientManualPaletteFamiliesForOrderedFlow(familySegments = []) {
+    const segments = Array.isArray(familySegments)
+      ? familySegments.filter(segment => Array.isArray(segment) && segment.length > 0)
+      : [];
+    if (segments.length <= 1) {
+      return segments.map(segment => segment.slice());
+    }
+
+    const candidateSets = segments.map(segment => buildManualPaletteFamilyVariants(segment));
+    if (candidateSets.some(set => !Array.isArray(set) || !set.length)) {
+      return segments.map(segment => segment.slice());
+    }
+
+    const transitionWeight = 6.8;
+    const cycleClosureWeight = 7.2;
+    let bestScore = Number.POSITIVE_INFINITY;
+    let best = null;
+    const chosen = new Array(candidateSets.length);
+
+    const walk = (idx, score) => {
+      if (idx >= candidateSets.length) {
+        let total = score;
+        if (candidateSets.length > 1) {
+          const first = chosen[0];
+          const last = chosen[chosen.length - 1];
+          total += hueDistanceCircularDeg(last.endHue, first.startHue) * cycleClosureWeight;
+        }
+        if (total < bestScore) {
+          bestScore = total;
+          best = chosen.slice();
+        }
+        return;
+      }
+
+      for (const candidate of candidateSets[idx]) {
+        let nextScore = score + candidate.internalScore;
+        if (idx > 0) {
+          const prev = chosen[idx - 1];
+          nextScore += hueDistanceCircularDeg(prev.endHue, candidate.startHue) * transitionWeight;
+        }
+        if (nextScore >= bestScore) continue;
+        chosen[idx] = candidate;
+        walk(idx + 1, nextScore);
+      }
+    };
+
+    walk(0, 0);
+    if (!best || !best.length) {
+      return segments.map(segment => segment.slice());
+    }
+    return best.map(item => item.colors.slice());
   }
 
   function buildActiveManualPaletteSequence(config = null) {
@@ -2416,17 +2948,38 @@ module.exports = function createRaveEngine(controls) {
       config && typeof config === "object" ? config : getManualPaletteGlobalConfig(),
       getManualPaletteGlobalConfig()
     );
+    const cacheKey = [
+      String(normalizeManualPaletteColorCount(
+        paletteConfig.colorsPerFamily,
+        DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+      )),
+      normalizeManualPaletteFamilies(
+        paletteConfig.families,
+        DEFAULT_MANUAL_PALETTE_CONFIG.families
+      ).join(","),
+      paletteConfig.disorder ? "1" : "0"
+    ].join("|");
+    if (manualPaletteSequenceCache.has(cacheKey)) {
+      return manualPaletteSequenceCache.get(cacheKey).map(color => ({ ...color }));
+    }
+
     const sequence = [];
     const selectedFamilies = normalizeManualPaletteFamilies(
       paletteConfig.families,
       DEFAULT_MANUAL_PALETTE_CONFIG.families
     );
-    for (const familyId of selectedFamilies) {
-      const familyColors = buildManualPaletteColorsForFamily(
+    const familySegments = selectedFamilies
+      .map(familyId => buildManualPaletteColorsForFamily(
         familyId,
         paletteConfig.colorsPerFamily
-      );
-      for (const color of familyColors) {
+      ))
+      .filter(segment => Array.isArray(segment) && segment.length > 0);
+    const flowSegments = !paletteConfig.disorder && familySegments.length >= 2
+      ? orientManualPaletteFamiliesForOrderedFlow(familySegments)
+      : familySegments;
+
+    for (const segment of flowSegments) {
+      for (const color of segment) {
         sequence.push({
           r: clamp255(color.r),
           g: clamp255(color.g),
@@ -2435,7 +2988,7 @@ module.exports = function createRaveEngine(controls) {
       }
     }
     if (!sequence.length) {
-      const fallback = buildManualPaletteColorsForFamily("blue", 3);
+      const fallback = buildManualPaletteColorsForFamily("red", 3);
       for (const color of fallback) {
         sequence.push({
           r: clamp255(color.r),
@@ -2444,7 +2997,33 @@ module.exports = function createRaveEngine(controls) {
         });
       }
     }
+    manualPaletteSequenceCache.set(cacheKey, sequence.map(color => ({ ...color })));
+    while (manualPaletteSequenceCache.size > MANUAL_PALETTE_SEQUENCE_CACHE_MAX) {
+      const firstKey = manualPaletteSequenceCache.keys().next().value;
+      manualPaletteSequenceCache.delete(firstKey);
+    }
     return sequence;
+  }
+
+  function getManualPaletteGroupSize(config = null, length = 1) {
+    const normalizedConfig = normalizeManualPaletteConfigSnapshot(
+      config && typeof config === "object" ? config : getManualPaletteGlobalConfig(),
+      getManualPaletteGlobalConfig()
+    );
+    const requestedSize = normalizeManualPaletteColorCount(
+      normalizedConfig.colorsPerFamily,
+      DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+    );
+    const len = Math.max(1, Number(length) || 1);
+    return clamp(requestedSize, 1, len);
+  }
+
+  function normalizeManualPaletteGroupBase(index, length, groupSize) {
+    const len = Math.max(1, Number(length) || 1);
+    const size = clamp(Math.round(Number(groupSize) || 1), 1, len);
+    const base = ((Number(index) || 0) % len + len) % len;
+    const group = Math.floor(base / size);
+    return clamp(group * size, 0, Math.max(0, len - 1));
   }
 
   function pickManualPaletteNextIndex(currentIndex, length, paletteConfig = null, options = {}) {
@@ -2455,6 +3034,16 @@ module.exports = function createRaveEngine(controls) {
       paletteConfig && typeof paletteConfig === "object" ? paletteConfig : getManualPaletteGlobalConfig(),
       getManualPaletteGlobalConfig()
     );
+    const scope = String(options?.scope || "color").trim().toLowerCase();
+    if (scope === "group") {
+      const groupSize = getManualPaletteGroupSize(config, len);
+      const groupCount = Math.max(1, Math.ceil(len / groupSize));
+      if (groupCount <= 1) return 0;
+      const currentGroup = clamp(Math.floor(base / groupSize), 0, groupCount - 1);
+      const step = Boolean(options?.isDrop) && groupCount > 2 ? 2 : 1;
+      const nextGroup = (currentGroup + step) % groupCount;
+      return normalizeManualPaletteGroupBase(nextGroup * groupSize, len, groupSize);
+    }
     if (!config.disorder) return (base + 1) % len;
     const isBeat = Boolean(options.isBeat);
     const isDrop = Boolean(options.isDrop);
@@ -2472,6 +3061,367 @@ module.exports = function createRaveEngine(controls) {
     const directionBias = clamp(0.52 + aggression * 0.2, 0.5, 0.82);
     const direction = Math.random() < directionBias ? 1 : -1;
     return ((base + (jump * direction)) % len + len) % len;
+  }
+
+  function getManualPaletteRuntimeFingerprint(config = null) {
+    const normalized = normalizeManualPaletteConfigSnapshot(
+      config && typeof config === "object" ? config : getManualPaletteGlobalConfig(),
+      getManualPaletteGlobalConfig()
+    );
+    return [
+      String(normalized.colorsPerFamily),
+      normalizeManualPaletteFamilies(normalized.families, DEFAULT_MANUAL_PALETTE_CONFIG.families).join(","),
+      normalized.disorder ? "1" : "0",
+      String(Math.round(normalizeManualPaletteDisorderAggression(normalized.disorderAggression, 0.35) * 1000)),
+      normalizeManualPaletteCycleMode(normalized.cycleMode, DEFAULT_MANUAL_PALETTE_CONFIG.cycleMode),
+      String(normalizeManualPaletteTimedIntervalSec(normalized.timedIntervalSec, DEFAULT_MANUAL_PALETTE_CONFIG.timedIntervalSec)),
+      normalized.beatLock ? "1" : "0",
+      String(normalizeManualPaletteBeatLockGraceSec(normalized.beatLockGraceSec, DEFAULT_MANUAL_PALETTE_CONFIG.beatLockGraceSec)),
+      String(normalizeManualPaletteReactiveMargin(normalized.reactiveMargin, DEFAULT_MANUAL_PALETTE_CONFIG.reactiveMargin)),
+      normalizeManualPaletteSpectrumMapMode(normalized.spectrumMapMode, DEFAULT_MANUAL_PALETTE_CONFIG.spectrumMapMode),
+      normalizeManualPaletteSpectrumFeatureMap(normalized.spectrumFeatureMap, DEFAULT_MANUAL_PALETTE_CONFIG.spectrumFeatureMap).join(",")
+    ].join("|");
+  }
+
+  function getManualPaletteCycleState(brandKey) {
+    const key = normalizeManualPaletteBrandKey(brandKey);
+    if (!key) return null;
+    const state = manualPaletteCycleStateByBrand[key];
+    return state && typeof state === "object" ? state : null;
+  }
+
+  function normalizeManualPaletteSignalValue(value, min = 0, max = 1, fallback = 0) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return clamp(n, min, max);
+  }
+
+  function buildManualPaletteCycleSignal(sceneName = "", isBeat = false, isDrop = false) {
+    return {
+      nowMs: Date.now(),
+      bpm: normalizeManualPaletteSignalValue(telemetry.bpm, 0, 260, 0),
+      energy: normalizeManualPaletteSignalValue(telemetry.energy, 0, 1, 0),
+      rms: normalizeManualPaletteSignalValue(
+        telemetry.audioSourceLevel ?? telemetry.rms,
+        0,
+        1,
+        0
+      ),
+      lows: normalizeManualPaletteSignalValue(audioBandLow, 0, 1, 0),
+      mids: normalizeManualPaletteSignalValue(audioBandMid, 0, 1, 0),
+      highs: normalizeManualPaletteSignalValue(audioBandHigh, 0, 1, 0),
+      flux: normalizeManualPaletteSignalValue(audioFlux, 0, 1, 0),
+      peaks: normalizeManualPaletteSignalValue(audioPeak, 0, 1.5, 0) / 1.5,
+      transients: normalizeManualPaletteSignalValue(audioTransient, 0, 1.2, 0) / 1.2,
+      beat: normalizeManualPaletteSignalValue(
+        telemetry.beatConfidence,
+        0,
+        1,
+        (isBeat || isDrop) ? 0.62 : 0
+      ),
+      phrase: String(telemetry.phrase || "").trim().toLowerCase(),
+      scene: String(sceneName || telemetry.scene || "").trim().toLowerCase()
+    };
+  }
+
+  function getManualPaletteCycleSignalFeatureValue(signal = {}, feature = "rms") {
+    const key = normalizeManualPaletteAudioFeatureKey(feature, "rms");
+    if (key === "lows") return normalizeManualPaletteSignalValue(signal.lows, 0, 1, 0);
+    if (key === "mids") return normalizeManualPaletteSignalValue(signal.mids, 0, 1, 0);
+    if (key === "highs") return normalizeManualPaletteSignalValue(signal.highs, 0, 1, 0);
+    if (key === "energy") return normalizeManualPaletteSignalValue(signal.energy, 0, 1, 0);
+    if (key === "flux") return normalizeManualPaletteSignalValue(signal.flux, 0, 1, 0);
+    if (key === "peaks") return normalizeManualPaletteSignalValue(signal.peaks, 0, 1, 0);
+    if (key === "transients") return normalizeManualPaletteSignalValue(signal.transients, 0, 1, 0);
+    if (key === "beat") return normalizeManualPaletteSignalValue(signal.beat, 0, 1, 0);
+    return normalizeManualPaletteSignalValue(signal.rms, 0, 1, 0);
+  }
+
+  function resolveManualPaletteSpectrumFeatureMap(config = {}) {
+    const mode = normalizeManualPaletteSpectrumMapMode(
+      config.spectrumMapMode,
+      DEFAULT_MANUAL_PALETTE_CONFIG.spectrumMapMode
+    );
+    if (mode === "manual") {
+      return normalizeManualPaletteSpectrumFeatureMap(
+        config.spectrumFeatureMap,
+        DEFAULT_MANUAL_PALETTE_CONFIG.spectrumFeatureMap
+      );
+    }
+    return DEFAULT_MANUAL_PALETTE_CONFIG.spectrumFeatureMap.slice();
+  }
+
+  function pickManualPaletteSpectrumIndex(length, config = {}, signal = {}, state = {}) {
+    const len = Math.max(1, Number(length) || 1);
+    if (len <= 1) return 0;
+    const featureMap = resolveManualPaletteSpectrumFeatureMap(config);
+    const values = [];
+    for (let i = 0; i < len; i += 1) {
+      const feature = featureMap[i % featureMap.length];
+      values.push(getManualPaletteCycleSignalFeatureValue(signal, feature));
+    }
+    let bestIndex = 0;
+    let bestValue = values[0] || 0;
+    for (let i = 1; i < values.length; i += 1) {
+      if (values[i] > bestValue) {
+        bestValue = values[i];
+        bestIndex = i;
+      }
+    }
+    const rawPreviousIndex = Number(state.lastSpectrumIndex);
+    const previousIndex = Number.isFinite(rawPreviousIndex)
+      ? clamp(Math.round(rawPreviousIndex), 0, len - 1)
+      : 0;
+    const previousValue = values[previousIndex] || 0;
+    if ((bestValue - previousValue) < 0.05) {
+      return previousIndex;
+    }
+    return bestIndex;
+  }
+
+  function shouldAdvanceManualPaletteTimed(state = {}, config = {}, options = {}, signal = {}) {
+    const nowMs = Number(signal.nowMs || Date.now());
+    const intervalMs = normalizeManualPaletteTimedIntervalSec(
+      config.timedIntervalSec,
+      DEFAULT_MANUAL_PALETTE_CONFIG.timedIntervalSec
+    ) * 1000;
+    if (!(Number(state.lastAdvanceAt) > 0)) {
+      state.lastAdvanceAt = nowMs;
+      state.waitStartAt = 0;
+      return false;
+    }
+    const dueAt = Number(state.lastAdvanceAt) + intervalMs;
+    if (nowMs < dueAt) {
+      state.waitStartAt = 0;
+      return false;
+    }
+    const beatLock = parseBool(config.beatLock, false) === true;
+    if (!beatLock) {
+      state.waitStartAt = 0;
+      state.lastAdvanceAt = nowMs;
+      return true;
+    }
+    if (Boolean(options.isBeat) || Boolean(options.isDrop)) {
+      state.waitStartAt = 0;
+      state.lastAdvanceAt = nowMs;
+      return true;
+    }
+    const graceMs = normalizeManualPaletteBeatLockGraceSec(
+      config.beatLockGraceSec,
+      DEFAULT_MANUAL_PALETTE_CONFIG.beatLockGraceSec
+    ) * 1000;
+    if (!(Number(state.waitStartAt) > 0)) {
+      state.waitStartAt = dueAt;
+    }
+    if ((nowMs - Number(state.waitStartAt)) >= graceMs) {
+      state.waitStartAt = 0;
+      state.lastAdvanceAt = nowMs;
+      return true;
+    }
+    return false;
+  }
+
+  function computeManualPaletteReactiveShiftScore(currentSignal = {}, previousSignal = {}, options = {}, reactiveMargin = DEFAULT_MANUAL_PALETTE_CONFIG.reactiveMargin) {
+    const margin = normalizeManualPaletteReactiveMargin(
+      reactiveMargin,
+      DEFAULT_MANUAL_PALETTE_CONFIG.reactiveMargin
+    );
+    const marginNorm = clamp(
+      (margin - MANUAL_PALETTE_REACTIVE_MARGIN_MIN) /
+      Math.max(1, MANUAL_PALETTE_REACTIVE_MARGIN_MAX - MANUAL_PALETTE_REACTIVE_MARGIN_MIN),
+      0,
+      1
+    );
+    const sensitivityBoost = 1.62 - (marginNorm * 0.9);
+    const bpmScale = Math.max(4, 6 + (margin * 0.34));
+    const bpmDelta = Math.abs(Number(currentSignal.bpm || 0) - Number(previousSignal.bpm || 0)) / bpmScale;
+    const energyDelta = Math.abs(Number(currentSignal.energy || 0) - Number(previousSignal.energy || 0));
+    const fluxDelta = Math.abs(Number(currentSignal.flux || 0) - Number(previousSignal.flux || 0));
+    const bandDelta = Math.max(
+      Math.abs(Number(currentSignal.lows || 0) - Number(previousSignal.lows || 0)),
+      Math.abs(Number(currentSignal.mids || 0) - Number(previousSignal.mids || 0)),
+      Math.abs(Number(currentSignal.highs || 0) - Number(previousSignal.highs || 0))
+    );
+    const phraseShift = currentSignal.phrase && previousSignal.phrase && currentSignal.phrase !== previousSignal.phrase
+      ? 0.86
+      : 0;
+    const sceneShift = currentSignal.scene && previousSignal.scene && currentSignal.scene !== previousSignal.scene
+      ? 0.52
+      : 0;
+    const eventBoost = options.isDrop
+      ? 0.66
+      : (options.isBeat ? 0.24 : 0);
+    const score = (
+      (bpmDelta * 1.08) +
+      (energyDelta * 1.8 * sensitivityBoost) +
+      (fluxDelta * 1.45 * sensitivityBoost) +
+      (bandDelta * 1.24 * sensitivityBoost) +
+      phraseShift +
+      sceneShift +
+      eventBoost
+    );
+    const threshold = 1.04 + (marginNorm * 0.84);
+    return { score, threshold };
+  }
+
+  function shouldAdvanceManualPaletteReactive(state = {}, config = {}, options = {}, signal = {}) {
+    const nowMs = Number(signal.nowMs || Date.now());
+    const previousSignal = state.lastSignal && typeof state.lastSignal === "object"
+      ? state.lastSignal
+      : null;
+    state.lastSignal = {
+      bpm: normalizeManualPaletteSignalValue(signal.bpm, 0, 260, 0),
+      energy: normalizeManualPaletteSignalValue(signal.energy, 0, 1, 0),
+      lows: normalizeManualPaletteSignalValue(signal.lows, 0, 1, 0),
+      mids: normalizeManualPaletteSignalValue(signal.mids, 0, 1, 0),
+      highs: normalizeManualPaletteSignalValue(signal.highs, 0, 1, 0),
+      flux: normalizeManualPaletteSignalValue(signal.flux, 0, 1, 0),
+      phrase: String(signal.phrase || "").trim().toLowerCase(),
+      scene: String(signal.scene || "").trim().toLowerCase()
+    };
+    if (!previousSignal) {
+      state.lastAdvanceAt = nowMs;
+      return false;
+    }
+    const margin = normalizeManualPaletteReactiveMargin(
+      config.reactiveMargin,
+      DEFAULT_MANUAL_PALETTE_CONFIG.reactiveMargin
+    );
+    const cooldownMs = 260 + Math.round(margin * 7.2);
+    if ((nowMs - Number(state.lastAdvanceAt || 0)) < cooldownMs) {
+      return false;
+    }
+    const scored = computeManualPaletteReactiveShiftScore(signal, previousSignal, options, margin);
+    if (scored.score >= scored.threshold) {
+      state.lastAdvanceAt = nowMs;
+      return true;
+    }
+    return false;
+  }
+
+  function resolveManualPaletteIndexForEmit(brandKey, currentIndex, length, paletteConfig = null, options = {}) {
+    const len = Math.max(1, Number(length) || 1);
+    const baseIndex = ((Number(currentIndex) || 0) % len + len) % len;
+    if (len <= 1) {
+      return { emitIndex: 0, index: 0, advanced: false };
+    }
+    const state = getManualPaletteCycleState(brandKey);
+    if (!state) {
+      return { emitIndex: baseIndex, index: baseIndex, advanced: false };
+    }
+    const config = normalizeManualPaletteConfigSnapshot(
+      paletteConfig && typeof paletteConfig === "object" ? paletteConfig : getManualPaletteConfigForBrand(brandKey),
+      getManualPaletteConfigForBrand(brandKey)
+    );
+    const groupSize = getManualPaletteGroupSize(config, len);
+    const groupCount = Math.max(1, Math.ceil(len / groupSize));
+    const signal = buildManualPaletteCycleSignal(options.sceneName, options.isBeat, options.isDrop);
+    const fingerprint = getManualPaletteRuntimeFingerprint(config);
+    if (state.fingerprint !== fingerprint || Number(state.length) !== len) {
+      state.index = normalizeManualPaletteGroupBase(baseIndex, len, groupSize);
+      state.colorOffset = 0;
+      state.length = len;
+      state.fingerprint = fingerprint;
+      state.lastAdvanceAt = signal.nowMs;
+      state.waitStartAt = 0;
+      state.lastSignal = null;
+      state.lastSpectrumIndex = clamp(Math.floor(state.index / groupSize), 0, Math.max(0, groupCount - 1));
+    }
+    let index = normalizeManualPaletteGroupBase(state.index, len, groupSize);
+    const mode = normalizeManualPaletteCycleMode(config.cycleMode, DEFAULT_MANUAL_PALETTE_CONFIG.cycleMode);
+    const orderedOffsetStep = Boolean(options.isDrop) && groupSize > 2 ? 2 : 1;
+    const applyGroupColorOffset = () => {
+      const groupSpan = Math.max(1, Math.min(groupSize, len - index));
+      let offset = clamp(Math.round(Number(state.colorOffset) || 0), 0, Math.max(0, groupSpan - 1));
+      if (groupSpan > 1) {
+        if (config.disorder) {
+          const aggression = clamp(config.disorderAggression, 0, 1);
+          const randomChance = clamp(
+            0.22 + aggression * 0.56 + (options.isBeat ? 0.08 : 0) + (options.isDrop ? 0.14 : 0),
+            0.12,
+            0.98
+          );
+          if (Math.random() < randomChance) {
+            offset = Math.floor(Math.random() * groupSpan);
+          }
+        } else {
+          offset = (offset + orderedOffsetStep) % groupSpan;
+        }
+      } else {
+        offset = 0;
+      }
+      state.colorOffset = offset;
+      return normalizeManualPaletteGroupBase(index, len, groupSize) + offset;
+    };
+
+    if (mode === "spectrum_mapper") {
+      const groupIndex = pickManualPaletteSpectrumIndex(groupCount, config, signal, state);
+      index = normalizeManualPaletteGroupBase(groupIndex * groupSize, len, groupSize);
+      state.index = index;
+      state.lastSpectrumIndex = clamp(groupIndex, 0, Math.max(0, groupCount - 1));
+      state.lastAdvanceAt = signal.nowMs;
+      const emitIndex = applyGroupColorOffset();
+      return {
+        emitIndex,
+        index,
+        advanced: index !== normalizeManualPaletteGroupBase(baseIndex, len, groupSize)
+      };
+    }
+
+    if (mode === "timed_cycle") {
+      const shouldAdvance = shouldAdvanceManualPaletteTimed(state, config, options, signal);
+      if (shouldAdvance) {
+        const steps = clamp(Math.round(Number(options.advanceStep) || 1), 1, 4);
+        for (let i = 0; i < steps; i += 1) {
+          index = pickManualPaletteNextIndex(index, len, config, { ...options, scope: "group" });
+        }
+        state.index = index;
+      }
+      const emitIndex = applyGroupColorOffset();
+      return {
+        emitIndex,
+        index,
+        advanced: shouldAdvance
+      };
+    }
+
+    if (mode === "reactive_shift") {
+      const shouldAdvance = shouldAdvanceManualPaletteReactive(state, config, options, signal);
+      if (shouldAdvance) {
+        const steps = clamp(Math.round(Number(options.advanceStep) || 1), 1, 4);
+        for (let i = 0; i < steps; i += 1) {
+          index = pickManualPaletteNextIndex(index, len, config, { ...options, scope: "group" });
+        }
+        state.index = index;
+        state.lastSpectrumIndex = clamp(Math.floor(index / groupSize), 0, Math.max(0, groupCount - 1));
+      }
+      const emitIndex = applyGroupColorOffset();
+      return {
+        emitIndex,
+        index,
+        advanced: shouldAdvance
+      };
+    }
+
+    // on_trigger: advance palette group on trigger events while still moving within active group.
+    let advanced = false;
+    const triggerHint = Boolean(options.triggerHint);
+    if (triggerHint) {
+      const steps = clamp(Math.round(Number(options.advanceStep) || 1), 1, 4);
+      for (let i = 0; i < steps; i += 1) {
+        index = pickManualPaletteNextIndex(index, len, config, { ...options, scope: "group" });
+      }
+      state.index = index;
+      state.lastAdvanceAt = signal.nowMs;
+      state.lastSpectrumIndex = clamp(Math.floor(index / groupSize), 0, Math.max(0, groupCount - 1));
+      advanced = true;
+    }
+    const emitIndex = applyGroupColorOffset();
+    return {
+      emitIndex,
+      index,
+      advanced
+    };
   }
 
   applyManualPaletteTelemetry();
@@ -5525,27 +6475,38 @@ module.exports = function createRaveEngine(controls) {
   let wizBeatPulse = 0;
   let lastWizBeatAt = 0;
   let wizBeatStep = 0;
+  let lastWizPaletteAdvanceAt = 0;
   let hueBrightnessSmoothed = 96;
   let wizBrightnessSmoothed = 0.2;
+  let brightnessLevelFloorEma = 0.004;
+  let brightnessLevelCeilEma = 0.16;
+  let brightnessPresenceHold = 0;
+  let brightnessPercentSmoothed = 0.05;
+  let brightnessDriveEma = 0;
+  let brightnessSilentFrames = 0;
   let lastWizScene = null;
-  const WIZ_SLOW_SCENES = new Set([
-    "flow_ambient",
-    "flow_house",
-    "flow_pop",
-    "flow_rnb",
-    "flow_media",
-    "flow_sunset",
-    "flow_glacier"
-  ]);
-  const WIZ_AGGRESSIVE_SCENES = new Set([
-    "flow_metal",
-    "flow_dnb",
-    "flow_techno",
-    "flow_rock",
-    "flow_storm",
-    "flow_cyberpunk"
-  ]);
-  const WIZ_TRANCE_LIKE_SCENES = new Set(["flow_trance", "flow_edm", "flow_cyberpunk"]);
+  const manualPaletteCycleStateByBrand = {
+    hue: {
+      index: 0,
+      colorOffset: 0,
+      fingerprint: "",
+      length: 0,
+      lastAdvanceAt: 0,
+      waitStartAt: 0,
+      lastSignal: null,
+      lastSpectrumIndex: 0
+    },
+    wiz: {
+      index: 0,
+      colorOffset: 0,
+      fingerprint: "",
+      length: 0,
+      lastAdvanceAt: 0,
+      waitStartAt: 0,
+      lastSignal: null,
+      lastSpectrumIndex: 0
+    }
+  };
   const WIZ_FLOW_DESYNC_ALIAS = Object.freeze({
     flow_wash: "flow_house",
     flow_edm: "flow_trance",
@@ -5600,136 +6561,346 @@ module.exports = function createRaveEngine(controls) {
     return HZ_INTERVALS.normal;
   }
 
+  function getRawMusicBody() {
+    const baseline = clamp(
+      Math.max(
+        audio,
+        audioRms * 0.96,
+        energy * 0.84
+      ),
+      0,
+      1
+    );
+    const drums = clamp(
+      audioBandLow * 0.58 +
+      audioTransient * 0.27 +
+      audioFlux * 0.15,
+      0,
+      1
+    );
+    const mids = clamp(audioBandMid * 0.72 + audioBandHigh * 0.28, 0, 1);
+    const beat = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
+    const body = clamp(
+      Math.max(
+        baseline * 0.78 + drums * 0.34,
+        baseline * 0.62 + drums * 0.28 + mids * 0.16,
+        drums * 0.84,
+        beat * 0.66
+      ),
+      0,
+      1
+    );
+    return {
+      baseline,
+      drums,
+      mids,
+      beat,
+      body
+    };
+  }
+
+  const BRIGHTNESS_TIER_MIN = 0.06;
+  const BRIGHTNESS_TIER_LOW = 0.40;
+  const BRIGHTNESS_TIER_MEDIUM = 0.70;
+  const BRIGHTNESS_TIER_HIGH = 1.00;
+
+  function getVolumeBrightnessTier() {
+    const smoothStep = (a, b, x) => {
+      const t = clamp((x - a) / Math.max(1e-6, (b - a)), 0, 1);
+      return t * t * (3 - 2 * t);
+    };
+    const sourceLevelRaw = clamp(
+      Math.max(
+        audio * 0.62 + audioRms * 0.38,
+        audioRms * 0.96,
+        Number(telemetry.audioSourceLevel || 0)
+      ),
+      0,
+      1
+    );
+    const presenceEvidence = clamp(
+      Math.max(
+        audioTransient * 0.9,
+        audioFlux * 0.84,
+        Number(telemetry.beatConfidence || 0) * 0.88,
+        audioBandLow * 0.78,
+        audioBandMid * 0.62,
+        energy * 0.54
+      ),
+      0,
+      1
+    );
+    const floorAlpha = sourceLevelRaw <= brightnessLevelFloorEma ? 0.22 : 0.015;
+    const ceilAlpha = sourceLevelRaw >= brightnessLevelCeilEma ? 0.2 : 0.02;
+    brightnessLevelFloorEma = lerp(brightnessLevelFloorEma, sourceLevelRaw, floorAlpha);
+    brightnessLevelCeilEma = lerp(brightnessLevelCeilEma, sourceLevelRaw, ceilAlpha);
+    if (brightnessLevelCeilEma < (brightnessLevelFloorEma + 0.06)) {
+      brightnessLevelCeilEma = brightnessLevelFloorEma + 0.06;
+    }
+    const dynamicLevel = clamp(
+      (sourceLevelRaw - (brightnessLevelFloorEma + 0.0035)) /
+      Math.max(0.05, brightnessLevelCeilEma - brightnessLevelFloorEma),
+      0,
+      1
+    );
+    brightnessPresenceHold = Math.max(
+      presenceEvidence,
+      brightnessPresenceHold * (presenceEvidence > brightnessPresenceHold ? 0.97 : 0.92)
+    );
+    const rhythmicPresence = clamp(
+      Math.max(
+        dynamicLevel * 0.72 + presenceEvidence * 0.28,
+        sourceLevelRaw * 0.48 + dynamicLevel * 0.26 + presenceEvidence * 0.26,
+        presenceEvidence * 0.82
+      ),
+      0,
+      1
+    );
+    brightnessDriveEma = lerp(
+      brightnessDriveEma,
+      rhythmicPresence,
+      rhythmicPresence > brightnessDriveEma ? 0.2 : 0.075
+    );
+    const absoluteSilentEdge = 0.004;
+    const silentCandidate =
+      sourceLevelRaw <= absoluteSilentEdge &&
+      presenceEvidence < 0.045 &&
+      dynamicLevel < 0.05 &&
+      brightnessDriveEma < 0.075;
+    brightnessSilentFrames = silentCandidate ? (brightnessSilentFrames + 1) : 0;
+    const sustainedSilent = brightnessSilentFrames >= 12;
+    const sourceLevel = sustainedSilent
+      ? 0
+      : clamp(
+        Math.max(
+          dynamicLevel * 0.74 + brightnessDriveEma * 0.26,
+          sourceLevelRaw * 0.28 + presenceEvidence * 0.36 + brightnessPresenceHold * 0.36
+        ),
+        0,
+        1
+      );
+    const effectiveLevel = sustainedSilent
+      ? 0
+      : clamp(
+        Math.max(
+          sourceLevel,
+          sourceLevelRaw * 0.42 + dynamicLevel * 0.36 + brightnessPresenceHold * 0.22
+        ),
+        0,
+        1
+      );
+    let percent = BRIGHTNESS_TIER_MIN;
+    if (effectiveLevel <= 0.05) {
+      percent = BRIGHTNESS_TIER_MIN;
+    } else if (effectiveLevel <= 0.34) {
+      percent = lerp(
+        BRIGHTNESS_TIER_MIN,
+        BRIGHTNESS_TIER_LOW,
+        smoothStep(0.05, 0.34, effectiveLevel)
+      );
+    } else if (effectiveLevel <= 0.78) {
+      percent = lerp(
+        BRIGHTNESS_TIER_LOW,
+        BRIGHTNESS_TIER_MEDIUM,
+        smoothStep(0.34, 0.78, effectiveLevel)
+      );
+    } else {
+      percent = lerp(
+        BRIGHTNESS_TIER_MEDIUM,
+        BRIGHTNESS_TIER_HIGH,
+        smoothStep(0.78, 1, effectiveLevel)
+      );
+    }
+
+    const peakLevel = clamp(
+      Math.max(
+        presenceEvidence * 0.88 + dynamicLevel * 0.12,
+        sourceLevelRaw * 0.26 + dynamicLevel * 0.74,
+        telemetry.drop ? 1 : 0
+      ),
+      0,
+      1
+    );
+    if (peakLevel > 0.8) {
+      const peakBoost = lerp(
+        BRIGHTNESS_TIER_MEDIUM,
+        BRIGHTNESS_TIER_HIGH,
+        smoothStep(0.8, 1, peakLevel)
+      );
+      percent = Math.max(percent, peakBoost);
+    }
+
+    const rawPercent = clamp(percent, BRIGHTNESS_TIER_MIN, BRIGHTNESS_TIER_HIGH);
+    const percentAlpha = rawPercent >= brightnessPercentSmoothed
+      ? clamp(0.18 + peakLevel * 0.1, 0.14, 0.32)
+      : (sustainedSilent ? 0.18 : 0.085);
+    brightnessPercentSmoothed = lerp(brightnessPercentSmoothed, rawPercent, percentAlpha);
+    const resolvedPercent = clamp(brightnessPercentSmoothed, BRIGHTNESS_TIER_MIN, BRIGHTNESS_TIER_HIGH);
+    const previousTier = String(telemetry.brightnessTier || "silent").trim().toLowerCase();
+    const silentThreshold = previousTier === "low" ? 0.095 : 0.11;
+    const mediumThreshold = previousTier === "medium" ? 0.5 : 0.54;
+    const highThreshold = previousTier === "high" ? 0.8 : 0.88;
+    let tier = "silent";
+    if (resolvedPercent <= silentThreshold) tier = "silent";
+    else if (resolvedPercent < mediumThreshold) tier = "low";
+    else if (resolvedPercent < highThreshold) tier = "medium";
+    else tier = "high";
+    telemetry.brightnessTier = tier;
+    telemetry.brightnessPercent = resolvedPercent;
+    telemetry.brightnessSourceLevel = effectiveLevel;
+    telemetry.brightnessSourceRaw = sourceLevelRaw;
+    telemetry.brightnessSourceNormalized = dynamicLevel;
+    return {
+      tier,
+      percent: resolvedPercent,
+      sourceLevel: effectiveLevel,
+      effectiveLevel,
+      sourceLevelRaw,
+      normalizedLevel: dynamicLevel
+    };
+  }
+
+  function getRhythmCadenceSignal(now = Date.now()) {
+    const raw = getRawMusicBody();
+    const rms = clamp(Math.max(audioRms, audio, 0.02), 0.02, 1);
+    const beat = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
+    const relTransient = clamp(audioTransient / (0.06 + rms * 0.52), 0, 1.4);
+    const relFlux = clamp(audioFlux / (0.05 + rms * 0.5), 0, 1.3);
+    const beatRecency = lastWizBeatAt > 0
+      ? clamp(1 - ((now - lastWizBeatAt) / 420), 0, 1)
+      : 0;
+    const drums = clamp(
+      raw.drums * 0.72 +
+      relTransient * 0.18 +
+      relFlux * 0.12 +
+      beat * 0.08,
+      0,
+      1
+    );
+    const rhythmPeak = Math.max(
+      drums,
+      relTransient * 0.86,
+      relFlux * 0.82,
+      beat * 0.74,
+      beatRecency * 0.68
+    );
+    const rhythmBody = clamp(
+      drums * 0.38 +
+      relTransient * 0.2 +
+      relFlux * 0.18 +
+      beat * 0.16 +
+      beatRecency * 0.08,
+      0,
+      1
+    );
+    const rhythm = clamp(
+      rhythmBody * 0.74 + rhythmPeak * 0.26,
+      0,
+      1
+    );
+    return {
+      raw,
+      drums,
+      beat,
+      beatRecency,
+      relTransient,
+      relFlux,
+      rhythm
+    };
+  }
+
   function getEnergyDrive() {
-    const base = clamp(energy * 0.72 + audio * 0.28, 0, 1);
+    const raw = getRawMusicBody();
+    const base = clamp(energy * 0.58 + raw.baseline * 0.42, 0, 1);
     const motion = clamp(
       Math.max(
         audioTransient * 0.9,
-        audioFlux * 1.05,
-        Number(telemetry.beatConfidence || 0) * 0.95
+        audioFlux * 1.02,
+        raw.drums * 0.88,
+        raw.body * 0.74,
+        raw.beat * 0.92
       ),
       0,
       1
     );
-    const motionDrive = clamp((motion - 0.11) / 0.72, 0, 1);
-    return clamp(Math.max(base, motionDrive * 0.82), 0, 1);
+    const motionDrive = clamp((motion - 0.08) / 0.74, 0, 1);
+    const bodyDrive = clamp(raw.body * (0.82 + raw.drums * 0.22), 0, 1);
+    return clamp(Math.max(base, bodyDrive, motionDrive * 0.84), 0, 1);
   }
 
-  function getHueIntervalMs() {
+  function getHueIntervalMs(now = Date.now()) {
     const base = getBaseIntervalMs();
-    const motion = clamp(
-      Math.max(audioTransient, audioFlux, Number(telemetry.beatConfidence || 0)),
-      0,
-      1
-    );
-    const slowMultiplier = 1 + Math.max(0.2, (1 - getEnergyDrive()) * 1.05 - motion * 0.4);
-    return Math.round(base * slowMultiplier);
+    const rhythm = getRhythmCadenceSignal(now);
+    const rhythmInterval = Math.round(lerp(280, 92, rhythm.rhythm));
+    const overclockBoostCap = Math.round(base * 1.08);
+    return Math.round(clamp(Math.min(rhythmInterval, overclockBoostCap), 84, 340));
   }
 
-  function getWizIntervalMs() {
+  function getWizIntervalMs(now = Date.now()) {
     const base = getBaseIntervalMs();
-    const motion = clamp(
-      Math.max(audioTransient, audioFlux, Number(telemetry.beatConfidence || 0)),
-      0,
-      1
-    );
-    const slowMultiplier = 1 + Math.max(0.2, (1 - getEnergyDrive()) * 0.98 - motion * 0.34);
-    const scene = String(telemetry.scene || "");
-    const flowMultiplier = scene.startsWith("flow_") ? 1.08 : 1.02;
-    return Math.round(base * slowMultiplier * flowMultiplier);
+    const rhythm = getRhythmCadenceSignal(now);
+    const rhythmInterval = Math.round(lerp(248, 80, rhythm.rhythm));
+    const overclockBoostCap = Math.round(base * 0.98);
+    return Math.round(clamp(Math.min(rhythmInterval, overclockBoostCap), 74, 300));
   }
 
   function applyEnergyBrightnessScale(rawBri) {
-    const drive = getEnergyDrive();
-    const beatConfidence = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
-    const transientCue = clamp(
-      audioTransient * 0.58 +
-      audioPeak * 0.42 +
-      (telemetry.drop ? 0.12 : 0),
+    const volumeTier = getVolumeBrightnessTier();
+    const rhythm = getRhythmCadenceSignal();
+    const minFloor = Math.max(1, Math.round(254 * BRIGHTNESS_TIER_MIN));
+    const source = clamp(rawBri, 1, 254);
+    const accent = clamp(
+      rhythm.rhythm * 0.18 +
+      rhythm.relTransient * 0.08 +
+      rhythm.relFlux * 0.06 +
+      (telemetry.beat ? 0.07 : 0) +
+      (telemetry.drop ? 0.18 : 0),
       0,
-      1
+      0.14
     );
-    const silenceSignal = clamp(
-      Math.max(
-        audio * 0.9,
-        audioTransient * 0.8,
-        audioFlux * 0.76,
-        beatConfidence * 0.72
-      ),
-      0,
-      1
-    );
-    const calmHold = clamp(
-      (CALM_SILENCE_THRESHOLD - silenceSignal) / CALM_SILENCE_THRESHOLD,
-      0,
-      1
-    );
-    const driveCurve = Math.pow(drive, 1.12);
-    const scale =
-      0.1 +
-      driveCurve * 1.3 +
-      beatConfidence * 0.08 +
-      transientCue * 0.12;
-    const floor = 8 + Math.round((1 - calmHold) * 10 + driveCurve * 54);
-    const target = clamp(rawBri * scale, floor, 254);
-    const transientFloor = clamp(
-      rawBri * (0.72 + transientCue * 0.24 + beatConfidence * 0.08),
-      floor,
-      254
-    );
-    const accentedTarget = Math.max(target, transientFloor);
-    if (!(hueBrightnessSmoothed > 0)) hueBrightnessSmoothed = target;
+    let target = source * volumeTier.percent;
+    if (volumeTier.tier === "silent") {
+      target = Math.max(minFloor, source * BRIGHTNESS_TIER_MIN * (1 + accent * 0.08));
+    } else {
+      target *= 1 + accent * 0.16;
+    }
+    const accentedTarget = clamp(target, minFloor, 254);
+    if (!(hueBrightnessSmoothed > 0)) hueBrightnessSmoothed = accentedTarget;
     const blend = accentedTarget >= hueBrightnessSmoothed
-      ? clamp(0.28 + driveCurve * 0.22 + beatConfidence * 0.1 + transientCue * 0.08, 0.22, 0.64)
-      : clamp(0.14 + (1 - driveCurve) * 0.14 + calmHold * 0.1, 0.1, 0.4);
+      ? clamp(0.26 + rhythm.rhythm * 0.18, 0.2, 0.56)
+      : clamp(0.13 + (1 - rhythm.rhythm) * 0.06, 0.1, 0.24);
     hueBrightnessSmoothed = lerp(hueBrightnessSmoothed, accentedTarget, blend);
-    return Math.round(clamp(hueBrightnessSmoothed, 1, 254));
+    const output = Math.round(clamp(hueBrightnessSmoothed, 1, 254));
+    telemetry.hueBrightnessOut = clamp(output / 254, 0, 1);
+    return output;
   }
 
-  function getWizBrightness() {
-    const drive = getEnergyDrive();
-    const motion = clamp(
-      Math.max(audioTransient, audioFlux, Number(telemetry.beatConfidence || 0)),
-      0,
-      1
-    );
+  function getWizBrightness(nowMs = Date.now()) {
+    const volumeTier = getVolumeBrightnessTier();
+    const rhythm = getRhythmCadenceSignal(nowMs);
     const beatConfidence = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
-    const beatAgeMs = lastWizBeatAt > 0 ? (Date.now() - lastWizBeatAt) : Number.POSITIVE_INFINITY;
-    const beatAgeLift = beatAgeMs < 220 ? (1 - (beatAgeMs / 220)) * 0.14 : 0;
-    const pulseLift = wizBeatPulse * (0.18 + beatConfidence * 0.1);
-    const quietPenalty = clamp((0.24 - drive) / 0.24, 0, 1) * 0.14;
-    const driveCurve = Math.pow(drive, 1.12);
-    const motionCurve = Math.pow(motion, 1.08);
-    const midDominance = clamp(
-      audioBandMid - Math.max(audioBandLow * 0.84, audioBandHigh * 0.9),
+    const beatAgeMs = lastWizBeatAt > 0 ? (nowMs - lastWizBeatAt) : Number.POSITIVE_INFINITY;
+    const beatAgeLift = beatAgeMs < 220 ? (1 - (beatAgeMs / 220)) * 0.12 : 0;
+    const pulseLift = wizBeatPulse * (0.16 + beatConfidence * 0.08);
+    const accent = clamp(
+      rhythm.rhythm * 0.22 +
+      rhythm.drums * 0.16 +
+      rhythm.relTransient * 0.08 +
+      pulseLift +
+      beatAgeLift +
+      (telemetry.beat ? 0.06 : 0) +
+      (telemetry.drop ? 0.2 : 0),
       0,
-      1
+      0.16
     );
-    const percussionSupport = clamp(audioBandLow * 1.4 + audioTransient * 0.6 + audioFlux * 0.5, 0, 1);
-    const vocalPenalty = midDominance * (1 - percussionSupport) * 0.16;
-    const peakCue = clamp(
-      audioPeak * 0.5 +
-      audioTransient * 0.3 +
-      beatConfidence * 0.2,
-      0,
-      1
-    );
-    const shaped =
-      0.03 +
-      driveCurve * 0.92 +
-      motionCurve * 0.22 +
-      pulseLift * 0.78 +
-      beatAgeLift * 0.74 +
-      peakCue * 0.12 -
-      quietPenalty -
-      vocalPenalty;
-    if (
-      telemetry.drop ||
-      peakCue > 0.88 ||
-      (drive >= 0.8 && motion >= 0.56) ||
-      (wizBeatPulse > 0.84 && drive > 0.55)
-    ) return 1;
-    return clamp(shaped, 0.02, 1);
+    let target = volumeTier.percent;
+    if (volumeTier.tier === "silent") {
+      target = BRIGHTNESS_TIER_MIN + accent * 0.08;
+    } else {
+      target = volumeTier.percent * (1 + accent * 0.18);
+    }
+    if (telemetry.drop) target = Math.max(target, 0.9);
+    return clamp(target, BRIGHTNESS_TIER_MIN, 1);
   }
 
   function setOverclock(v, options = {}) {
@@ -5774,8 +6945,14 @@ module.exports = function createRaveEngine(controls) {
     const now = Date.now();
     const hueInterval = getHueIntervalMs();
     const wizInterval = getWizIntervalMs();
-    nextHueEmitAt = Math.max(nextHueEmitAt, now + hueInterval);
-    nextWizEmitAt = Math.max(nextWizEmitAt, now + wizInterval);
+    // Overclock changes can happen rapidly under Meta Auto; never postpone emit deadlines.
+    // Tighten future deadlines only, so cadence cannot be starved by repeated retiming.
+    if (nextHueEmitAt > 0) {
+      nextHueEmitAt = Math.min(nextHueEmitAt, now + hueInterval);
+    }
+    if (nextWizEmitAt > 0) {
+      nextWizEmitAt = Math.min(nextWizEmitAt, now + wizInterval);
+    }
   }
 
 
@@ -5914,19 +7091,6 @@ function updateMode() {
   telemetry.mode = "interpret";
   telemetry.modeLock = "interpret";
   forcedMode = "interpret";
-}
-
-function setLegacyComponentsEnabled(enabled) {
-  legacyComponentsEnabled = Boolean(enabled);
-  telemetry.legacyComponentsEnabled = legacyComponentsEnabled;
-  forcedMode = "interpret";
-  telemetry.mode = "interpret";
-  telemetry.modeLock = "interpret";
-  return legacyComponentsEnabled;
-}
-
-function getLegacyComponentsEnabled() {
-  return legacyComponentsEnabled === true;
 }
 
 function getModeSwitchBias() {
@@ -6174,8 +7338,6 @@ function getModeSwitchBias() {
       return { bpm: 0, confidence: 0 };
     }
 
-    const ref = effectiveGenreReference || GENRE_REFERENCE_TRACKS.auto;
-    const refBpm = clamp(Number(ref.detectBpm || ref.bpm || 118), 60, 190);
     const frameMs = clamp(onsetTempoFrameMs, 10, 48);
 
     const mean = series.reduce((sum, value) => sum + value, 0) / len;
@@ -6200,9 +7362,7 @@ function getModeSwitchBias() {
       const corr = sum / Math.sqrt(normA * normB);
       if (!Number.isFinite(corr)) continue;
 
-      const priorSigma = refBpm >= 150 ? 30 : 24;
-      const prior = Math.exp(-0.5 * Math.pow((bpm - refBpm) / priorSigma, 2));
-      const score = corr * (0.6 + prior * 0.7);
+      const score = corr;
       if (score > bestScore) {
         secondScore = bestScore;
         bestScore = score;
@@ -6221,48 +7381,79 @@ function getModeSwitchBias() {
 
     const margin = Math.max(0, bestScore - Math.max(0, secondScore));
     const confidence = clamp(bestScore * 0.65 + margin * 0.9, 0, 1);
+    const percussiveEvidence = clamp(
+      audioTransient * 0.52 +
+      audioFlux * 0.34 +
+      audioBandLow * 0.24,
+      0,
+      1
+    );
+    let resolvedBpm = bestBpm;
+    if (bestBpm < 112 && (bestBpm * 2) <= ONSET_TEMPO_MAX_BPM) {
+      const doubledBpm = bestBpm * 2;
+      const doubledLag = Math.round((60000 / doubledBpm) / frameMs);
+      if (doubledLag >= 2 && doubledLag < (len - 6)) {
+        let sum = 0;
+        let normA = 0;
+        let normB = 0;
+        for (let i = doubledLag; i < len; i += 1) {
+          const a = series[i] - mean;
+          const b = series[i - doubledLag] - mean;
+          sum += a * b;
+          normA += a * a;
+          normB += b * b;
+        }
+        if (normA > 0 && normB > 0) {
+          const doubledCorr = sum / Math.sqrt(normA * normB);
+          const promote = (
+            doubledCorr >= (bestScore * 0.84) &&
+            bestScore >= 0.08 &&
+            doubledCorr >= 0.07 &&
+            percussiveEvidence >= 0.22
+          );
+          if (promote) {
+            resolvedBpm = doubledBpm;
+          }
+        }
+      }
+    }
 
-    onsetTempoCachedBpm = bestBpm;
+    onsetTempoCachedBpm = resolvedBpm;
     onsetTempoCachedConfidence = confidence;
     onsetTempoCachedAt = Number.isFinite(ts) ? ts : Date.now();
-    return { bpm: bestBpm, confidence };
+    return { bpm: resolvedBpm, confidence };
   }
 
   function resolveBeatBpmHint() {
-    const genreRef = effectiveGenreReference || GENRE_REFERENCE_TRACKS.auto;
-    const genreHint = clamp(Number(genreRef.detectBpm || genreRef.bpm || 118), 60, 190);
     const onsetTempo = estimateOnsetTempoBpm();
     const onsetBpm = clamp(Number(onsetTempo.bpm || 0), 0, 190);
     const onsetConfidence = clamp(Number(onsetTempo.confidence || 0), 0, 1);
-    const onsetHint = onsetBpm > 0
-      ? lerp(
-        genreHint,
-        onsetBpm,
-        clamp(0.28 + onsetConfidence * 0.5, 0.28, 0.82)
-      )
-      : genreHint;
     const liveBpmRaw = Number(telemetry.bpm || 0);
     const liveConfidence = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
-    if (liveBpmRaw > 0 && liveConfidence >= 0.2) {
-      const liveBpm = clamp(liveBpmRaw, 55, 190);
-      const divergence = onsetHint > 0
-        ? Math.abs(liveBpm - onsetHint) / onsetHint
-        : 0;
-      const maxLiveWeight = divergence > 0.5 ? 0.22 : (divergence > 0.3 ? 0.34 : 0.5);
-      const liveWeight = clamp(0.16 + liveConfidence * 0.36, 0.16, maxLiveWeight);
-      return clamp(lerp(onsetHint, liveBpm, liveWeight), 55, 190);
-    }
+    let hint = liveBpmRaw > 0 ? clamp(liveBpmRaw, 55, 190) : 120;
     if (beatIntervals.length >= 3) {
       const estimate = estimateBpm();
       if (estimate > 0) {
-        const divergence = onsetHint > 0
-          ? Math.abs(estimate - onsetHint) / onsetHint
-          : 0;
-        const estimateWeight = divergence > 0.45 ? 0.3 : 0.56;
-        return clamp(lerp(onsetHint, estimate, estimateWeight), 55, 190);
+        const weight = liveBpmRaw > 0
+          ? clamp(0.36 + (1 - liveConfidence) * 0.2, 0.36, 0.62)
+          : 0.68;
+        hint = clamp(lerp(hint, estimate, weight), 55, 190);
       }
     }
-    return onsetHint;
+    if (onsetBpm > 0) {
+      const onsetWeight = clamp(0.06 + onsetConfidence * 0.72, 0.06, 0.78);
+      hint = clamp(lerp(hint, onsetBpm, onsetWeight), 55, 190);
+    }
+    if (liveBpmRaw > 0 && liveConfidence >= 0.2) {
+      const liveBpm = clamp(liveBpmRaw, 55, 190);
+      const liveWeight = clamp(0.42 + liveConfidence * 0.38, 0.42, 0.8);
+      hint = clamp(lerp(hint, liveBpm, liveWeight), 55, 190);
+    }
+    const resolved = clamp(hint, 55, 190);
+    telemetry.onsetTempoBpm = onsetBpm;
+    telemetry.onsetTempoConfidence = onsetConfidence;
+    telemetry.beatHintBpm = resolved;
+    return resolved;
   }
 
   function normalizeBeatIntervalForBpm(intervalMs, gapScale = 1) {
@@ -6271,9 +7462,19 @@ function getModeSwitchBias() {
     const _safeScale = Number.isFinite(gapScale) ? clamp(gapScale, 0.35, 1.15) : 1;
 
     const bpmHint = resolveBeatBpmHint();
-    const ref = effectiveGenreReference || GENRE_REFERENCE_TRACKS.auto;
-    const referenceBpm = clamp(Number(ref.detectBpm || ref.bpm || bpmHint || 118), 60, 190);
+    const onsetTempo = estimateOnsetTempoBpm();
+    const onsetBpm = clamp(Number(onsetTempo.bpm || 0), 0, 190);
+    const onsetConfidence = clamp(Number(onsetTempo.confidence || 0), 0, 1);
     const currentBpm = clamp(Number(telemetry.bpm || 0), 0, 190);
+    const raw = getRawMusicBody();
+    const highTempoIntent = clamp(
+      raw.drums * 0.62 +
+      audioTransient * 0.2 +
+      audioFlux * 0.14 +
+      Number(telemetry.beatConfidence || 0) * 0.08,
+      0,
+      1
+    );
     const candidates = [];
     const pushCandidate = value => {
       const n = Number(value);
@@ -6283,7 +7484,8 @@ function getModeSwitchBias() {
       if (!near) candidates.push(n);
     };
     const ratios = [0.5, 2 / 3, 0.75, 5 / 6, 1, 6 / 5, 4 / 3, 1.5, 2];
-    [safeInterval].forEach(base => {
+    const normalizedBase = safeInterval / _safeScale;
+    [safeInterval, normalizedBase].forEach(base => {
       for (const ratio of ratios) {
         pushCandidate(base * ratio);
       }
@@ -6294,31 +7496,24 @@ function getModeSwitchBias() {
       if (!Number.isFinite(candidateInterval) || candidateInterval <= 0) continue;
       const candidateBpm = 60000 / candidateInterval;
       if (!Number.isFinite(candidateBpm) || candidateBpm <= 0) continue;
-      let score = Math.abs(candidateBpm - bpmHint);
-      score += Math.abs(candidateBpm - referenceBpm) * 0.95;
-      if (bpmHint >= 88 && bpmHint <= 132) {
-        const highWindow = bpmHint * 1.35;
-        const lowWindow = bpmHint * 0.58;
-        if (candidateBpm > highWindow) {
-          score += (candidateBpm - highWindow) * 1.4;
-        } else if (candidateBpm < lowWindow) {
-          score += (lowWindow - candidateBpm) * 0.8;
-        }
+      const intervalDrift = Math.abs(Math.log2(candidateInterval / safeInterval));
+      let score = Math.abs(candidateBpm - bpmHint) * 0.86;
+      score += intervalDrift * 2.2;
+      if (onsetBpm > 0) {
+        score += Math.abs(candidateBpm - onsetBpm) * (0.34 - onsetConfidence * 0.2);
       }
       if (candidateBpm > 190) score += (candidateBpm - 190) * 2;
-      else if (candidateBpm > 178) score += (candidateBpm - 178) * 1.2;
-      if (candidateBpm < 62) score += (62 - candidateBpm) * 0.9;
+      else if (candidateBpm > 182) score += (candidateBpm - 182) * 0.75;
+      if (candidateBpm < 58) score += (58 - candidateBpm) * 1.2;
       if (currentBpm > 0) {
         const currentDelta = Math.abs(candidateBpm - currentBpm);
-        score += Math.min(currentDelta, 24) * 0.08 + Math.max(0, currentDelta - 24) * 0.015;
-        const lowLock = currentBpm < (bpmHint * 0.78);
-        if (
-          lowLock &&
-          candidateBpm >= (bpmHint * 0.82) &&
-          candidateBpm <= Math.min(190, bpmHint * 1.45)
-        ) {
-          score -= 6;
-        }
+        score += Math.min(currentDelta, 18) * 0.05 + Math.max(0, currentDelta - 18) * 0.018;
+      }
+      if (highTempoIntent > 0.56 && candidateBpm >= 146 && candidateBpm <= 182) {
+        score -= (highTempoIntent - 0.56) * 24;
+      }
+      if (highTempoIntent > 0.62 && candidateBpm < 120) {
+        score += (120 - candidateBpm) * 0.22;
       }
       if (candidateInterval < BPM_INTERVAL_MIN_MS) {
         score += (BPM_INTERVAL_MIN_MS - candidateInterval) / 24;
@@ -6335,26 +7530,148 @@ function getModeSwitchBias() {
     if (!beatIntervals.length) return 0;
     const sorted = [...beatIntervals].sort((a, b) => a - b);
     const center = sorted.slice(1, Math.max(2, sorted.length - 1));
-    const avg =
-      center.reduce((sum, n) => sum + n, 0) / Math.max(1, center.length);
-    if (!Number.isFinite(avg) || avg <= 0) return 0;
-    const rawBpm = clamp(60000 / avg, 55, 190);
-    const ref = effectiveGenreReference || GENRE_REFERENCE_TRACKS.auto;
-    const refBpm = clamp(Number(ref.detectBpm || ref.bpm || rawBpm || 118), 60, 190);
+    const avg = center.reduce((sum, n) => sum + n, 0) / Math.max(1, center.length);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const blendedInterval = (Number.isFinite(median) && median > 0)
+      ? (median * 0.72 + avg * 0.28)
+      : avg;
+    if (!Number.isFinite(blendedInterval) || blendedInterval <= 0) return 0;
+    const rawBpm = clamp(60000 / blendedInterval, 55, 190);
+    const onsetTempo = estimateOnsetTempoBpm();
+    const onsetBpm = clamp(Number(onsetTempo.bpm || 0), 0, 190);
+    const onsetConfidence = clamp(Number(onsetTempo.confidence || 0), 0, 1);
+    const currentBpm = clamp(Number(telemetry.bpm || 0), 0, 190);
+    const raw = getRawMusicBody();
+    const highTempoIntent = clamp(
+      raw.drums * 0.62 +
+      audioTransient * 0.22 +
+      audioFlux * 0.16,
+      0,
+      1
+    );
     const ratios = [0.5, 2 / 3, 0.75, 5 / 6, 1, 6 / 5, 4 / 3, 1.5, 2];
     let best = rawBpm;
-    let bestScore = Math.abs(rawBpm - refBpm);
+    let bestScore = Number.POSITIVE_INFINITY;
     for (const ratio of ratios) {
       const candidate = rawBpm * ratio;
       if (!(candidate >= 55 && candidate <= 190)) continue;
-      const ratioPenalty = Math.abs(Math.log2(ratio)) * 2.2;
-      const score = Math.abs(candidate - refBpm) + ratioPenalty;
+      const ratioPenalty = Math.abs(Math.log2(ratio)) * 1.45;
+      let score = ratioPenalty;
+      if (onsetBpm > 0) {
+        score += Math.abs(candidate - onsetBpm) * (0.3 - onsetConfidence * 0.22);
+      }
+      if (currentBpm > 0) {
+        score += Math.abs(candidate - currentBpm) * 0.085;
+      }
+      score += Math.abs(candidate - rawBpm) * 0.16;
+      if (highTempoIntent > 0.56 && candidate >= 146 && candidate <= 182) {
+        score -= (highTempoIntent - 0.56) * 22;
+      }
+      if (highTempoIntent > 0.6 && candidate < 118) {
+        score += (118 - candidate) * 0.18;
+      }
       if (score < bestScore) {
         bestScore = score;
         best = candidate;
       }
     }
+    if (best < 108 && (best * 2) <= 190) {
+      const doubled = best * 2;
+      const onsetSupportsDouble = onsetBpm > 0 && Math.abs(onsetBpm - doubled) <= 16;
+      const hintBpm = clamp(Number(telemetry.beatHintBpm || 0), 0, 190);
+      const hintSupportsDouble = hintBpm > 0 && Math.abs(hintBpm - doubled) <= 18;
+      const promoteScore = clamp(
+        (onsetSupportsDouble ? 0.56 : 0) +
+        (hintSupportsDouble ? 0.24 : 0) +
+        onsetConfidence * 0.18 +
+        (onsetSupportsDouble ? 0.24 : 0) +
+        (currentBpm >= 138 ? 0.12 : 0) +
+        (beatIntervals.length >= 5 ? 0.08 : 0),
+        0,
+        1
+      );
+      if (promoteScore >= 0.58) {
+        best = doubled;
+      }
+    }
+    if (onsetBpm >= 150 && onsetConfidence >= 0.2 && best < (onsetBpm * 0.94)) {
+      const liftWeight = clamp(
+        0.08 +
+        onsetConfidence * 0.34 +
+        highTempoIntent * 0.22,
+        0.08,
+        0.72
+      );
+      best = lerp(best, onsetBpm, liftWeight);
+    }
     return clamp(best, 55, 190);
+  }
+
+  function stabilizeBpmEstimate(rawBpm) {
+    const baseCandidate = clamp(Number(rawBpm || 0), 0, 190);
+    if (!(baseCandidate > 0)) return 0;
+
+    const previousBpm = clamp(Number(telemetry.bpm || 0), 0, 190);
+    if (!(previousBpm > 0)) return baseCandidate;
+
+    let candidateBpm = baseCandidate;
+    const liveBeatConfidence = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
+    const stabilizerPercussiveEvidence = clamp(
+      audioTransient * 0.48 +
+      audioFlux * 0.32 +
+      audioBandLow * 0.2,
+      0,
+      1
+    );
+    const onsetTempo = estimateOnsetTempoBpm();
+    const onsetBpm = clamp(Number(onsetTempo.bpm || 0), 0, 190);
+    const onsetConfidence = clamp(Number(onsetTempo.confidence || 0), 0, 1);
+    const forceLowTempoInterpretation =
+      onsetBpm > 0 &&
+      onsetBpm <= 115 &&
+      onsetConfidence >= 0.24 &&
+      stabilizerPercussiveEvidence < 0.24 &&
+      previousBpm >= 138;
+
+    if (forceLowTempoInterpretation && candidateBpm > 120) {
+      candidateBpm = clamp(candidateBpm * 0.5, 55, 190);
+    }
+
+    if (
+      candidateBpm < (previousBpm * 0.72) &&
+      liveBeatConfidence >= 0.82 &&
+      candidateBpm >= 96 &&
+      stabilizerPercussiveEvidence >= 0.22
+    ) {
+      const doubled = candidateBpm * 2;
+      if (doubled <= 190 && Math.abs(doubled - previousBpm) < Math.abs(candidateBpm - previousBpm)) {
+        candidateBpm = doubled;
+      }
+    }
+
+    const harmonicCandidates = forceLowTempoInterpretation
+      ? [candidateBpm, candidateBpm / 2, candidateBpm * (2 / 3)]
+      : [candidateBpm, candidateBpm * 2, candidateBpm / 2, candidateBpm * 1.5, candidateBpm * (2 / 3)];
+    const filteredCandidates = harmonicCandidates.filter(value => value >= 55 && value <= 190);
+
+    let best = candidateBpm;
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const option of filteredCandidates) {
+      const continuityPenalty = Math.abs(Math.log2(option / previousBpm)) * 16;
+      const onsetPenalty = onsetBpm > 0
+        ? Math.abs(option - onsetBpm) * (0.18 - onsetConfidence * 0.1)
+        : 0;
+      const driftPenalty = Math.abs(option - candidateBpm) * 0.11;
+      const score = continuityPenalty + onsetPenalty + driftPenalty;
+      if (score < bestScore) {
+        bestScore = score;
+        best = option;
+      }
+    }
+
+    const jumpRatio = Math.abs(best - previousBpm) / Math.max(1, previousBpm);
+    const alpha = jumpRatio > 0.34 ? 0.24 : (jumpRatio > 0.18 ? 0.36 : 0.5);
+    return clamp(lerp(previousBpm, best, alpha), 55, 190);
   }
 
   function registerBeat(now, options = {}) {
@@ -6369,11 +7686,11 @@ function getModeSwitchBias() {
       normalizedIntervalMs = normalizeBeatIntervalForBpm(interval, gapScale);
       if (normalizedIntervalMs >= BPM_INTERVAL_MIN_MS && normalizedIntervalMs <= BPM_INTERVAL_MAX_MS) {
         beatIntervals.push(normalizedIntervalMs);
-        if (beatIntervals.length > 12) beatIntervals.shift();
+        if (beatIntervals.length > 16) beatIntervals.shift();
       }
     }
 
-    const bpm = estimateBpm();
+    const bpm = stabilizeBpmEstimate(estimateBpm());
     telemetry.bpm = bpm;
     telemetry.beatIntervalMs = lastBeatTime > 0 ? normalizedIntervalMs : 0;
 
@@ -6402,10 +7719,24 @@ function getModeSwitchBias() {
       return true;
     }
 
-    const bpmHint = clamp(Number(genreRef.detectBpm || genreRef.bpm || 124), 60, 190);
-    const bpmForGap = telemetry.bpm > 0 ? telemetry.bpm : bpmHint;
-    const beatGapScale = clamp(Number(genreRef.beatGapScale ?? 0.45), 0.36, 0.58);
+    const onsetTempo = estimateOnsetTempoBpm(now);
+    const onsetBpm = clamp(Number(onsetTempo.bpm || 0), 0, 190);
+    const bpmHint = resolveBeatBpmHint();
+    const bpmForGap = telemetry.bpm > 0
+      ? telemetry.bpm
+      : (onsetBpm > 0 ? onsetBpm : bpmHint);
+    const beatGapScaleBase = bpmForGap >= 152
+      ? 0.58
+      : (bpmForGap >= 132 ? 0.5 : 0.4);
+    const beatGapScale = clamp(
+      beatGapScaleBase +
+      (audioTransient * 0.04) -
+      (audioFlux * 0.02),
+      0.42,
+      0.66
+    );
     const predictedMs = clamp((60000 / bpmForGap) * beatGapScale, 128, 520);
+    const raw = getRawMusicBody();
 
     const gap = now - lastBeatTime;
     if (gap < predictedMs) return false;
@@ -6461,6 +7792,37 @@ function getModeSwitchBias() {
       gp.beatRiseMin * 0.38,
       gp.beatRiseMax + 0.004
     );
+
+    const percussiveFastHit = (
+      gap >= Math.max(138, predictedMs * 0.72) &&
+      raw.drums > 0.26 &&
+      (audioTransient > 0.15 || audioFlux > 0.13) &&
+      energy > (effectiveThreshold * 0.9)
+    );
+    if (percussiveFastHit) {
+      registerBeat(now, { gapScale: beatGapScale });
+      return true;
+    }
+
+    const pulseEvidence = clamp(
+      audioTransient * 0.52 +
+      audioFlux * 0.34 +
+      raw.drums * 0.22 +
+      audioBandLow * 0.18,
+      0,
+      1
+    );
+    const fallbackGapFactor = bpmForGap >= 145 ? 2.45 : (bpmForGap >= 120 ? 2.15 : 1.85);
+    const fallbackEvidenceGate = bpmForGap >= 145 ? 0.24 : (bpmForGap >= 120 ? 0.2 : 0.15);
+    const overdueFallbackHit = (
+      gap >= (predictedMs * fallbackGapFactor) &&
+      pulseEvidence >= fallbackEvidenceGate &&
+      audioRms >= 0.01
+    );
+    if (overdueFallbackHit) {
+      registerBeat(now, { gapScale: beatGapScale });
+      return true;
+    }
 
     if (energy > effectiveThreshold && rise > effectiveRiseGate) {
       registerBeat(now, { gapScale: beatGapScale });
@@ -6550,10 +7912,13 @@ function getModeSwitchBias() {
     const mem = getGenreMemory(activeGenre);
     const modeBias = getModeSwitchBias();
     const drive = getEnergyDrive();
+    const raw = getRawMusicBody();
     const motion = Math.max(
       audioTransient,
       audioFlux,
-      Number(telemetry.beatConfidence || 0)
+      Number(telemetry.beatConfidence || 0),
+      raw.drums * 0.88,
+      raw.body * 0.72
     );
 
     let idleT = 0.08 - (mem.idle - 1) * 0.01;
@@ -6708,7 +8073,12 @@ function getModeSwitchBias() {
       const quietRmsGate = clamp(Number(genreRef.quietRmsGate ?? 0.12) * quietGuardScale, 0.06, 0.24);
       const quietTransientGate = clamp(Number(genreRef.quietTransientGate ?? 0.16) * quietGuardScale, 0.08, 0.28);
       const quietFluxGate = clamp(Number(genreRef.quietFluxGate ?? 0.14) * quietGuardScale, 0.08, 0.26);
-      const quietAudio = audio < quietRmsGate && audioTransient < quietTransientGate && audioFlux < quietFluxGate;
+      const quietAudio =
+        audio < quietRmsGate &&
+        audioTransient < quietTransientGate &&
+        audioFlux < quietFluxGate &&
+        raw.body < (quietRmsGate * 1.28) &&
+        raw.drums < (quietTransientGate * 1.34);
       if (quietAudio) {
         if (drive < 0.1) desired = "idle";
         else if (desired === "pulse") desired = "flow";
@@ -6720,13 +8090,17 @@ function getModeSwitchBias() {
           audio,
           audioBandLow * 0.84,
           audioBandMid * 0.94,
-          energy * 0.78
+          energy * 0.78,
+          raw.body * 0.92,
+          raw.drums * 0.98
         );
         const bodyPresent =
           bodySignal >= (quietRmsGate * 0.94) &&
           (
             audioBandLow >= 0.2 ||
             audioBandMid >= 0.2 ||
+            raw.body >= (quietRmsGate * 1.02) ||
+            raw.drums >= (quietTransientGate * 0.88) ||
             audioTransient >= (quietTransientGate * 0.72) ||
             audioFlux >= (quietFluxGate * 0.72)
           );
@@ -6773,6 +8147,7 @@ function getModeSwitchBias() {
       const pulseMotion =
         buildDrivenMotion ||
         beatDrivenMotion ||
+        raw.drums > (motionTransientGate * 0.9) ||
         audioTransient > motionTransientGate ||
         audioFlux > motionFluxGate;
 
@@ -6950,6 +8325,10 @@ function getModeSwitchBias() {
   function emitHue(now, isBeat) {
     const interval = getHueIntervalMs();
     if (!nextHueEmitAt) nextHueEmitAt = now;
+    const maxFutureSkew = Math.max(interval * 2, 1200);
+    if ((nextHueEmitAt - now) > maxFutureSkew) {
+      nextHueEmitAt = now;
+    }
     if (now < nextHueEmitAt) return;
 
     nextHueEmitAt += interval;
@@ -6976,7 +8355,18 @@ function getModeSwitchBias() {
     const manualPaletteActive = Array.isArray(manualPalette) && manualPalette.length > 0;
 
     let hue, bri, transition;
-    let sat = scene.sat;
+    const satFloor = sceneName === "idle_soft"
+      ? 176
+      : (sceneName.startsWith("flow_") ? 192 : 236);
+    const satMotionLift = Math.round(
+      clamp(audioTransient * 0.56 + audioFlux * 0.44, 0, 1) * 14
+    );
+    const satEventLift = (isBeat ? 5 : 0) + (telemetry.drop ? 10 : 0);
+    let sat = clamp(
+      Math.round(Math.max(scene.sat, satFloor) + satMotionLift + satEventLift),
+      0,
+      254
+    );
 
     if (sceneName === "idle_soft") {
       hue = (phase * scene.hueSpeed) % 65535;
@@ -7104,26 +8494,38 @@ function getModeSwitchBias() {
 
     if (manualPaletteActive) {
       const len = Math.max(1, manualPalette.length);
-      const paletteIndex = ((hueColorIndex % len) + len) % len;
+      const resolved = resolveManualPaletteIndexForEmit("hue", hueColorIndex, len, manualPaletteConfig, {
+        sceneName,
+        isBeat,
+        isDrop: telemetry.drop,
+        triggerHint: Boolean(isBeat || telemetry.drop)
+      });
+      hueColorIndex = resolved.index;
+      const paletteIndex = ((resolved.emitIndex % len) + len) % len;
       const paletteColor = manualPalette[paletteIndex];
       const hsv = rgbToHsv(paletteColor);
       hue = Math.round((hsv.h / 360) * 65535) % 65535;
       if (hue < 0) hue += 65535;
       sat = clamp(Math.round(hsv.s * 254), 0, 254);
-      hueColorIndex = pickManualPaletteNextIndex(hueColorIndex, len, manualPaletteConfig, {
-        isBeat,
-        isDrop: telemetry.drop
-      });
     }
+    const rawSignal = getRawMusicBody();
+    const drumPulse = rawSignal.drums > 0.2 || (rawSignal.drums > 0.16 && rawSignal.body > 0.24);
+    const hueForceDelta = sceneName.startsWith("flow_") || drumPulse;
+    const hueDeltaScale = sceneName.startsWith("flow_")
+      ? clamp(0.75 - rawSignal.drums * 0.22 - rawSignal.body * 0.12, 0.4, 0.9)
+      : clamp(1 - rawSignal.drums * 0.3 - rawSignal.body * 0.18, 0.45, 1);
+    const hueRateMs = drumPulse
+      ? Math.min(interval, rawSignal.drums > 0.3 ? 170 : 200)
+      : interval;
 
     controls.emit({
       type: "HUE_STATE",
       phase,
       energy,
-      rateMs: interval,
+      rateMs: hueRateMs,
       forceRate: overclockLevel >= 2,
-      forceDelta: sceneName.startsWith("flow_"),
-      deltaScale: sceneName.startsWith("flow_") ? 0.75 : 1,
+      forceDelta: hueForceDelta,
+      deltaScale: hueDeltaScale,
       state: {
         on: true,
         hue,
@@ -7134,22 +8536,107 @@ function getModeSwitchBias() {
     });
   }
 
-  /* =========================
-    WIZ EMITTER
-  ========================= */
-  function emitWiz(now, isBeat) {
-    const interval = getWizIntervalMs();
-    if (!nextWizEmitAt) nextWizEmitAt = now;
-    if (now < nextWizEmitAt) return;
-
-    nextWizEmitAt += interval;
-    if (nextWizEmitAt < now - interval * 2) {
-      nextWizEmitAt = now + interval;
-    }
-
-    const scene = resolveWizScene(now);
-    telemetry.wizScene = scene;
+  function buildWizEmitterSignal(now, isBeat, sceneName) {
+    const scene = String(sceneName || "idle_soft").trim().toLowerCase() || "idle_soft";
     const flowScene = scene.startsWith("flow_");
+    const pulseScene = scene === "pulse_strobe";
+    const isDrop = Boolean(telemetry.drop);
+    const beatConfidence = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
+    const raw = getRawMusicBody();
+    const drive = getEnergyDrive();
+    const elapsedMs = lastWizEmit > 0 ? Math.max(1, now - lastWizEmit) : 16;
+    const beatHalfLifeMs = pulseScene ? 170 : (flowScene ? 210 : 190);
+    wizBeatPulse *= Math.pow(0.5, elapsedMs / beatHalfLifeMs);
+    if (isDrop) {
+      wizBeatPulse = Math.max(wizBeatPulse, 1);
+      lastWizBeatAt = now;
+      wizBeatStep = (wizBeatStep + 2) % 256;
+    } else if (isBeat) {
+      wizBeatPulse = Math.max(wizBeatPulse, 0.72 + (beatConfidence * 0.24));
+      lastWizBeatAt = now;
+      wizBeatStep = (wizBeatStep + 1) % 256;
+    }
+    wizBeatPulse = clamp(wizBeatPulse, 0, 1);
+    const pulseRecentWindowMs = isDrop ? 230 : 170;
+    const pulseRecent = lastWizBeatAt > 0 && (now - lastWizBeatAt) <= pulseRecentWindowMs;
+    const pulseHit = Boolean(isDrop || isBeat || (pulseRecent && wizBeatPulse > 0.42));
+    const motion = clamp(
+      Math.max(
+        audioTransient,
+        audioFlux,
+        beatConfidence,
+        raw.drums * 0.92,
+        raw.body * 0.72,
+        wizBeatPulse * 0.88
+      ),
+      0,
+      1.4
+    );
+    const silenceSignal = clamp(
+      Math.max(
+        audio * 0.9,
+        raw.baseline * 0.92,
+        raw.body * 0.88,
+        raw.drums * 0.94,
+        audioTransient * 0.82,
+        audioFlux * 0.78,
+        beatConfidence * 0.7
+      ),
+      0,
+      1
+    );
+    const calmHold = clamp(
+      (CALM_SILENCE_THRESHOLD - silenceSignal) / CALM_SILENCE_THRESHOLD,
+      0,
+      1
+    );
+    const phrase = String(telemetry.phrase || "").trim().toLowerCase();
+    const build = phrase === "build";
+    const targetHue = (
+      (audioBandLow * 32) +
+      (audioBandMid * 82) +
+      (audioBandHigh * 176) +
+      (wizBeatPulse * 28) +
+      (isDrop ? 20 : 0) +
+      ((scene.length * 7) % 30)
+    ) % 360;
+    const risk = clamp(
+      (drive * 0.44) +
+      (motion * 0.46) +
+      (raw.drums * 0.12) +
+      (wizBeatPulse * 0.34) +
+      (isDrop ? 0.24 : 0) +
+      (isBeat ? 0.14 : 0) +
+      (build ? 0.1 : 0),
+      0,
+      1.8
+    );
+    return {
+      now,
+      scene,
+      flowScene,
+      pulseScene,
+      isBeat: Boolean(isBeat),
+      isDrop,
+      beatConfidence,
+      drive,
+      motion,
+      silenceSignal,
+      calmHold,
+      pulseHit,
+      phrase,
+      build,
+      targetHue,
+      risk,
+      wizBeatPulse,
+      rawDrums: raw.drums,
+      rawBody: raw.body,
+      rawActivity: raw.activity
+    };
+  }
+
+  function resolveWizPaletteForEmit(sceneName) {
+    const scene = String(sceneName || "idle_soft").trim().toLowerCase() || "idle_soft";
     const pulseScene = scene === "pulse_strobe";
     const manualPaletteConfig = getManualPaletteConfigForBrand("wiz");
     const manualPalette = buildActiveManualPaletteSequence(manualPaletteConfig);
@@ -7157,7 +8644,7 @@ function getModeSwitchBias() {
     let palette = manualPaletteActive
       ? tuneWizManualPalette(manualPalette, { pulseScene })
       : (WIZ_PALETTES[scene] || WIZ_PALETTES.idle_soft);
-    if (!manualPaletteActive && scene === "pulse_strobe") {
+    if (!manualPaletteActive && pulseScene) {
       palette = WIZ_PULSE_PALETTES.auto;
     }
     if (!manualPaletteActive) {
@@ -7179,9 +8666,179 @@ function getModeSwitchBias() {
           });
       palette = reorderPaletteForContrast(palette, true);
     }
+    if (!Array.isArray(palette) || !palette.length) {
+      palette = WIZ_PALETTES.idle_soft;
+    }
+    const safePalette = palette.map(color => ({
+      r: clamp255(color?.r),
+      g: clamp255(color?.g),
+      b: clamp255(color?.b)
+    }));
+    return {
+      scene,
+      pulseScene,
+      manualPaletteActive,
+      manualPaletteConfig,
+      palette: safePalette
+    };
+  }
 
-    // reset palette position if scene changed
-    if (scene !== lastWizScene) {
+  /* =========================
+    WIZ EMITTER
+  ========================= */
+  function getWizPaletteAdvanceDecision(signal, intervalMs) {
+    const sinceLastAdvance = lastWizPaletteAdvanceAt > 0
+      ? Math.max(0, signal.now - lastWizPaletteAdvanceAt)
+      : Number.POSITIVE_INFINITY;
+    const cadenceFloorMs = signal.flowScene ? 70 : (signal.pulseScene ? 92 : 130);
+    const cadenceCeilMs = signal.flowScene ? 420 : (signal.pulseScene ? 640 : 1100);
+    let cadenceMs = (
+      (signal.pulseScene ? 180 : (signal.flowScene ? 132 : 240)) +
+      (signal.calmHold * (signal.pulseScene ? 250 : (signal.flowScene ? 190 : 560))) +
+      (intervalMs * (signal.flowScene ? 0.66 : 0.94)) -
+      (signal.motion * (signal.pulseScene ? 120 : (signal.flowScene ? 96 : 140))) -
+      (signal.drive * (signal.flowScene ? 58 : 72))
+    );
+    cadenceMs = clamp(cadenceMs, cadenceFloorMs, cadenceCeilMs);
+    const eventAdvance = signal.isDrop ||
+      signal.isBeat ||
+      signal.build ||
+      (signal.pulseScene
+        ? signal.pulseHit
+        : (signal.wizBeatPulse > (signal.flowScene ? 0.58 : 0.66) && signal.beatConfidence > 0.4));
+    const dueByCadence = sinceLastAdvance >= cadenceMs;
+    const keepAliveAdvance = signal.flowScene
+      ? (
+        signal.motion > (0.16 + signal.calmHold * 0.14) &&
+        sinceLastAdvance >= Math.max(90, cadenceMs * 0.58)
+      )
+      : (!signal.pulseScene && sinceLastAdvance >= Math.max(760, cadenceMs * 2.4));
+    const hardLivenessAdvance = sinceLastAdvance >= (
+      signal.flowScene
+        ? 720
+        : (signal.pulseScene ? 980 : 1400)
+    );
+    const shouldAdvance = Boolean(
+      eventAdvance ||
+      dueByCadence ||
+      keepAliveAdvance ||
+      hardLivenessAdvance
+    );
+    let step = 1;
+    if (signal.isDrop) step += 1;
+    else if (signal.isBeat && signal.motion > 0.52) step += 1;
+    if (signal.build && !signal.flowScene) step += 1;
+    if (signal.risk > 1.05 && signal.isBeat) step += 1;
+    return {
+      sinceLastAdvance,
+      cadenceMs,
+      eventAdvance,
+      dueByCadence,
+      keepAliveAdvance,
+      hardLivenessAdvance,
+      shouldAdvance,
+      step: clamp(Math.round(step), 1, 4)
+    };
+  }
+
+  function pickWizPaletteHueTargetIndex(palette, targetHue, fallbackIndex = 0) {
+    if (!Array.isArray(palette) || !palette.length) return 0;
+    let bestIndex = clamp(Math.round(Number(fallbackIndex) || 0), 0, Math.max(0, palette.length - 1));
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < palette.length; i += 1) {
+      const hue = rgbToHsv(palette[i]).h;
+      const distance = Math.abs((((hue - targetHue + 540) % 360) - 180));
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  }
+
+  function computeWizBrightnessForEmit(now, signal) {
+    const lowEndCue = clamp(
+      (audioBandLow * 0.56) +
+      (signal.beatConfidence * 0.22) +
+      (signal.wizBeatPulse * 0.24),
+      0,
+      1.4
+    );
+    const rawBrightness = signal.flowScene
+      ? clamp(
+        getWizBrightness(now) * clamp(0.96 + flowIntensity * 0.08 + signal.wizBeatPulse * 0.04, 0.84, 1.2),
+        0.01,
+        1
+      )
+      : getWizBrightness(now);
+    const flowBeatAccent = signal.flowScene
+      ? (
+        signal.isDrop
+          ? 0.06
+          : (signal.isBeat ? (0.03 + signal.beatConfidence * 0.02) : 0)
+      )
+      : 0;
+    let brightnessTarget = clamp(
+      rawBrightness +
+      flowBeatAccent * 0.9 +
+      (signal.wizBeatPulse * 0.06) +
+      (signal.isDrop ? 0.08 : 0),
+      0.01,
+      1
+    );
+    if (signal.pulseScene) {
+      const beatAgeMs = lastWizBeatAt > 0 ? (now - lastWizBeatAt) : Number.POSITIVE_INFINITY;
+      const strobeWindowMs = signal.isDrop ? 220 : 150;
+      const strobeActive = beatAgeMs <= strobeWindowMs || signal.wizBeatPulse > 0.62;
+      const strobeFreqDiv = signal.isDrop ? 28 : 38;
+      const strobeWave = 0.76 + (Math.sin((now / strobeFreqDiv) + (wizBeatStep * 0.42)) * 0.24);
+      const pulseFloor = clamp(0.14 + signal.wizBeatPulse * 0.22 + (signal.isDrop ? 0.12 : 0), 0.12, 0.62);
+      if (strobeActive) {
+        brightnessTarget = clamp(Math.max(brightnessTarget, pulseFloor * 0.92) * strobeWave, 0.08, 1);
+      } else {
+        const settle = 0.78 + Math.sin(now / 160 + wizPhase * 0.2) * 0.12;
+        brightnessTarget = clamp(Math.max(brightnessTarget, pulseFloor * 0.9) * settle, 0.1, 1);
+      }
+    }
+    if (!(wizBrightnessSmoothed > 0)) wizBrightnessSmoothed = brightnessTarget;
+    const brightnessBlend = signal.pulseScene
+      ? (
+        brightnessTarget >= wizBrightnessSmoothed
+          ? clamp(0.3 + lowEndCue * 0.1 + (signal.isBeat ? 0.06 : 0), 0.24, 0.56)
+          : clamp(0.2 + (1 - lowEndCue) * 0.08 + signal.calmHold * 0.03, 0.16, 0.36)
+      )
+      : (
+        brightnessTarget >= wizBrightnessSmoothed
+          ? clamp(0.24 + lowEndCue * 0.1 + (signal.isBeat ? 0.05 : 0), 0.2, 0.46)
+          : clamp(0.14 + (1 - lowEndCue) * 0.09 + signal.calmHold * 0.05, 0.1, 0.3)
+      );
+    wizBrightnessSmoothed = lerp(wizBrightnessSmoothed, brightnessTarget, brightnessBlend);
+    return clamp(wizBrightnessSmoothed, 0.01, 1);
+  }
+
+  function emitWiz(now, isBeat) {
+    const interval = getWizIntervalMs();
+    if (!nextWizEmitAt) nextWizEmitAt = now;
+    const maxFutureSkew = Math.max(interval * 2, 1200);
+    if ((nextWizEmitAt - now) > maxFutureSkew) {
+      nextWizEmitAt = now;
+    }
+    if (now < nextWizEmitAt) return;
+
+    nextWizEmitAt += interval;
+    if (nextWizEmitAt < now - interval * 2) {
+      nextWizEmitAt = now + interval;
+    }
+
+    const scene = resolveWizScene(now);
+    telemetry.wizScene = scene;
+    const signal = buildWizEmitterSignal(now, isBeat, scene);
+    const paletteState = resolveWizPaletteForEmit(signal.scene);
+    const manualPaletteActive = paletteState.manualPaletteActive;
+    const manualPaletteConfig = paletteState.manualPaletteConfig;
+    const palette = paletteState.palette;
+
+    if (signal.scene !== lastWizScene) {
       if (!manualPaletteActive) {
         wizColorIndex = 0;
         wizColorCursor = 0;
@@ -7191,172 +8848,72 @@ function getModeSwitchBias() {
         wizColorIndex = ((wizColorIndex % manualLen) + manualLen) % manualLen;
         wizColorCursor = wizColorIndex;
       }
-      lastWizScene = scene;
+      lastWizScene = signal.scene;
+      lastWizPaletteAdvanceAt = now;
     }
 
-    const drive = getEnergyDrive();
-    const beatConfidence = clamp(Number(telemetry.beatConfidence || 0), 0, 1);
-    const elapsedMs = lastWizEmit > 0 ? Math.max(1, now - lastWizEmit) : 16;
-    const beatDecay = Math.pow(0.5, elapsedMs / 180);
-    wizBeatPulse *= beatDecay;
-    if (telemetry.drop) {
-      wizBeatPulse = Math.max(wizBeatPulse, 1);
-      lastWizBeatAt = now;
-      wizBeatStep = (wizBeatStep + 2) % 256;
-    } else if (isBeat) {
-      wizBeatPulse = Math.max(wizBeatPulse, 0.72 + (beatConfidence * 0.24));
-      lastWizBeatAt = now;
-      wizBeatStep = (wizBeatStep + 1) % 256;
-    }
-    wizBeatPulse = clamp(wizBeatPulse, 0, 1);
-    const pulseBeatWindowMs = telemetry.drop ? 220 : 170;
-    const pulseBeatRecent = lastWizBeatAt > 0 && (now - lastWizBeatAt) <= pulseBeatWindowMs;
-    const pulseHit = Boolean(telemetry.drop || isBeat || (pulseBeatRecent && wizBeatPulse > 0.44));
-    const motion = Math.max(
-      audioTransient,
-      audioFlux,
-      beatConfidence,
-      wizBeatPulse * 0.9
-    );
-    const silenceSignal = clamp(
-      Math.max(
-        audio * 0.9,
-        audioTransient * 0.82,
-        audioFlux * 0.78,
-        beatConfidence * 0.7
-      ),
-      0,
-      1
-    );
-    const calmHold = clamp(
-      (CALM_SILENCE_THRESHOLD - silenceSignal) / CALM_SILENCE_THRESHOLD,
-      0,
-      1
-    );
-    // Keep flow scenes alive in quieter passages, and keep non-flow scenes
-    // on a deterministic cadence so color never hard-stalls.
-    const riskDrive = clamp(
-      (drive * 0.44) +
-      (motion * 0.46) +
-      (wizBeatPulse * 0.34) +
-      (telemetry.drop ? 0.24 : 0) +
-      (isBeat ? 0.14 : 0) +
-      (telemetry.phrase === "build" ? 0.1 : 0),
-      0,
-      1.8
-    );
-    const motionAdvanceEvery = WIZ_SLOW_SCENES.has(scene)
-      ? Math.max(2, 6 - Math.round(motion * 4) - Math.round(drive * 2))
-      : Math.max(2, 5 - Math.round(motion * 4) - Math.round(drive * 2));
-    const motionAdvance = flowScene &&
-      motion > (0.22 + calmHold * 0.16) &&
-      (isBeat || telemetry.drop || telemetry.phrase === "build" || wizBeatPulse > 0.66) &&
-      (wizPhase % motionAdvanceEvery === 0);
-    const eventAdvance = pulseScene
-      ? pulseHit
-      : (
-        WIZ_SLOW_SCENES.has(scene)
-          ? (
-            telemetry.drop ||
-            isBeat ||
-            telemetry.phrase === "build" ||
-            (wizBeatPulse > 0.7 && beatConfidence > 0.48)
-          )
-          : WIZ_AGGRESSIVE_SCENES.has(scene)
-            ? (isBeat || telemetry.drop || telemetry.phrase === "build" || (energy > 0.62 && wizBeatPulse > 0.72))
-            : WIZ_TRANCE_LIKE_SCENES.has(scene)
-              ? (isBeat || telemetry.drop || telemetry.phrase === "build" || (telemetry.audioFlux > 0.3 && wizBeatPulse > 0.64))
-              : (isBeat || telemetry.drop || telemetry.phrase === "build")
-      );
-    const deterministicAdvanceEvery = flowScene
-      ? 1
-      : (
-        WIZ_SLOW_SCENES.has(scene)
-          ? Math.max(1, 3 - Math.round(drive * 3) - Math.round(motion * 4))
-          : Math.max(1, 2 - Math.round(drive * 3) - Math.round(motion * 4))
-      );
-    const deterministicAdvanceGate = !flowScene
-      ? (
-        pulseScene
-          ? Math.max(1, Math.round(deterministicAdvanceEvery * (1 + calmHold * 1.8)))
-          : Math.max(1, Math.round(deterministicAdvanceEvery * (1 + calmHold * 8.5)))
-      )
-      : deterministicAdvanceEvery;
-    const deterministicAdvance = !flowScene && !pulseScene && (wizPhase % deterministicAdvanceGate === 0);
-    const riskAdvanceEvery = Math.max(1, 4 - Math.round(riskDrive * 2) + Math.round(calmHold * 2));
-    const riskAdvance = !flowScene && !pulseScene &&
-      riskDrive > (0.42 + calmHold * 0.52) &&
-      (wizPhase % riskAdvanceEvery === 0);
-    const pulseFallbackAdvance = pulseScene &&
-      !pulseHit &&
-      (now - Number(lastWizBeatAt || 0)) > 1800 &&
-      (wizPhase % 9 === 0);
-    const shouldAdvance = eventAdvance || motionAdvance || deterministicAdvance || riskAdvance || pulseFallbackAdvance;
-
-    if (!palette.length) {
-      palette = WIZ_PALETTES.idle_soft;
-    }
-
-    let color;
+    const advanceDecision = getWizPaletteAdvanceDecision(signal, interval);
+    let color = palette[0] || { r: 255, g: 255, b: 255 };
     let paletteAdvanced = false;
-    const targetHue = (
-      (audioBandLow * 32) +
-      (audioBandMid * 82) +
-      (audioBandHigh * 176) +
-      (wizBeatPulse * 28) +
-      (telemetry.drop ? 20 : 0) +
-      ((scene.length * 7) % 30)
-    ) % 360;
+
     if (manualPaletteActive) {
       const len = Math.max(1, palette.length);
-      const flowAdvanceGate = flowScene
-        ? (wizPhase % Math.max(1, 4 - Math.round(motion * 0.8))) === 0
-        : false;
-      if (shouldAdvance || flowAdvanceGate) {
-        let steps = 1;
-        if (flowScene) {
-          if (telemetry.drop) steps += 1;
-          else if (isBeat && motion > 0.5) steps += 1;
-        } else {
-          if (telemetry.drop || telemetry.phrase === "build") steps += 1;
-          if (isBeat) steps += 1;
-        }
-        for (let i = 0; i < steps; i += 1) {
-          wizColorIndex = pickManualPaletteNextIndex(wizColorIndex, len, manualPaletteConfig, {
-            isBeat,
-            isDrop: telemetry.drop
-          });
-        }
-        paletteAdvanced = true;
+      const manualCycleMode = normalizeManualPaletteCycleMode(
+        manualPaletteConfig.cycleMode,
+        DEFAULT_MANUAL_PALETTE_CONFIG.cycleMode
+      );
+      const resolved = resolveManualPaletteIndexForEmit("wiz", wizColorIndex, len, manualPaletteConfig, {
+        sceneName: signal.scene,
+        isBeat: signal.isBeat,
+        isDrop: signal.isDrop,
+        triggerHint: manualCycleMode === "on_trigger"
+          ? advanceDecision.shouldAdvance
+          : false,
+        advanceStep: manualCycleMode === "on_trigger"
+          ? advanceDecision.step
+          : 1
+      });
+      wizColorIndex = resolved.index;
+      paletteAdvanced = Boolean(resolved.advanced);
+      if (paletteAdvanced) {
+        lastWizPaletteAdvanceAt = now;
       }
-      const manualIndex = ((wizColorIndex % len) + len) % len;
-      color = palette[manualIndex];
-    } else if (flowScene) {
+      const emitIndex = ((resolved.emitIndex % len) + len) % len;
+      color = palette[emitIndex] || palette[0];
+    } else if (signal.flowScene) {
       const len = Math.max(1, palette.length);
       const flowEnergy = clamp(flowIntensity, FLOW_INTENSITY_MIN, FLOW_INTENSITY_MAX);
       const flowSpeedScale = 0.62 + flowEnergy * 0.58;
       const flowTextureScale = 0.68 + flowEnergy * 0.62;
-      const speedBase = (0.016 + drive * 0.11 + motion * 0.2 + riskDrive * 0.03) * flowSpeedScale;
-      const phraseBoost = telemetry.phrase === "build" ? 0.03 : 0;
-      const beatBoost = isBeat ? (0.05 + motion * 0.08 + riskDrive * 0.03) : 0;
-      const dropBoost = telemetry.drop ? 0.1 : 0;
+      const speedBase = (0.016 + signal.drive * 0.11 + signal.motion * 0.2 + signal.risk * 0.03) * flowSpeedScale;
+      const phraseBoost = signal.build ? 0.03 : 0;
+      const beatBoost = signal.isBeat ? (0.05 + signal.motion * 0.08 + signal.risk * 0.03) : 0;
+      const dropBoost = signal.isDrop ? 0.1 : 0;
       const intervalScale = clamp(interval / 165, 0.5, 2.1);
       let step = Math.max(0.012, (speedBase + phraseBoost + beatBoost + dropBoost) * intervalScale * 0.44);
-      if (!isBeat && !telemetry.drop && motion < 0.24) {
+      if (!signal.isBeat && !signal.isDrop && signal.motion < 0.24) {
         step *= 0.55;
       }
-      if (isBeat && !telemetry.drop) {
-        step += 0.045 + motion * 0.03;
-      } else if (telemetry.drop) {
-        step += 0.09 + motion * 0.05;
+      if (signal.isBeat && !signal.isDrop) {
+        step += 0.045 + signal.motion * 0.03;
+      } else if (signal.isDrop) {
+        step += 0.09 + signal.motion * 0.05;
       }
+      const flowStepFloor = signal.isDrop
+        ? 0.056
+        : (
+          signal.isBeat
+            ? 0.038
+            : (signal.calmHold > 0.72 ? 0.028 : 0.018)
+        );
+      step = Math.max(step, flowStepFloor);
       wizColorCursor = (wizColorCursor + step) % len;
 
       const baseIdx = Math.floor(wizColorCursor) % len;
       const nextIdx = (baseIdx + 1) % len;
       const mixT = wizColorCursor - Math.floor(wizColorCursor);
       const crossfadeWindow = clamp(
-        0.1 + motion * 0.06 + (telemetry.drop ? 0.04 : 0),
+        0.1 + signal.motion * 0.06 + (signal.isDrop ? 0.04 : 0),
         0.08,
         0.18
       );
@@ -7365,32 +8922,35 @@ function getModeSwitchBias() {
         : clamp((mixT - (1 - crossfadeWindow)) / crossfadeWindow, 0, 1);
       const paletteBlend = blendColor(palette[baseIdx], palette[nextIdx], steppedMixT);
       const spectralColor = hsvToRgb255(
-        targetHue,
+        signal.targetHue,
         1,
-        clamp(0.84 + (drive * 0.14) + (wizBeatPulse * 0.12), 0.7, 1)
+        clamp(0.84 + (signal.drive * 0.14) + (signal.wizBeatPulse * 0.12), 0.7, 1)
       );
       const spectralMix = clamp(
         0.03 +
-        (motion * 0.07) +
-        (wizBeatPulse * 0.1) +
-        (telemetry.drop ? 0.08 : 0) -
-        (calmHold * 0.14),
+        (signal.motion * 0.07) +
+        (signal.wizBeatPulse * 0.1) +
+        (signal.isDrop ? 0.08 : 0) -
+        (signal.calmHold * 0.14),
         0.02,
         0.22
       );
       const baseColor = blendColor(paletteBlend, spectralColor, spectralMix);
-
-      // Add subtle time/audio modulation so flow never looks frozen.
-      const texture = (2 + motion * 6 + Math.max(0, drive - 0.16) * 3 + riskDrive * 2) * flowTextureScale;
+      const texture = (
+        2 +
+        signal.motion * 6 +
+        Math.max(0, signal.drive - 0.16) * 3 +
+        signal.risk * 2
+      ) * flowTextureScale;
       const waveR =
         Math.sin(now / 260 + wizColorCursor * 1.35 + audioBandHigh * 4.2) * texture +
-        Math.sin(now / 760 + audioBandLow * 3.5) * (0.8 + drive * 1.2);
+        Math.sin(now / 760 + audioBandLow * 3.5) * (0.8 + signal.drive * 1.2);
       const waveG =
         Math.sin(now / 300 + wizColorCursor * 1.05 + audioBandMid * 2.6) * texture +
-        Math.sin(now / 820 + audioBandHigh * 3.2) * (0.8 + motion * 1.2);
+        Math.sin(now / 820 + audioBandHigh * 3.2) * (0.8 + signal.motion * 1.2);
       const waveB =
         Math.sin(now / 240 + wizColorCursor * 1.55 + audioBandLow * 3.8) * texture +
-        Math.sin(now / 700 + audioBandMid * 2.2) * (0.8 + drive * 1);
+        Math.sin(now / 700 + audioBandMid * 2.2) * (0.8 + signal.drive * 1);
 
       color = {
         r: clamp255(baseColor.r + waveR),
@@ -7399,56 +8959,52 @@ function getModeSwitchBias() {
       };
       paletteAdvanced = baseIdx !== wizColorIndex;
       wizColorIndex = baseIdx;
+      if (paletteAdvanced || advanceDecision.shouldAdvance) {
+        lastWizPaletteAdvanceAt = now;
+      }
     } else {
-      if (shouldAdvance) {
-        const len = Math.max(1, palette.length);
-        if (pulseScene) {
-          if (pulseHit && len > 1) {
-            const beatDrivenIndex = ((wizBeatStep + Math.round(targetHue / 48) + (telemetry.drop ? 2 : 0)) % len);
-            if (telemetry.drop) {
+      const len = Math.max(1, palette.length);
+      if (advanceDecision.shouldAdvance && len > 1) {
+        if (signal.pulseScene) {
+          const beatDrivenIndex = (
+            wizBeatStep +
+            Math.round(signal.targetHue / 48) +
+            (signal.isDrop ? 2 : 0)
+          ) % len;
+          if (signal.pulseHit) {
+            if (signal.isDrop) {
               wizColorIndex = (beatDrivenIndex + 1) % len;
             } else if (beatDrivenIndex !== wizColorIndex) {
               wizColorIndex = beatDrivenIndex;
             } else {
               wizColorIndex = (wizColorIndex + 1) % len;
             }
-          } else if (pulseFallbackAdvance && len > 1) {
+          } else {
             wizColorIndex = (wizColorIndex + 1) % len;
           }
         } else {
-          let targetIndex = wizColorIndex;
-          const beatDrivenIndex = len > 0
-            ? ((wizBeatStep + Math.round(targetHue / 42) + (telemetry.drop ? 2 : 0)) % len)
-            : 0;
-          if ((isBeat || telemetry.drop || wizBeatPulse > 0.62) && palette.length > 1) {
-            targetIndex = beatDrivenIndex;
-          } else if (palette.length > 1) {
-            let bestDistance = Number.POSITIVE_INFINITY;
-            for (let i = 0; i < palette.length; i += 1) {
-              const hue = rgbToHsv(palette[i]).h;
-              const distance = Math.abs((((hue - targetHue + 540) % 360) - 180));
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                targetIndex = i;
-              }
-            }
-          }
-          let advanceStep = 1;
-          if (telemetry.drop || telemetry.phrase === "build") advanceStep += 1;
-          if (riskDrive > 0.78) advanceStep += 1;
-          if (riskDrive > 1.1 && isBeat) advanceStep += 1;
-          if (isBeat && palette.length > 1) {
-            advanceStep = Math.max(advanceStep, 2);
-          }
-          if (targetIndex !== wizColorIndex) {
-            wizColorIndex = targetIndex;
+          const beatDrivenIndex = (
+            wizBeatStep +
+            Math.round(signal.targetHue / 42) +
+            (signal.isDrop ? 2 : 0)
+          ) % len;
+          const preferredIndex =
+            (signal.isBeat || signal.isDrop || signal.wizBeatPulse > 0.62)
+              ? beatDrivenIndex
+              : pickWizPaletteHueTargetIndex(palette, signal.targetHue, wizColorIndex);
+          if (preferredIndex !== wizColorIndex) {
+            wizColorIndex = preferredIndex;
           } else {
-            wizColorIndex = (wizColorIndex + advanceStep) % palette.length;
+            wizColorIndex = (wizColorIndex + advanceDecision.step) % len;
           }
         }
         paletteAdvanced = true;
+        lastWizPaletteAdvanceAt = now;
+      } else if (advanceDecision.shouldAdvance) {
+        lastWizPaletteAdvanceAt = now;
       }
-      color = palette[wizColorIndex];
+      const index = ((wizColorIndex % len) + len) % len;
+      color = palette[index] || palette[0];
     }
 
     if (!manualPaletteActive) {
@@ -7457,7 +9013,7 @@ function getModeSwitchBias() {
       if (maxCh > 0 && (maxCh - minCh) < 16) {
         const fallbackHue = (
           (wizPhase * 53) +
-          (scene.length * 31) +
+          (signal.scene.length * 31) +
           (wizColorIndex * 47)
         ) % 360;
         const fallbackValue = clamp(maxCh / 255, 0.28, 1);
@@ -7466,100 +9022,59 @@ function getModeSwitchBias() {
     }
 
     const boostedColor = manualPaletteActive
-      ? {
-          r: clamp255(color.r),
-          g: clamp255(color.g),
-          b: clamp255(color.b)
-        }
+      ? tunePaletteVibrancy(color, {
+          satBoost: 0.28,
+          minSat: 0.66,
+          minValue: 0.24,
+          maxValue: 1,
+          preserveNeutralBelow: 0.06
+        })
       : enforceMinSaturation(
-          boostColorSaturation(color, 1.9),
-          clamp(0.95 + (wizBeatPulse * 0.04) + (telemetry.drop ? 0.03 : 0), 0.94, 1),
-          clamp(0.26 + (wizBeatPulse * 0.14), 0.2, 0.56)
+          boostColorSaturation(color, 1),
+          clamp(0.95 + (signal.wizBeatPulse * 0.04) + (signal.isDrop ? 0.03 : 0), 0.94, 1),
+          clamp(0.26 + (signal.wizBeatPulse * 0.14), 0.2, 0.56)
         );
-    const lowEndCue = clamp(
-      (audioBandLow * 0.56) +
-      (beatConfidence * 0.22) +
-      (wizBeatPulse * 0.24),
-      0,
-      1.4
-    );
-    const rawBrightness = flowScene
-      ? clamp(getWizBrightness() * clamp(0.92 + flowIntensity * 0.18 + wizBeatPulse * 0.09, 0.72, 1.45), 0.01, 1)
-      : getWizBrightness();
-    const flowBeatAccent = flowScene
-      ? (
-        telemetry.drop
-          ? 0.08
-          : (isBeat ? (0.04 + beatConfidence * 0.03) : 0)
-      )
-      : 0;
-    let brightnessTarget = clamp(
-      rawBrightness * (0.5 + lowEndCue * 0.98) +
-      flowBeatAccent +
-      (wizBeatPulse * 0.14) +
-      (telemetry.drop ? 0.16 : 0),
-      0.01,
-      1
-    );
-    if (pulseScene) {
-      const beatAgeMs = lastWizBeatAt > 0 ? (now - lastWizBeatAt) : Number.POSITIVE_INFINITY;
-      const strobeWindowMs = telemetry.drop ? 220 : 145;
-      const strobeActive = beatAgeMs <= strobeWindowMs || wizBeatPulse > 0.62;
-      const strobeFreqDiv = telemetry.drop ? 22 : 30;
-      const strobeWave = Math.sin((now / strobeFreqDiv) + (wizBeatStep * 0.42)) > 0
-        ? 1
-        : clamp(0.22 + wizBeatPulse * 0.36, 0.22, 0.64);
-      const basePulseFloor = clamp(0.14 + wizBeatPulse * 0.22 + (telemetry.drop ? 0.12 : 0), 0.12, 0.62);
-      if (strobeActive) {
-        brightnessTarget = clamp(Math.max(brightnessTarget, basePulseFloor) * strobeWave, 0.05, 1);
-      } else {
-        const settle = 0.62 + Math.sin(now / 132 + wizPhase * 0.2) * 0.18;
-        brightnessTarget = clamp(Math.max(brightnessTarget, basePulseFloor * 0.86) * settle, 0.08, 1);
-      }
-    }
-    if (getEnergyDrive() < 0.24 && lowEndCue < 0.26 && !telemetry.drop) {
-      const quietCap = clamp(0.08 + lowEndCue * 0.26 + (isBeat ? 0.1 : 0), 0.06, 0.36);
-      brightnessTarget = Math.min(brightnessTarget, quietCap);
-    }
-    if (!(wizBrightnessSmoothed > 0)) wizBrightnessSmoothed = brightnessTarget;
-    const brightnessBlend = pulseScene
-      ? (
-        brightnessTarget >= wizBrightnessSmoothed
-          ? clamp(0.62 + lowEndCue * 0.16 + (isBeat ? 0.12 : 0), 0.5, 0.9)
-          : clamp(0.42 + (1 - lowEndCue) * 0.12 + calmHold * 0.04, 0.34, 0.66)
-      )
-      : (
-        brightnessTarget >= wizBrightnessSmoothed
-          ? clamp(0.36 + lowEndCue * 0.16 + (isBeat ? 0.08 : 0), 0.3, 0.68)
-          : clamp(0.22 + (1 - lowEndCue) * 0.14 + calmHold * 0.08, 0.16, 0.48)
-      );
-    wizBrightnessSmoothed = lerp(wizBrightnessSmoothed, brightnessTarget, brightnessBlend);
-    const finalBrightness = clamp(wizBrightnessSmoothed, 0.01, 1);
-
+    const finalBrightness = computeWizBrightnessForEmit(now, signal);
+    telemetry.wizBrightnessOut = clamp(finalBrightness, 0, 1);
     lastWizEmit = now;
 
     controls.emit({
       type: "WIZ_PULSE",
       phase: wizPhase++,
       energy,
-      rateMs: pulseScene
-        ? Math.max(68, Math.round(interval * (telemetry.drop ? 0.86 : 1.12)))
-        : interval,
-      forceRate: overclockLevel >= 3,
-      // Keep flow moving even on low-motion tracks.
-      forceDelta: pulseScene
-        ? pulseHit
-        : (
-          flowScene
-            ? true
-            : (motion > 0.24 || wizBeatPulse > 0.46 || paletteAdvanced || deterministicAdvance)
+      rateMs: signal.pulseScene
+        ? Math.max(68, Math.round(interval * (signal.isDrop ? 0.86 : 1.12)))
+        : Math.min(
+          interval,
+          signal.rawDrums > 0.24
+            ? 110
+            : (signal.rawActivity > 0.32 ? 128 : interval)
         ),
-      deltaScale: pulseScene
+      forceRate: overclockLevel >= 3,
+      forceDelta: signal.pulseScene
+        ? signal.pulseHit
+        : (
+          signal.flowScene
+            ? true
+            : (
+              signal.motion > 0.24 ||
+              signal.wizBeatPulse > 0.46 ||
+              signal.rawDrums > 0.2 ||
+              signal.rawActivity > 0.3 ||
+              paletteAdvanced ||
+              advanceDecision.shouldAdvance
+            )
+        ),
+      deltaScale: signal.pulseScene
         ? 1
-        : (flowScene ? clamp(0.9 - motion * 0.24, 0.5, 1) : 1),
-      beat: telemetry.drop || isBeat,
-      drop: telemetry.drop,
-      scene,
+        : (
+          signal.flowScene
+            ? clamp(0.9 - signal.motion * 0.24 - signal.rawDrums * 0.12, 0.4, 1)
+            : clamp(1 - signal.rawDrums * 0.28 - signal.rawActivity * 0.14, 0.45, 1)
+        ),
+      beat: signal.isDrop || signal.isBeat,
+      drop: signal.isDrop,
+      scene: signal.scene,
       color: boostedColor,
       brightness: finalBrightness
     });
@@ -7616,7 +9131,6 @@ function getModeSwitchBias() {
       forcedSceneInput = null;
       telemetry.mode = "interpret";
       telemetry.modeLock = "interpret";
-      telemetry.legacyComponentsEnabled = legacyComponentsEnabled;
 
       audio = 0;
       audioRms = 0;
@@ -7640,9 +9154,28 @@ function getModeSwitchBias() {
       wizColorIndex = 0;
       wizColorCursor = 0;
       wizBeatStep = 0;
+      lastWizPaletteAdvanceAt = 0;
       hueBrightnessSmoothed = 96;
       wizBrightnessSmoothed = 0.2;
+      brightnessLevelFloorEma = 0.004;
+      brightnessLevelCeilEma = 0.16;
+      brightnessPresenceHold = 0;
+      brightnessPercentSmoothed = BRIGHTNESS_TIER_MIN;
+      brightnessDriveEma = 0;
+      brightnessSilentFrames = 0;
       lastWizScene = null;
+      for (const brandKey of MANUAL_PALETTE_SUPPORTED_BRANDS) {
+        const cycleState = getManualPaletteCycleState(brandKey);
+        if (!cycleState) continue;
+        cycleState.index = 0;
+        cycleState.colorOffset = 0;
+        cycleState.fingerprint = "";
+        cycleState.length = 0;
+        cycleState.lastAdvanceAt = 0;
+        cycleState.waitStartAt = 0;
+        cycleState.lastSignal = null;
+        cycleState.lastSpectrumIndex = 0;
+      }
       overclockLevel = DEFAULT_OVERCLOCK_LEVEL;
       transportPressureEma = 0;
       transportPressureRaw = 0;
@@ -7682,6 +9215,11 @@ function getModeSwitchBias() {
       telemetry.beatConfidence = 0;
       telemetry.beatIntervalMs = 0;
       telemetry.bpm = 0;
+      telemetry.brightnessTier = "silent";
+      telemetry.brightnessPercent = BRIGHTNESS_TIER_MIN;
+      telemetry.brightnessSourceLevel = 0;
+      telemetry.hueBrightnessOut = 0;
+      telemetry.wizBrightnessOut = 0;
       telemetry.intensity = 0;
       telemetry.rms = 0;
       telemetry.audioSourceLevel = 0;
@@ -7849,14 +9387,6 @@ function getModeSwitchBias() {
       telemetry.mode = "interpret";
       forcedMode = "interpret";
       telemetry.modeLock = "interpret";
-    },
-
-    setLegacyComponentsEnabled(enabled) {
-      return setLegacyComponentsEnabled(enabled);
-    },
-
-    getLegacyComponentsEnabled() {
-      return getLegacyComponentsEnabled();
     },
 
     setAutoProfile(name) {

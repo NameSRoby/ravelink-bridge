@@ -270,80 +270,123 @@ const SYSTEM_CONFIG_DEFAULT = Object.freeze({
   autoLaunchBrowser: true,
   browserLaunchDelayMs: 1200,
   unsafeExposeSensitiveLogs: false,
-  hueTransportPreference: HUE_TRANSPORT_PREFERENCE.AUTO,
-  legacyComponentsEnabled: false
+  hueTransportPreference: HUE_TRANSPORT_PREFERENCE.AUTO
 });
 const STANDALONE_STATE_CONFIG_DEFAULT = Object.freeze({
   version: 1,
   fixtures: Object.freeze({})
 });
-const PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5]);
+const PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5, 8, 12]);
 const PALETTE_SUPPORTED_BRANDS = Object.freeze(["hue", "wiz"]);
-const PALETTE_FAMILY_ORDER = Object.freeze(["blue", "purple", "red", "green", "yellow"]);
+const PALETTE_FAMILY_ORDER = Object.freeze(["red", "green", "blue"]);
 const PALETTE_FAMILY_ALIASES = Object.freeze({
-  magenta: "purple",
-  amber: "yellow"
+  magenta: "red",
+  purple: "red",
+  pink: "red",
+  amber: "green",
+  yellow: "green",
+  lime: "green",
+  cyan: "blue",
+  aqua: "blue",
+  teal: "blue"
 });
+const PALETTE_CYCLE_MODE_ORDER = Object.freeze([
+  "on_trigger",
+  "timed_cycle",
+  "reactive_shift",
+  "spectrum_mapper"
+]);
+const PALETTE_SPECTRUM_MAP_MODE_ORDER = Object.freeze(["auto", "manual"]);
+const PALETTE_AUDIO_FEATURE_KEYS = Object.freeze([
+  "lows",
+  "mids",
+  "highs",
+  "rms",
+  "energy",
+  "flux",
+  "peaks",
+  "transients",
+  "beat"
+]);
+const PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP = Object.freeze([
+  "lows",
+  "mids",
+  "highs",
+  "rms",
+  "flux"
+]);
+const PALETTE_TIMED_INTERVAL_MIN_SEC = 2;
+const PALETTE_TIMED_INTERVAL_MAX_SEC = 60;
+const PALETTE_BEAT_LOCK_GRACE_MIN_SEC = 0;
+const PALETTE_BEAT_LOCK_GRACE_MAX_SEC = 8;
+const PALETTE_REACTIVE_MARGIN_MIN = 5;
+const PALETTE_REACTIVE_MARGIN_MAX = 100;
 const PALETTE_CONFIG_DEFAULT = Object.freeze({
   colorsPerFamily: 3,
-  families: Object.freeze(["blue", "purple"]),
+  families: Object.freeze(["red", "green", "blue"]),
   disorder: false,
-  disorderAggression: 0.35
+  disorderAggression: 0.35,
+  cycleMode: "on_trigger",
+  timedIntervalSec: 5,
+  beatLock: false,
+  beatLockGraceSec: 2,
+  reactiveMargin: 28,
+  spectrumMapMode: "auto",
+  spectrumFeatureMap: PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
 });
 const PALETTE_FAMILY_DEFS = Object.freeze({
-  blue: Object.freeze({
-    id: "blue",
-    label: "BLUE",
-    colors: Object.freeze([
-      Object.freeze({ r: 12, g: 34, b: 138 }),
-      Object.freeze({ r: 18, g: 72, b: 186 }),
-      Object.freeze({ r: 36, g: 116, b: 228 }),
-      Object.freeze({ r: 62, g: 166, b: 252 }),
-      Object.freeze({ r: 96, g: 212, b: 255 })
-    ])
-  }),
-  purple: Object.freeze({
-    id: "purple",
-    label: "PURPLE",
-    colors: Object.freeze([
-      Object.freeze({ r: 40, g: 20, b: 110 }),
-      Object.freeze({ r: 72, g: 32, b: 150 }),
-      Object.freeze({ r: 108, g: 48, b: 196 }),
-      Object.freeze({ r: 148, g: 72, b: 236 }),
-      Object.freeze({ r: 188, g: 110, b: 255 })
-    ])
-  }),
   red: Object.freeze({
     id: "red",
     label: "RED",
     colors: Object.freeze([
-      Object.freeze({ r: 88, g: 0, b: 14 }),
-      Object.freeze({ r: 132, g: 0, b: 22 }),
-      Object.freeze({ r: 178, g: 6, b: 34 }),
-      Object.freeze({ r: 226, g: 16, b: 50 }),
-      Object.freeze({ r: 255, g: 40, b: 70 })
+      Object.freeze({ r: 110, g: 0, b: 10 }),
+      Object.freeze({ r: 154, g: 0, b: 18 }),
+      Object.freeze({ r: 196, g: 8, b: 24 }),
+      Object.freeze({ r: 236, g: 22, b: 30 }),
+      Object.freeze({ r: 255, g: 52, b: 42 }),
+      Object.freeze({ r: 255, g: 84, b: 88 }),
+      Object.freeze({ r: 255, g: 74, b: 132 }),
+      Object.freeze({ r: 246, g: 58, b: 174 }),
+      Object.freeze({ r: 220, g: 50, b: 214 }),
+      Object.freeze({ r: 186, g: 56, b: 242 }),
+      Object.freeze({ r: 150, g: 58, b: 252 }),
+      Object.freeze({ r: 120, g: 46, b: 224 })
     ])
   }),
   green: Object.freeze({
     id: "green",
     label: "GREEN",
     colors: Object.freeze([
-      Object.freeze({ r: 8, g: 72, b: 22 }),
-      Object.freeze({ r: 14, g: 116, b: 32 }),
-      Object.freeze({ r: 22, g: 162, b: 44 }),
-      Object.freeze({ r: 38, g: 208, b: 62 }),
-      Object.freeze({ r: 92, g: 248, b: 84 })
+      Object.freeze({ r: 6, g: 66, b: 10 }),
+      Object.freeze({ r: 8, g: 106, b: 14 }),
+      Object.freeze({ r: 14, g: 146, b: 22 }),
+      Object.freeze({ r: 28, g: 186, b: 30 }),
+      Object.freeze({ r: 56, g: 222, b: 42 }),
+      Object.freeze({ r: 96, g: 242, b: 38 }),
+      Object.freeze({ r: 142, g: 250, b: 30 }),
+      Object.freeze({ r: 190, g: 248, b: 24 }),
+      Object.freeze({ r: 136, g: 255, b: 86 }),
+      Object.freeze({ r: 74, g: 252, b: 138 }),
+      Object.freeze({ r: 30, g: 236, b: 186 }),
+      Object.freeze({ r: 18, g: 214, b: 220 })
     ])
   }),
-  yellow: Object.freeze({
-    id: "yellow",
-    label: "YELLOW",
+  blue: Object.freeze({
+    id: "blue",
+    label: "BLUE",
     colors: Object.freeze([
-      Object.freeze({ r: 96, g: 78, b: 0 }),
-      Object.freeze({ r: 140, g: 118, b: 0 }),
-      Object.freeze({ r: 186, g: 162, b: 0 }),
-      Object.freeze({ r: 232, g: 214, b: 28 }),
-      Object.freeze({ r: 255, g: 245, b: 96 })
+      Object.freeze({ r: 6, g: 14, b: 106 }),
+      Object.freeze({ r: 10, g: 36, b: 156 }),
+      Object.freeze({ r: 18, g: 72, b: 206 }),
+      Object.freeze({ r: 22, g: 114, b: 246 }),
+      Object.freeze({ r: 16, g: 156, b: 255 }),
+      Object.freeze({ r: 20, g: 198, b: 255 }),
+      Object.freeze({ r: 86, g: 236, b: 255 }),
+      Object.freeze({ r: 72, g: 126, b: 255 }),
+      Object.freeze({ r: 96, g: 110, b: 255 }),
+      Object.freeze({ r: 118, g: 98, b: 255 }),
+      Object.freeze({ r: 140, g: 86, b: 255 }),
+      Object.freeze({ r: 162, g: 76, b: 248 })
     ])
   })
 });
@@ -533,10 +576,6 @@ function sanitizeSystemConfig(input = {}) {
     unsafeExposeSensitiveLogs: parseBooleanLoose(
       raw.unsafeExposeSensitiveLogs,
       SYSTEM_CONFIG_DEFAULT.unsafeExposeSensitiveLogs
-    ),
-    legacyComponentsEnabled: parseBooleanLoose(
-      raw.legacyComponentsEnabled,
-      SYSTEM_CONFIG_DEFAULT.legacyComponentsEnabled
     ),
     hueTransportPreference: sanitizeHueTransportPreference(
       raw.hueTransportPreference,
@@ -772,13 +811,13 @@ function sanitizeAudioReactivityMapConfig(input = {}) {
   }
   const defaultTrackers = AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers || {};
   const fallbackTrackers = sanitizeMetaAutoTempoTrackersConfig(defaultTrackers, defaultTrackers);
-  const baselineLegacy = parseBooleanLoose(
+  const baselineBlend = parseBooleanLoose(
     raw.metaAutoHueWizBaselineBlend,
     parseBooleanLoose(fallbackTrackers.baseline, false)
   );
   const mergedTrackersInput = {
     ...fallbackTrackers,
-    baseline: baselineLegacy,
+    baseline: baselineBlend,
     ...(
       raw.metaAutoTempoTrackers && typeof raw.metaAutoTempoTrackers === "object"
         ? raw.metaAutoTempoTrackers
@@ -789,7 +828,7 @@ function sanitizeAudioReactivityMapConfig(input = {}) {
     mergedTrackersInput,
     fallbackTrackers
   );
-  const legacyMetaBlend = metaAutoTempoTrackers.baseline === true;
+  const baselineBlendEnabled = metaAutoTempoTrackers.baseline === true;
   return {
     version: 1,
     dropEnabled: parseBooleanLoose(raw.dropEnabled, AUDIO_REACTIVITY_MAP_DEFAULT.dropEnabled),
@@ -797,7 +836,7 @@ function sanitizeAudioReactivityMapConfig(input = {}) {
       raw.hardwareRateLimitsEnabled,
       AUDIO_REACTIVITY_MAP_DEFAULT.hardwareRateLimitsEnabled
     ),
-    metaAutoHueWizBaselineBlend: legacyMetaBlend,
+    metaAutoHueWizBaselineBlend: baselineBlendEnabled,
     metaAutoTempoTrackersAuto: parseBooleanLoose(
       raw.metaAutoTempoTrackersAuto,
       parseBooleanLoose(AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackersAuto, false)
@@ -865,7 +904,9 @@ function normalizePaletteBrandKey(value) {
 function normalizePaletteColorCount(value, fallback = PALETTE_CONFIG_DEFAULT.colorsPerFamily) {
   const parsed = Number(value);
   if (PALETTE_COLOR_COUNT_OPTIONS.includes(parsed)) return parsed;
-  return Number(fallback) || PALETTE_CONFIG_DEFAULT.colorsPerFamily;
+  const fallbackParsed = Number(fallback);
+  if (PALETTE_COLOR_COUNT_OPTIONS.includes(fallbackParsed)) return fallbackParsed;
+  return PALETTE_CONFIG_DEFAULT.colorsPerFamily;
 }
 
 function normalizePaletteDisorderAggression(value, fallback = PALETTE_CONFIG_DEFAULT.disorderAggression) {
@@ -873,6 +914,121 @@ function normalizePaletteDisorderAggression(value, fallback = PALETTE_CONFIG_DEF
   if (!Number.isFinite(parsed)) return Number(fallback) || PALETTE_CONFIG_DEFAULT.disorderAggression;
   const normalized = parsed > 1 ? (parsed / 100) : parsed;
   return Math.max(0, Math.min(1, normalized));
+}
+
+function normalizePaletteCycleMode(value, fallback = PALETTE_CONFIG_DEFAULT.cycleMode) {
+  const key = String(value || "").trim().toLowerCase();
+  if (PALETTE_CYCLE_MODE_ORDER.includes(key)) return key;
+  const fallbackKey = String(fallback || "").trim().toLowerCase();
+  return PALETTE_CYCLE_MODE_ORDER.includes(fallbackKey)
+    ? fallbackKey
+    : PALETTE_CONFIG_DEFAULT.cycleMode;
+}
+
+function normalizePaletteTimedIntervalSec(value, fallback = PALETTE_CONFIG_DEFAULT.timedIntervalSec) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(
+      Math.round(parsed),
+      PALETTE_TIMED_INTERVAL_MIN_SEC,
+      PALETTE_TIMED_INTERVAL_MAX_SEC,
+      PALETTE_CONFIG_DEFAULT.timedIntervalSec
+    );
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(
+      Math.round(fallbackNum),
+      PALETTE_TIMED_INTERVAL_MIN_SEC,
+      PALETTE_TIMED_INTERVAL_MAX_SEC,
+      PALETTE_CONFIG_DEFAULT.timedIntervalSec
+    );
+  }
+  return PALETTE_CONFIG_DEFAULT.timedIntervalSec;
+}
+
+function normalizePaletteBeatLockGraceSec(value, fallback = PALETTE_CONFIG_DEFAULT.beatLockGraceSec) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(
+      Math.round(parsed),
+      PALETTE_BEAT_LOCK_GRACE_MIN_SEC,
+      PALETTE_BEAT_LOCK_GRACE_MAX_SEC,
+      PALETTE_CONFIG_DEFAULT.beatLockGraceSec
+    );
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(
+      Math.round(fallbackNum),
+      PALETTE_BEAT_LOCK_GRACE_MIN_SEC,
+      PALETTE_BEAT_LOCK_GRACE_MAX_SEC,
+      PALETTE_CONFIG_DEFAULT.beatLockGraceSec
+    );
+  }
+  return PALETTE_CONFIG_DEFAULT.beatLockGraceSec;
+}
+
+function normalizePaletteReactiveMargin(value, fallback = PALETTE_CONFIG_DEFAULT.reactiveMargin) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(
+      Math.round(parsed),
+      PALETTE_REACTIVE_MARGIN_MIN,
+      PALETTE_REACTIVE_MARGIN_MAX,
+      PALETTE_CONFIG_DEFAULT.reactiveMargin
+    );
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(
+      Math.round(fallbackNum),
+      PALETTE_REACTIVE_MARGIN_MIN,
+      PALETTE_REACTIVE_MARGIN_MAX,
+      PALETTE_CONFIG_DEFAULT.reactiveMargin
+    );
+  }
+  return PALETTE_CONFIG_DEFAULT.reactiveMargin;
+}
+
+function normalizePaletteSpectrumMapMode(value, fallback = PALETTE_CONFIG_DEFAULT.spectrumMapMode) {
+  const key = String(value || "").trim().toLowerCase();
+  if (PALETTE_SPECTRUM_MAP_MODE_ORDER.includes(key)) return key;
+  const fallbackKey = String(fallback || "").trim().toLowerCase();
+  return PALETTE_SPECTRUM_MAP_MODE_ORDER.includes(fallbackKey)
+    ? fallbackKey
+    : PALETTE_CONFIG_DEFAULT.spectrumMapMode;
+}
+
+function normalizePaletteAudioFeatureKey(value, fallback = PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP[0]) {
+  const key = String(value || "").trim().toLowerCase();
+  if (PALETTE_AUDIO_FEATURE_KEYS.includes(key)) return key;
+  const fallbackKey = String(fallback || "").trim().toLowerCase();
+  return PALETTE_AUDIO_FEATURE_KEYS.includes(fallbackKey)
+    ? fallbackKey
+    : PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP[0];
+}
+
+function normalizePaletteSpectrumFeatureMap(value, fallback = PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP) {
+  const list = Array.isArray(value)
+    ? value
+    : String(value || "")
+      .split(",")
+      .map(item => item.trim())
+      .filter(Boolean);
+  const fallbackList = Array.isArray(fallback) && fallback.length
+    ? fallback
+    : PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP;
+  const out = [];
+  for (let i = 0; i < 5; i += 1) {
+    const raw = Object.prototype.hasOwnProperty.call(list, i)
+      ? list[i]
+      : fallbackList[i % fallbackList.length];
+    out.push(
+      normalizePaletteAudioFeatureKey(raw, fallbackList[i % fallbackList.length])
+    );
+  }
+  return out;
 }
 
 function normalizePaletteFamilies(value, fallback = PALETTE_CONFIG_DEFAULT.families) {
@@ -917,6 +1073,30 @@ function normalizePaletteConfigSnapshot(source = {}, fallback = PALETTE_CONFIG_D
     disorderAggression: normalizePaletteDisorderAggression(
       raw.disorderAggression,
       normalizePaletteDisorderAggression(safeFallback.disorderAggression, PALETTE_CONFIG_DEFAULT.disorderAggression)
+    ),
+    cycleMode: normalizePaletteCycleMode(raw.cycleMode, safeFallback.cycleMode),
+    timedIntervalSec: normalizePaletteTimedIntervalSec(
+      raw.timedIntervalSec,
+      normalizePaletteTimedIntervalSec(safeFallback.timedIntervalSec, PALETTE_CONFIG_DEFAULT.timedIntervalSec)
+    ),
+    beatLock: Object.prototype.hasOwnProperty.call(raw, "beatLock")
+      ? parseBooleanLoose(raw.beatLock, Boolean(safeFallback.beatLock))
+      : Boolean(safeFallback.beatLock),
+    beatLockGraceSec: normalizePaletteBeatLockGraceSec(
+      raw.beatLockGraceSec,
+      normalizePaletteBeatLockGraceSec(safeFallback.beatLockGraceSec, PALETTE_CONFIG_DEFAULT.beatLockGraceSec)
+    ),
+    reactiveMargin: normalizePaletteReactiveMargin(
+      raw.reactiveMargin,
+      normalizePaletteReactiveMargin(safeFallback.reactiveMargin, PALETTE_CONFIG_DEFAULT.reactiveMargin)
+    ),
+    spectrumMapMode: normalizePaletteSpectrumMapMode(raw.spectrumMapMode, safeFallback.spectrumMapMode),
+    spectrumFeatureMap: normalizePaletteSpectrumFeatureMap(
+      raw.spectrumFeatureMap,
+      normalizePaletteSpectrumFeatureMap(
+        safeFallback.spectrumFeatureMap,
+        PALETTE_CONFIG_DEFAULT.spectrumFeatureMap
+      )
     )
   };
 }
@@ -1119,7 +1299,6 @@ console.log(
   `[SYSTEM] config loaded (autoLaunchBrowser=${systemConfigRuntime.autoLaunchBrowser}, ` +
   `delayMs=${systemConfigRuntime.browserLaunchDelayMs}, ` +
   `unsafeExposeSensitiveLogs=${Boolean(systemConfigRuntime.unsafeExposeSensitiveLogs)}, ` +
-  `legacyComponentsEnabled=${Boolean(systemConfigRuntime.legacyComponentsEnabled)}, ` +
   `hueTransportPreference=${sanitizeHueTransportPreference(systemConfigRuntime.hueTransportPreference)})`
 );
 const standaloneStateConfigRuntime = readStandaloneStateConfig();
@@ -1173,10 +1352,7 @@ const MUTATING_HTTP_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ALLOW_REMOTE_WRITE_RUNTIME = String(process.env.RAVELINK_ALLOW_REMOTE_WRITE || "").trim() === "1";
 const ALLOW_REMOTE_PRIVILEGED_READ_RUNTIME =
   String(process.env.RAVELINK_ALLOW_REMOTE_PRIVILEGED_READ || "").trim() === "1";
-const ALLOW_LEGACY_MUTATING_GET_RUNTIME =
-  String(process.env.RAVELINK_ALLOW_LEGACY_MUTATING_GET || "").trim() === "1";
 const LOOPBACK_HOST_ALIASES = new Set(["127.0.0.1", "localhost", "::1"]);
-const LEGACY_MUTATING_GET_ROUTES = new Set(["/rave/on", "/rave/off", "/teach", "/color"]);
 const PRIVILEGED_READ_ROUTES = new Set([
   "/fixtures",
   "/fixtures/config",
@@ -1303,7 +1479,6 @@ app.disable("x-powered-by");
 app.set("etag", false);
 app.use((req, res, next) => {
   const originValidation = validateBrowserOrigin(req);
-  const isLegacyMutatingGetRoute = req.method === "GET" && LEGACY_MUTATING_GET_ROUTES.has(req.path);
   if (originValidation.allowOrigin) {
     res.setHeader("Access-Control-Allow-Origin", originValidation.allowOrigin);
     res.setHeader("Vary", "Origin");
@@ -1330,7 +1505,7 @@ app.use((req, res, next) => {
     return;
   }
 
-  if (isCrossSiteBrowserRequest(req) && (MUTATING_HTTP_METHODS.has(req.method) || isLegacyMutatingGetRoute)) {
+  if (isCrossSiteBrowserRequest(req) && MUTATING_HTTP_METHODS.has(req.method)) {
     res.status(403).json({
       ok: false,
       error: "cross_site_blocked",
@@ -1339,7 +1514,7 @@ app.use((req, res, next) => {
     return;
   }
 
-  if (!originValidation.ok && (MUTATING_HTTP_METHODS.has(req.method) || isLegacyMutatingGetRoute)) {
+  if (!originValidation.ok && MUTATING_HTTP_METHODS.has(req.method)) {
     res.status(403).json({ ok: false, error: "untrusted_origin", detail: originValidation.reason });
     return;
   }
@@ -1519,8 +1694,7 @@ const modsHttpRouteRateLimit = createIpRateLimiter({
 });
 
 app.use((req, res, next) => {
-  const isLegacyMutatingGetRoute = req.method === "GET" && LEGACY_MUTATING_GET_ROUTES.has(req.path);
-  if (!MUTATING_HTTP_METHODS.has(req.method) && !isLegacyMutatingGetRoute) {
+  if (!MUTATING_HTTP_METHODS.has(req.method)) {
     next();
     return;
   }
@@ -1528,8 +1702,7 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  const isLegacyMutatingGetRoute = req.method === "GET" && LEGACY_MUTATING_GET_ROUTES.has(req.path);
-  if (!MUTATING_HTTP_METHODS.has(req.method) && !isLegacyMutatingGetRoute) {
+  if (!MUTATING_HTTP_METHODS.has(req.method)) {
     next();
     return;
   }
@@ -1690,37 +1863,37 @@ let hueRecoverySuppressedLogAt = 0;
 const TRANSPORT_RATE_CAPS = Object.freeze({
   hue: Object.freeze({
     rest: Object.freeze({
-      defaultMs: 260,
-      safeMinMs: 170,
-      safeMaxMs: 550,
+      defaultMs: 220,
+      safeMinMs: 150,
+      safeMaxMs: 460,
       unsafeMinMs: 120,
       unsafeMaxMs: 1200,
-      maxSilenceMs: 1200
+      maxSilenceMs: 900
     }),
     entertainment: Object.freeze({
-      defaultMs: 108,
-      safeMinMs: 84,
+      defaultMs: 96,
+      safeMinMs: 72,
       safeMaxMs: 260,
       unsafeMinMs: 40,
       unsafeMaxMs: 600,
-      maxSilenceMs: 780
+      maxSilenceMs: 620
     })
   }),
   wiz: Object.freeze({
     default: Object.freeze({
-      defaultMs: 148,
-      safeMinMs: 108,
+      defaultMs: 120,
+      safeMinMs: 85,
       safeMaxMs: 320,
       unsafeMinMs: 45,
       unsafeMaxMs: 600,
-      maxSilenceMs: 1100
+      maxSilenceMs: 760
     })
   })
 });
-const HUE_REST_SINGLE_FIXTURE_SAFE_MIN_MS = 190;
-const HUE_REST_FAST_TRANSITION_RATE_MS = 220;
-const HUE_REST_MEDIUM_TRANSITION_RATE_MS = 340;
-const HUE_REST_SLOW_TRANSITION_RATE_MS = 500;
+const HUE_REST_SINGLE_FIXTURE_SAFE_MIN_MS = 170;
+const HUE_REST_FAST_TRANSITION_RATE_MS = 190;
+const HUE_REST_MEDIUM_TRANSITION_RATE_MS = 280;
+const HUE_REST_SLOW_TRANSITION_RATE_MS = 420;
 
 function areHardwareRateLimitsEnabled() {
   return audioReactivityMapRuntime?.hardwareRateLimitsEnabled !== false;
@@ -1884,8 +2057,7 @@ function getFixtureZoneAliases(fixture) {
 
   const brand = String(fixture.brand || "").trim().toLowerCase();
   const zone = normalizeRouteZoneToken(fixture.zone, getCanonicalZoneFallback(brand, "custom"));
-  const legacyStandalone = String(fixture.controlMode || "engine").trim().toLowerCase() === "standalone";
-  const customEnabled = parseBoolean(fixture.customEnabled, legacyStandalone);
+  const customEnabled = parseBoolean(fixture.customEnabled, false);
 
   aliases.add(zone);
   aliases.add("all");
@@ -2461,7 +2633,7 @@ function isHueRecoveryTimeoutFailure(message = "") {
   return (
     lower.includes("dtls connect timeout") ||
     lower.includes("handshake timed out") ||
-    lower.includes("legacy-start") ||
+    lower.includes("original-start") ||
     lower.includes("forced-start")
   );
 }
@@ -3267,11 +3439,11 @@ function buildFixtureModeInteroperabilityReport(options = {}) {
     if (!id) continue;
 
     const brand = String(fixture.brand || "").trim().toLowerCase();
-    const legacyMode = String(fixture.controlMode || "engine").trim().toLowerCase();
+    const reportedMode = String(fixture.controlMode || "").trim().toLowerCase();
     const enabled = fixture.enabled !== false;
-    const engineEnabled = parseBoolean(fixture.engineEnabled, legacyMode === "engine");
+    const engineEnabled = parseBoolean(fixture.engineEnabled, false);
     const twitchEnabled = parseBoolean(fixture.twitchEnabled, false);
-    const customEnabled = parseBoolean(fixture.customEnabled, legacyMode === "standalone");
+    const customEnabled = parseBoolean(fixture.customEnabled, false);
     const controlMode = engineEnabled ? "engine" : "standalone";
     const engineBinding = String(
       fixture.engineBinding || (engineEnabled ? brand : "standalone")
@@ -3293,7 +3465,7 @@ function buildFixtureModeInteroperabilityReport(options = {}) {
     if (!engineEnabled && engineBinding !== "standalone") {
       issues.push({ id, severity: "warn", code: "standalone_binding_mismatch", message: "engineBinding should be 'standalone' when engineEnabled=false" });
     }
-    if (String(legacyMode || "") !== controlMode) {
+    if (reportedMode && reportedMode !== controlMode) {
       issues.push({ id, severity: "warn", code: "control_mode_mismatch", message: `controlMode should be '${controlMode}' for current mode flags` });
     }
 
@@ -3317,7 +3489,8 @@ function buildFixtureModeInteroperabilityReport(options = {}) {
         id,
         brand,
         enabled,
-        controlMode: legacyMode,
+        controlMode,
+        reportedControlMode: reportedMode || controlMode,
         engineBinding,
         engineEnabled,
         twitchEnabled,
@@ -3396,11 +3569,20 @@ function enqueueWiz(state, zone = "wiz", options = {}) {
 }
 
 const fixturePaletteSequenceState = new Map();
+const fixturePaletteSequenceCache = new Map();
+const PALETTE_SEQUENCE_CACHE_MAX = 192;
 const PALETTE_PATCH_FIELDS = Object.freeze([
   "colorsPerFamily",
   "families",
   "disorder",
-  "disorderAggression"
+  "disorderAggression",
+  "cycleMode",
+  "timedIntervalSec",
+  "beatLock",
+  "beatLockGraceSec",
+  "reactiveMargin",
+  "spectrumMapMode",
+  "spectrumFeatureMap"
 ]);
 
 function hasPalettePatchFields(patch = {}) {
@@ -3496,8 +3678,7 @@ function buildPaletteBrandFixtureCatalog(fixtures = null) {
     if (!fixtureId) continue;
     const brand = normalizePaletteBrandKey(fixture.brand);
     if (!brand) continue;
-    const legacyMode = String(fixture.controlMode || "engine").trim().toLowerCase();
-    const engineEnabled = parseBoolean(fixture.engineEnabled, legacyMode === "engine");
+    const engineEnabled = parseBoolean(fixture.engineEnabled, false);
     if (fixture.enabled === false || !engineEnabled) continue;
     const zone = getFixtureDispatchZoneForMode(fixture, "engine");
     byBrand[brand].push({
@@ -3554,26 +3735,162 @@ function buildPaletteFamilyColors(familyId, colorsPerFamily) {
   if (!family) return [];
   const colors = Array.isArray(family.colors) ? family.colors.slice() : [];
   if (!colors.length) return [];
-  const count = normalizePaletteColorCount(colorsPerFamily, 3);
-  if (count === 1) {
-    return [colors[Math.floor(colors.length / 2)]];
+  const count = normalizePaletteColorCount(colorsPerFamily, PALETTE_CONFIG_DEFAULT.colorsPerFamily);
+  const pickEvenly = (pool, targetCount) => {
+    if (!Array.isArray(pool) || !pool.length || targetCount <= 0) return [];
+    if (targetCount >= pool.length) return pool.slice();
+    if (targetCount === 1) return [pool[Math.floor((pool.length - 1) / 2)]];
+    const out = [];
+    const used = new Set();
+    for (let i = 0; i < targetCount; i += 1) {
+      const pos = (i * (pool.length - 1)) / (targetCount - 1);
+      let idx = clampNumber(Math.round(pos), 0, pool.length - 1, 0);
+      while (used.has(idx) && idx < pool.length - 1) idx += 1;
+      while (used.has(idx) && idx > 0) idx -= 1;
+      if (used.has(idx)) continue;
+      used.add(idx);
+      out.push(pool[idx]);
+    }
+    return out.length ? out : pool.slice(0, targetCount);
+  };
+  const corePalette = colors.slice(0, Math.min(5, colors.length));
+  if (count <= corePalette.length) {
+    return pickEvenly(corePalette, count);
   }
-  if (count === 3) {
-    return [
-      colors[0],
-      colors[Math.floor(colors.length / 2)],
-      colors[Math.min(colors.length - 1, 4)]
-    ];
+  return pickEvenly(colors, Math.min(count, colors.length));
+}
+
+function normalizePaletteHueDeg(value) {
+  const hue = Number(value);
+  if (!Number.isFinite(hue)) return 0;
+  return ((hue % 360) + 360) % 360;
+}
+
+function paletteHueDistanceDeg(a, b) {
+  const aa = normalizePaletteHueDeg(a);
+  const bb = normalizePaletteHueDeg(b);
+  const delta = Math.abs(aa - bb);
+  return delta > 180 ? (360 - delta) : delta;
+}
+
+function rotatePaletteColors(colors = [], shift = 0) {
+  const list = Array.isArray(colors) ? colors.slice() : [];
+  const len = list.length;
+  if (len <= 1) return list;
+  const offset = ((Math.round(Number(shift) || 0) % len) + len) % len;
+  if (offset === 0) return list;
+  return list.slice(offset).concat(list.slice(0, offset));
+}
+
+function buildPaletteFamilyVariants(colors = []) {
+  const base = Array.isArray(colors) ? colors : [];
+  if (!base.length) return [];
+  const variants = [];
+  const seen = new Set();
+  const directions = [base.slice(), base.slice().reverse()];
+
+  const pushVariant = candidate => {
+    const normalized = candidate.map(color => ({
+      r: clampRgb255(color?.r),
+      g: clampRgb255(color?.g),
+      b: clampRgb255(color?.b)
+    }));
+    const fingerprint = normalized.map(color => `${color.r},${color.g},${color.b}`).join("|");
+    if (!fingerprint || seen.has(fingerprint)) return;
+    const hues = normalized.map(color => normalizePaletteHueDeg(rgbToHsv255(color).h));
+    let internalScore = 0;
+    for (let i = 0; i < hues.length - 1; i += 1) {
+      internalScore += paletteHueDistanceDeg(hues[i], hues[i + 1]);
+    }
+    variants.push({
+      colors: normalized,
+      startHue: hues[0] || 0,
+      endHue: hues[hues.length - 1] || 0,
+      internalScore
+    });
+    seen.add(fingerprint);
+  };
+
+  for (const direction of directions) {
+    for (let offset = 0; offset < direction.length; offset += 1) {
+      pushVariant(rotatePaletteColors(direction, offset));
+    }
   }
-  return colors.slice(0, 5);
+  if (!variants.length) {
+    pushVariant(base);
+  }
+  return variants;
+}
+
+function orientPaletteFamiliesForOrderedFlow(segments = []) {
+  const safeSegments = Array.isArray(segments)
+    ? segments.filter(segment => Array.isArray(segment) && segment.length > 0)
+    : [];
+  if (safeSegments.length <= 1) {
+    return safeSegments.map(segment => segment.slice());
+  }
+
+  const candidateSets = safeSegments.map(segment => buildPaletteFamilyVariants(segment));
+  if (candidateSets.some(set => !Array.isArray(set) || !set.length)) {
+    return safeSegments.map(segment => segment.slice());
+  }
+
+  const transitionWeight = 6.8;
+  const cycleClosureWeight = 7.2;
+  let bestScore = Number.POSITIVE_INFINITY;
+  let best = null;
+  const chosen = new Array(candidateSets.length);
+
+  const walk = (idx, score) => {
+    if (idx >= candidateSets.length) {
+      let total = score;
+      if (candidateSets.length > 1) {
+        const first = chosen[0];
+        const last = chosen[chosen.length - 1];
+        total += paletteHueDistanceDeg(last.endHue, first.startHue) * cycleClosureWeight;
+      }
+      if (total < bestScore) {
+        bestScore = total;
+        best = chosen.slice();
+      }
+      return;
+    }
+    for (const candidate of candidateSets[idx]) {
+      let nextScore = score + candidate.internalScore;
+      if (idx > 0) {
+        const prev = chosen[idx - 1];
+        nextScore += paletteHueDistanceDeg(prev.endHue, candidate.startHue) * transitionWeight;
+      }
+      if (nextScore >= bestScore) continue;
+      chosen[idx] = candidate;
+      walk(idx + 1, nextScore);
+    }
+  };
+
+  walk(0, 0);
+  if (!best || !best.length) {
+    return safeSegments.map(segment => segment.slice());
+  }
+  return best.map(item => item.colors.slice());
 }
 
 function buildPaletteSequence(config = {}) {
   const normalized = normalizePaletteConfigSnapshot(config, PALETTE_CONFIG_DEFAULT);
+  const cacheKey = getPaletteConfigFingerprint(normalized);
+  if (fixturePaletteSequenceCache.has(cacheKey)) {
+    return fixturePaletteSequenceCache.get(cacheKey).map(color => ({ ...color }));
+  }
+
   const out = [];
-  for (const familyId of normalizePaletteFamilies(normalized.families, PALETTE_CONFIG_DEFAULT.families)) {
-    const colors = buildPaletteFamilyColors(familyId, normalized.colorsPerFamily);
-    for (const color of colors) {
+  const familySegments = normalizePaletteFamilies(normalized.families, PALETTE_CONFIG_DEFAULT.families)
+    .map(familyId => buildPaletteFamilyColors(familyId, normalized.colorsPerFamily))
+    .filter(segment => Array.isArray(segment) && segment.length > 0);
+  const flowSegments = !normalized.disorder && familySegments.length >= 2
+    ? orientPaletteFamiliesForOrderedFlow(familySegments)
+    : familySegments;
+
+  for (const segment of flowSegments) {
+    for (const color of segment) {
       out.push({
         r: clampRgb255(color.r),
         g: clampRgb255(color.g),
@@ -3581,12 +3898,19 @@ function buildPaletteSequence(config = {}) {
       });
     }
   }
-  if (out.length) return out;
-  return buildPaletteFamilyColors("blue", 3).map(color => ({
-    r: clampRgb255(color.r),
-    g: clampRgb255(color.g),
-    b: clampRgb255(color.b)
-  }));
+  if (!out.length) {
+    return buildPaletteFamilyColors("red", 3).map(color => ({
+      r: clampRgb255(color.r),
+      g: clampRgb255(color.g),
+      b: clampRgb255(color.b)
+    }));
+  }
+  fixturePaletteSequenceCache.set(cacheKey, out.map(color => ({ ...color })));
+  while (fixturePaletteSequenceCache.size > PALETTE_SEQUENCE_CACHE_MAX) {
+    const firstKey = fixturePaletteSequenceCache.keys().next().value;
+    fixturePaletteSequenceCache.delete(firstKey);
+  }
+  return out;
 }
 
 function getPaletteConfigFingerprint(config = {}) {
@@ -3595,8 +3919,256 @@ function getPaletteConfigFingerprint(config = {}) {
     String(normalized.colorsPerFamily),
     normalizePaletteFamilies(normalized.families, PALETTE_CONFIG_DEFAULT.families).join(","),
     normalized.disorder ? "1" : "0",
-    String(Math.round(normalizePaletteDisorderAggression(normalized.disorderAggression, 0.35) * 1000))
+    String(Math.round(normalizePaletteDisorderAggression(normalized.disorderAggression, 0.35) * 1000)),
+    normalizePaletteCycleMode(normalized.cycleMode, PALETTE_CONFIG_DEFAULT.cycleMode),
+    String(normalizePaletteTimedIntervalSec(normalized.timedIntervalSec, PALETTE_CONFIG_DEFAULT.timedIntervalSec)),
+    normalized.beatLock ? "1" : "0",
+    String(normalizePaletteBeatLockGraceSec(normalized.beatLockGraceSec, PALETTE_CONFIG_DEFAULT.beatLockGraceSec)),
+    String(normalizePaletteReactiveMargin(normalized.reactiveMargin, PALETTE_CONFIG_DEFAULT.reactiveMargin)),
+    normalizePaletteSpectrumMapMode(normalized.spectrumMapMode, PALETTE_CONFIG_DEFAULT.spectrumMapMode),
+    normalizePaletteSpectrumFeatureMap(normalized.spectrumFeatureMap, PALETTE_CONFIG_DEFAULT.spectrumFeatureMap).join(",")
   ].join("|");
+}
+
+function getPaletteSignalFromIntent(intent = {}) {
+  const raw = intent && typeof intent === "object" ? intent : {};
+  const nowMs = Date.now();
+  const normalizeUnit = (value, fallback = 0) => clampNumber(Number(value), 0, 1, fallback);
+  const normalizeWide = (value, max = 1.5) => clampNumber(Number(value), 0, max, 0) / max;
+  const bpm = clampNumber(Number(raw.bpm), 0, 260, 0);
+  return {
+    nowMs,
+    bpm,
+    energy: normalizeUnit(raw.energy, normalizeUnit(raw.audioDrive, normalizeUnit(raw.audioSourceLevel, 0))),
+    rms: normalizeUnit(raw.rms, normalizeUnit(raw.audioSourceLevel, 0)),
+    lows: normalizeUnit(raw.audioBandLow, normalizeUnit(raw.bandLow, 0)),
+    mids: normalizeUnit(raw.audioBandMid, normalizeUnit(raw.bandMid, 0)),
+    highs: normalizeUnit(raw.audioBandHigh, normalizeUnit(raw.bandHigh, 0)),
+    flux: normalizeUnit(raw.audioFlux, normalizeUnit(raw.flux, normalizeUnit(raw.audioMotion, 0))),
+    peaks: normalizeWide(raw.audioPeak, 1.5),
+    transients: normalizeWide(raw.audioTransient, 1.2),
+    beat: raw.beat === true || raw.drop === true
+      ? 1
+      : normalizeUnit(raw.beatConfidence, 0),
+    phrase: String(raw.phrase || "").trim().toLowerCase(),
+    scene: String(raw.scene || "").trim().toLowerCase()
+  };
+}
+
+function getPaletteSignalFeatureValue(signal = null, featureKey = "rms") {
+  const src = signal && typeof signal === "object" ? signal : {};
+  const feature = normalizePaletteAudioFeatureKey(featureKey, "rms");
+  if (feature === "lows") return clampNumber(src.lows, 0, 1, 0);
+  if (feature === "mids") return clampNumber(src.mids, 0, 1, 0);
+  if (feature === "highs") return clampNumber(src.highs, 0, 1, 0);
+  if (feature === "energy") return clampNumber(src.energy, 0, 1, 0);
+  if (feature === "flux") return clampNumber(src.flux, 0, 1, 0);
+  if (feature === "peaks") return clampNumber(src.peaks, 0, 1, 0);
+  if (feature === "transients") return clampNumber(src.transients, 0, 1, 0);
+  if (feature === "beat") return clampNumber(src.beat, 0, 1, 0);
+  return clampNumber(src.rms, 0, 1, 0);
+}
+
+function resolvePaletteGroupSize(config = {}, sequenceLength = 1) {
+  const len = Math.max(1, Number(sequenceLength) || 1);
+  const requested = normalizePaletteColorCount(config.colorsPerFamily, PALETTE_CONFIG_DEFAULT.colorsPerFamily);
+  return clampNumber(requested, 1, len, 1);
+}
+
+function normalizePaletteGroupBaseIndex(index, sequenceLength, groupSize) {
+  const len = Math.max(1, Number(sequenceLength) || 1);
+  const size = clampNumber(Math.round(Number(groupSize) || 1), 1, len, 1);
+  const base = ((Number(index) || 0) % len + len) % len;
+  const group = Math.floor(base / size);
+  return clampNumber(group * size, 0, Math.max(0, len - 1), 0);
+}
+
+function pickFixturePaletteNextIndex(currentIndex, sequenceLength, config = {}, intent = {}) {
+  const len = Math.max(1, Number(sequenceLength) || 1);
+  const index = ((Number(currentIndex) || 0) % len + len) % len;
+  if (len <= 1) return 0;
+  const scope = String(intent?.scope || "color").trim().toLowerCase();
+  if (scope === "group") {
+    const groupSize = resolvePaletteGroupSize(config, len);
+    const groupCount = Math.max(1, Math.ceil(len / groupSize));
+    if (groupCount <= 1) return 0;
+    const currentGroup = clampNumber(Math.floor(index / groupSize), 0, groupCount - 1, 0);
+    const step = Boolean(intent?.drop) && groupCount > 2 ? 2 : 1;
+    const nextGroup = (currentGroup + step) % groupCount;
+    return normalizePaletteGroupBaseIndex(nextGroup * groupSize, len, groupSize);
+  }
+  const isBeat = Boolean(intent?.beat);
+  const isDrop = Boolean(intent?.drop);
+  if (config.disorder) {
+    const aggression = normalizePaletteDisorderAggression(config.disorderAggression, 0.35);
+    const jumpChance = Math.max(
+      0.12,
+      Math.min(0.98, 0.18 + aggression * 0.64 + (isBeat ? 0.1 : 0) + (isDrop ? 0.12 : 0))
+    );
+    if (Math.random() < jumpChance) {
+      const maxJump = Math.max(1, Math.round(1 + aggression * Math.max(1, len - 1)));
+      const jump = 1 + Math.floor(Math.random() * maxJump);
+      return (index + jump) % len;
+    }
+    if (isBeat || isDrop) {
+      return (index + 1) % len;
+    }
+    return index;
+  }
+  let step = 1;
+  if (isDrop && len > 2) step = 2;
+  return (index + step) % len;
+}
+
+function shouldAdvanceFixturePaletteTimed(state = {}, config = {}, intent = {}, signal = {}) {
+  const nowMs = clampNumber(signal.nowMs, 0, Number.MAX_SAFE_INTEGER, Date.now());
+  const intervalMs = normalizePaletteTimedIntervalSec(
+    config.timedIntervalSec,
+    PALETTE_CONFIG_DEFAULT.timedIntervalSec
+  ) * 1000;
+  if (!(Number(state.lastAdvanceAt) > 0)) {
+    state.lastAdvanceAt = nowMs;
+    state.waitStartAt = 0;
+    return false;
+  }
+  const dueAt = Number(state.lastAdvanceAt) + intervalMs;
+  if (nowMs < dueAt) {
+    state.waitStartAt = 0;
+    return false;
+  }
+  const beatLock = parseBooleanLoose(config.beatLock, false) === true;
+  if (!beatLock) {
+    state.waitStartAt = 0;
+    state.lastAdvanceAt = nowMs;
+    return true;
+  }
+  if (Boolean(intent?.beat) || Boolean(intent?.drop)) {
+    state.waitStartAt = 0;
+    state.lastAdvanceAt = nowMs;
+    return true;
+  }
+  const graceMs = normalizePaletteBeatLockGraceSec(
+    config.beatLockGraceSec,
+    PALETTE_CONFIG_DEFAULT.beatLockGraceSec
+  ) * 1000;
+  if (!(Number(state.waitStartAt) > 0)) {
+    state.waitStartAt = dueAt;
+  }
+  if ((nowMs - Number(state.waitStartAt)) >= graceMs) {
+    state.waitStartAt = 0;
+    state.lastAdvanceAt = nowMs;
+    return true;
+  }
+  return false;
+}
+
+function computeFixtureReactiveShiftScore(currentSignal = {}, previousSignal = {}, intent = {}, reactiveMargin = PALETTE_CONFIG_DEFAULT.reactiveMargin) {
+  const margin = normalizePaletteReactiveMargin(reactiveMargin, PALETTE_CONFIG_DEFAULT.reactiveMargin);
+  const marginNorm = clampNumber(
+    (margin - PALETTE_REACTIVE_MARGIN_MIN) / Math.max(1, PALETTE_REACTIVE_MARGIN_MAX - PALETTE_REACTIVE_MARGIN_MIN),
+    0,
+    1,
+    0.2
+  );
+  const sensitivityBoost = 1.65 - (marginNorm * 0.9);
+  const bpmScale = Math.max(4, 6 + (margin * 0.34));
+  const bpmDelta = Math.abs(Number(currentSignal.bpm || 0) - Number(previousSignal.bpm || 0)) / bpmScale;
+  const energyDelta = Math.abs(Number(currentSignal.energy || 0) - Number(previousSignal.energy || 0));
+  const fluxDelta = Math.abs(Number(currentSignal.flux || 0) - Number(previousSignal.flux || 0));
+  const bandDelta = Math.max(
+    Math.abs(Number(currentSignal.lows || 0) - Number(previousSignal.lows || 0)),
+    Math.abs(Number(currentSignal.mids || 0) - Number(previousSignal.mids || 0)),
+    Math.abs(Number(currentSignal.highs || 0) - Number(previousSignal.highs || 0))
+  );
+  const phraseShift = currentSignal.phrase && previousSignal.phrase && currentSignal.phrase !== previousSignal.phrase
+    ? 0.86
+    : 0;
+  const sceneShift = currentSignal.scene && previousSignal.scene && currentSignal.scene !== previousSignal.scene
+    ? 0.52
+    : 0;
+  const eventBoost = Boolean(intent?.drop)
+    ? 0.66
+    : (Boolean(intent?.beat) ? 0.24 : 0);
+  const score = (
+    (bpmDelta * 1.08) +
+    (energyDelta * 1.8 * sensitivityBoost) +
+    (fluxDelta * 1.45 * sensitivityBoost) +
+    (bandDelta * 1.24 * sensitivityBoost) +
+    phraseShift +
+    sceneShift +
+    eventBoost
+  );
+  const threshold = 1.04 + (marginNorm * 0.84);
+  return { score, threshold };
+}
+
+function shouldAdvanceFixturePaletteReactive(state = {}, config = {}, intent = {}, signal = {}) {
+  const nowMs = clampNumber(signal.nowMs, 0, Number.MAX_SAFE_INTEGER, Date.now());
+  const previousSignal = state.lastSignal && typeof state.lastSignal === "object"
+    ? state.lastSignal
+    : null;
+  state.lastSignal = {
+    bpm: clampNumber(signal.bpm, 0, 260, 0),
+    energy: clampNumber(signal.energy, 0, 1, 0),
+    lows: clampNumber(signal.lows, 0, 1, 0),
+    mids: clampNumber(signal.mids, 0, 1, 0),
+    highs: clampNumber(signal.highs, 0, 1, 0),
+    flux: clampNumber(signal.flux, 0, 1, 0),
+    phrase: String(signal.phrase || "").trim().toLowerCase(),
+    scene: String(signal.scene || "").trim().toLowerCase()
+  };
+  if (!previousSignal) {
+    state.lastAdvanceAt = nowMs;
+    return false;
+  }
+  const margin = normalizePaletteReactiveMargin(config.reactiveMargin, PALETTE_CONFIG_DEFAULT.reactiveMargin);
+  const cooldownMs = 260 + Math.round(margin * 7.2);
+  if ((nowMs - Number(state.lastAdvanceAt || 0)) < cooldownMs) {
+    return false;
+  }
+  const scored = computeFixtureReactiveShiftScore(signal, previousSignal, intent, margin);
+  if (scored.score >= scored.threshold) {
+    state.lastAdvanceAt = nowMs;
+    return true;
+  }
+  return false;
+}
+
+function resolveFixtureSpectrumFeatureMap(config = {}) {
+  const mode = normalizePaletteSpectrumMapMode(config.spectrumMapMode, PALETTE_CONFIG_DEFAULT.spectrumMapMode);
+  if (mode === "manual") {
+    return normalizePaletteSpectrumFeatureMap(
+      config.spectrumFeatureMap,
+      PALETTE_CONFIG_DEFAULT.spectrumFeatureMap
+    );
+  }
+  return PALETTE_CONFIG_DEFAULT.spectrumFeatureMap.slice();
+}
+
+function pickFixtureSpectrumPaletteIndex(sequenceLength, config = {}, signal = {}, state = {}) {
+  const len = Math.max(1, Number(sequenceLength) || 1);
+  if (len <= 1) return 0;
+  const featureMap = resolveFixtureSpectrumFeatureMap(config);
+  const values = [];
+  for (let i = 0; i < len; i += 1) {
+    const feature = featureMap[i % featureMap.length];
+    const value = getPaletteSignalFeatureValue(signal, feature);
+    values.push(value);
+  }
+  let bestIndex = 0;
+  let bestValue = values[0] || 0;
+  for (let i = 1; i < values.length; i += 1) {
+    if (values[i] > bestValue) {
+      bestValue = values[i];
+      bestIndex = i;
+    }
+  }
+  const previousIndex = clampNumber(Number(state.lastSpectrumIndex), 0, Math.max(0, len - 1), 0);
+  const previousValue = values[previousIndex] || 0;
+  if (previousIndex >= 0 && (bestValue - previousValue) < 0.05) {
+    return previousIndex;
+  }
+  return bestIndex;
 }
 
 function pickFixturePaletteColor(fixtureId, brandKey, intent = {}) {
@@ -3608,48 +4180,98 @@ function pickFixturePaletteColor(fixtureId, brandKey, intent = {}) {
   const id = String(fixtureId || "").trim();
   if (!id) return null;
   const fingerprint = getPaletteConfigFingerprint(config);
+  const signal = getPaletteSignalFromIntent(intent);
+  const nowMs = signal.nowMs;
   let state = fixturePaletteSequenceState.get(id);
   if (!state || state.fingerprint !== fingerprint || Number(state.length) !== sequence.length) {
-    state = { index: 0, fingerprint, length: sequence.length };
+    state = {
+      index: 0,
+      colorOffset: 0,
+      fingerprint,
+      length: sequence.length,
+      lastAdvanceAt: nowMs,
+      waitStartAt: 0,
+      lastSignal: null,
+      lastSpectrumIndex: 0
+    };
   }
 
-  let index = Number(state.index) || 0;
-  if (index < 0 || index >= sequence.length) index = 0;
-  const color = sequence[index];
-
-  const isBeat = Boolean(intent?.beat);
-  const isDrop = Boolean(intent?.drop);
-  let nextIndex = index;
-
-  if (config.disorder) {
-    const aggression = normalizePaletteDisorderAggression(config.disorderAggression, 0.35);
-    const jumpChance = Math.max(
-      0.12,
-      Math.min(0.98, 0.18 + aggression * 0.64 + (isBeat ? 0.1 : 0) + (isDrop ? 0.12 : 0))
-    );
-    if (Math.random() < jumpChance) {
-      const maxJump = Math.max(1, Math.round(1 + aggression * Math.max(1, sequence.length - 1)));
-      const jump = 1 + Math.floor(Math.random() * maxJump);
-      nextIndex = (index + jump) % sequence.length;
-    } else if (isBeat || isDrop) {
-      nextIndex = (index + 1) % sequence.length;
+  const mode = normalizePaletteCycleMode(config.cycleMode, PALETTE_CONFIG_DEFAULT.cycleMode);
+  const groupSize = resolvePaletteGroupSize(config, sequence.length);
+  const groupCount = Math.max(1, Math.ceil(sequence.length / groupSize));
+  let index = normalizePaletteGroupBaseIndex(Number(state.index) || 0, sequence.length, groupSize);
+  const applyGroupColorOffset = () => {
+    const groupSpan = Math.max(1, Math.min(groupSize, sequence.length - index));
+    let offset = clampNumber(Math.round(Number(state.colorOffset) || 0), 0, Math.max(0, groupSpan - 1), 0);
+    if (groupSpan > 1) {
+      if (config.disorder) {
+        const aggression = normalizePaletteDisorderAggression(config.disorderAggression, 0.35);
+        const randomChance = clampNumber(
+          0.24 + aggression * 0.56 + (Boolean(intent?.beat) ? 0.08 : 0) + (Boolean(intent?.drop) ? 0.14 : 0),
+          0.12,
+          0.98,
+          0.48
+        );
+        if (Math.random() < randomChance) {
+          offset = Math.floor(Math.random() * groupSpan);
+        }
+      } else {
+        const step = Boolean(intent?.drop) && groupSpan > 2 ? 2 : 1;
+        offset = (offset + step) % groupSpan;
+      }
+    } else {
+      offset = 0;
     }
+    state.colorOffset = offset;
+    return normalizePaletteGroupBaseIndex(index, sequence.length, groupSize) + offset;
+  };
+
+  let emitIndex = index;
+  if (mode === "spectrum_mapper") {
+    const groupIndex = pickFixtureSpectrumPaletteIndex(groupCount, config, signal, state);
+    index = normalizePaletteGroupBaseIndex(groupIndex * groupSize, sequence.length, groupSize);
+    state.index = index;
+    state.lastSpectrumIndex = clampNumber(groupIndex, 0, Math.max(0, groupCount - 1), 0);
+    state.lastAdvanceAt = nowMs;
+    emitIndex = applyGroupColorOffset();
+  } else if (mode === "timed_cycle") {
+    const shouldAdvance = shouldAdvanceFixturePaletteTimed(state, config, intent, signal);
+    if (shouldAdvance) {
+      index = pickFixturePaletteNextIndex(index, sequence.length, config, { ...intent, scope: "group" });
+      state.index = index;
+    }
+    emitIndex = applyGroupColorOffset();
+  } else if (mode === "reactive_shift") {
+    const shouldAdvance = shouldAdvanceFixturePaletteReactive(state, config, intent, signal);
+    if (shouldAdvance) {
+      index = pickFixturePaletteNextIndex(index, sequence.length, config, { ...intent, scope: "group" });
+      state.index = index;
+      state.lastSpectrumIndex = clampNumber(Math.floor(index / groupSize), 0, Math.max(0, groupCount - 1), 0);
+    }
+    emitIndex = applyGroupColorOffset();
   } else {
-    let step = 1;
-    if (isDrop && sequence.length > 2) step = 2;
-    nextIndex = (index + step) % sequence.length;
+    // on_trigger: advance palette group only on beat/drop triggers.
+    const triggerAdvance = Boolean(intent?.beat || intent?.drop);
+    if (triggerAdvance) {
+      const nextIndex = pickFixturePaletteNextIndex(index, sequence.length, config, { ...intent, scope: "group" });
+      state.index = nextIndex;
+      index = normalizePaletteGroupBaseIndex(nextIndex, sequence.length, groupSize);
+      state.lastAdvanceAt = nowMs;
+      state.lastSpectrumIndex = clampNumber(Math.floor(index / groupSize), 0, Math.max(0, groupCount - 1), 0);
+    }
+    emitIndex = applyGroupColorOffset();
   }
 
   fixturePaletteSequenceState.set(id, {
-    index: nextIndex,
+    ...state,
     fingerprint,
     length: sequence.length
   });
 
   return {
-    r: clampRgb255(color.r),
-    g: clampRgb255(color.g),
-    b: clampRgb255(color.b)
+    r: clampRgb255((sequence[emitIndex] || sequence[0]).r),
+    g: clampRgb255((sequence[emitIndex] || sequence[0]).g),
+    b: clampRgb255((sequence[emitIndex] || sequence[0]).b)
   };
 }
 
@@ -3769,6 +4391,42 @@ function setFixturePaletteOverrideConfig(patch = {}) {
     updated.disorderAggression = normalizePaletteDisorderAggression(
       next.disorderAggression,
       current.disorderAggression
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "cycleMode")) {
+    updated.cycleMode = normalizePaletteCycleMode(next.cycleMode, current.cycleMode);
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "timedIntervalSec")) {
+    updated.timedIntervalSec = normalizePaletteTimedIntervalSec(
+      next.timedIntervalSec,
+      current.timedIntervalSec
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "beatLock")) {
+    updated.beatLock = parseBooleanLoose(next.beatLock, Boolean(current.beatLock));
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "beatLockGraceSec")) {
+    updated.beatLockGraceSec = normalizePaletteBeatLockGraceSec(
+      next.beatLockGraceSec,
+      current.beatLockGraceSec
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "reactiveMargin")) {
+    updated.reactiveMargin = normalizePaletteReactiveMargin(
+      next.reactiveMargin,
+      current.reactiveMargin
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "spectrumMapMode")) {
+    updated.spectrumMapMode = normalizePaletteSpectrumMapMode(
+      next.spectrumMapMode,
+      current.spectrumMapMode
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(next, "spectrumFeatureMap")) {
+    updated.spectrumFeatureMap = normalizePaletteSpectrumFeatureMap(
+      next.spectrumFeatureMap,
+      current.spectrumFeatureMap
     );
   }
 
@@ -4144,8 +4802,7 @@ function listMetricRoutedFixtureIds(brandKey, options = {}) {
       if (!fixture || typeof fixture !== "object") return false;
       const fixtureBrand = normalizePaletteBrandKey(fixture.brand);
       if (!fixtureBrand || fixtureBrand !== brand) return false;
-      const legacyMode = String(fixture.controlMode || "engine").trim().toLowerCase();
-      const engineEnabled = parseBoolean(fixture.engineEnabled, legacyMode === "engine");
+      const engineEnabled = parseBoolean(fixture.engineEnabled, false);
       if (fixture.enabled === false || !engineEnabled) return false;
       const fixtureId = String(fixture.id || "").trim();
       if (!fixtureId) return false;
@@ -4623,7 +5280,14 @@ function clearFixtureRoutingOverridesAtomic(patch = {}) {
             colorsPerFamily: paletteBrandBefore.colorsPerFamily,
             families: paletteBrandBefore.families,
             disorder: paletteBrandBefore.disorder,
-            disorderAggression: paletteBrandBefore.disorderAggression
+            disorderAggression: paletteBrandBefore.disorderAggression,
+            cycleMode: paletteBrandBefore.cycleMode,
+            timedIntervalSec: paletteBrandBefore.timedIntervalSec,
+            beatLock: paletteBrandBefore.beatLock,
+            beatLockGraceSec: paletteBrandBefore.beatLockGraceSec,
+            reactiveMargin: paletteBrandBefore.reactiveMargin,
+            spectrumMapMode: paletteBrandBefore.spectrumMapMode,
+            spectrumFeatureMap: paletteBrandBefore.spectrumFeatureMap
           });
         } else {
           engine.setPaletteConfig?.({
@@ -4704,8 +5368,7 @@ function persistStandaloneStateForFixture(id, state) {
 }
 
 function isStandaloneFixture(fixture) {
-  const legacyStandalone = String(fixture?.controlMode || "engine").trim().toLowerCase() === "standalone";
-  return parseBoolean(fixture?.customEnabled, legacyStandalone);
+  return parseBoolean(fixture?.customEnabled, false);
 }
 
 function listStandaloneFixtures() {
@@ -5137,8 +5800,7 @@ function stopStandaloneTimer(id) {
 function startStandaloneTimer(fixture, state) {
   const id = String(fixture?.id || "").trim();
   if (!id) return;
-  const legacyMode = String(fixture?.controlMode || "engine").trim().toLowerCase();
-  const engineEnabled = parseBoolean(fixture?.engineEnabled, legacyMode === "engine");
+  const engineEnabled = parseBoolean(fixture?.engineEnabled, false);
   if (engineEnabled) {
     stopStandaloneTimer(id);
     return;
@@ -5176,8 +5838,7 @@ function startStandaloneTimer(fixture, state) {
       stopStandaloneTimer(id);
       return;
     }
-    const liveLegacyMode = String(liveFixture.controlMode || "engine").trim().toLowerCase();
-    const liveEngineEnabled = parseBoolean(liveFixture.engineEnabled, liveLegacyMode === "engine");
+    const liveEngineEnabled = parseBoolean(liveFixture.engineEnabled, false);
     if (liveEngineEnabled) {
       stopStandaloneTimer(id);
       return;
@@ -5208,10 +5869,9 @@ function buildStandaloneSnapshot(fixture) {
   const target = fixture?.brand === "hue"
     ? `${fixture.bridgeIp || "-"} / light ${fixture.lightId || "-"}`
     : (fixture?.ip || "-");
-  const legacyMode = String(fixture?.controlMode || "engine").trim().toLowerCase();
-  const engineEnabled = parseBoolean(fixture?.engineEnabled, legacyMode === "engine");
+  const engineEnabled = parseBoolean(fixture?.engineEnabled, false);
   const twitchEnabled = parseBoolean(fixture?.twitchEnabled, false);
-  const customEnabled = parseBoolean(fixture?.customEnabled, legacyMode === "standalone");
+  const customEnabled = parseBoolean(fixture?.customEnabled, false);
 
   return {
     id,
@@ -5828,9 +6488,6 @@ function bootEngine(reason = "boot") {
 
   audio = createAudio(() => {});
 
-  if (engine?.setLegacyComponentsEnabled) {
-    engine.setLegacyComponentsEnabled(Boolean(systemConfigRuntime?.legacyComponentsEnabled));
-  }
   engine.setDropDetectionEnabled?.(Boolean(audioReactivityMapRuntime.dropEnabled));
   if (engine?.setMetaAutoTempoTrackers) {
     engine.setMetaAutoTempoTrackers(
@@ -6052,30 +6709,22 @@ async function handleRaveOff(_, res) {
 }
 
 app.post("/rave/on", handleRaveOn);
-if (ALLOW_LEGACY_MUTATING_GET_RUNTIME) {
-  app.get("/rave/on", handleRaveOn);
-} else {
-  app.get("/rave/on", (_, res) => {
-    res.status(405).json({
-      ok: false,
-      error: "method_not_allowed",
-      detail: "Use POST /rave/on. Legacy mutating GET routes are disabled by default."
-    });
+app.get("/rave/on", (_, res) => {
+  res.status(405).json({
+    ok: false,
+    error: "method_not_allowed",
+    detail: "Use POST /rave/on."
   });
-}
+});
 
 app.post("/rave/off", handleRaveOff);
-if (ALLOW_LEGACY_MUTATING_GET_RUNTIME) {
-  app.get("/rave/off", handleRaveOff);
-} else {
-  app.get("/rave/off", (_, res) => {
-    res.status(405).json({
-      ok: false,
-      error: "method_not_allowed",
-      detail: "Use POST /rave/off. Legacy mutating GET routes are disabled by default."
-    });
+app.get("/rave/off", (_, res) => {
+  res.status(405).json({
+    ok: false,
+    error: "method_not_allowed",
+    detail: "Use POST /rave/off."
   });
-}
+});
 
 app.post("/rave/reload", async (_, res) => {
   console.log("[RAVE] hot reload requested");
@@ -6355,30 +7004,7 @@ function sanitizeTwitchColorConfig(input = {}) {
 function readTwitchColorConfig() {
   try {
     const parsed = JSON.parse(fs.readFileSync(TWITCH_COLOR_CONFIG_PATH, "utf8"));
-    const sanitized = sanitizeTwitchColorConfig(parsed);
-    const raveOff = sanitized.raveOff || {};
-    const legacyDefaultText = String(raveOff.defaultText || "").trim().toLowerCase();
-    const hasGroupOverrides = Object.keys(raveOff.groups || {}).length > 0;
-    const hasFixtureOverrides = Object.keys(raveOff.fixtures || {}).length > 0;
-    const shouldMigrateLegacyDefault =
-      legacyDefaultText === "dim blue" &&
-      !hasGroupOverrides &&
-      !hasFixtureOverrides;
-    if (!shouldMigrateLegacyDefault) return sanitized;
-    const migrated = sanitizeTwitchColorConfig({
-      ...sanitized,
-      raveOff: {
-        ...raveOff,
-        defaultText: "random"
-      }
-    });
-    try {
-      writeTwitchColorConfig(migrated);
-      console.log("[COLOR] migrated legacy rave-off default from 'dim blue' to 'random'");
-    } catch (err) {
-      console.warn("[COLOR] unable to persist rave-off default migration:", err?.message || err);
-    }
-    return migrated;
+    return sanitizeTwitchColorConfig(parsed);
   } catch {
     return sanitizeTwitchColorConfig(TWITCH_COLOR_CONFIG_DEFAULT);
   }
@@ -6908,30 +7534,123 @@ function getAudioReactivityDrive(target = "hue", telemetry = null) {
   };
 }
 
+function appendPaletteSignalToIntentOutput(intent = {}, telemetry = null, fallbackScene = "") {
+  const nextIntent = intent && typeof intent === "object" ? { ...intent } : {};
+  const t = telemetry && typeof telemetry === "object"
+    ? telemetry
+    : (engine?.getTelemetry?.() || {});
+  const resolvedScene = String(
+    nextIntent.scene ||
+    t?.wizScene ||
+    t?.scene ||
+    fallbackScene ||
+    ""
+  ).trim().toLowerCase();
+  nextIntent.bpm = clampNumber(Number(nextIntent.bpm ?? t?.bpm), 0, 260, 0);
+  nextIntent.energy = clampNumber(
+    Number(nextIntent.energy ?? t?.energy ?? nextIntent.audioDrive),
+    0,
+    1,
+    0
+  );
+  nextIntent.rms = clampNumber(
+    Number(nextIntent.rms ?? t?.audioSourceLevel ?? t?.rms ?? nextIntent.audioSourceLevel),
+    0,
+    1,
+    0
+  );
+  nextIntent.audioBandLow = clampNumber(Number(nextIntent.audioBandLow ?? t?.audioBandLow), 0, 1, 0);
+  nextIntent.audioBandMid = clampNumber(Number(nextIntent.audioBandMid ?? t?.audioBandMid), 0, 1, 0);
+  nextIntent.audioBandHigh = clampNumber(Number(nextIntent.audioBandHigh ?? t?.audioBandHigh), 0, 1, 0);
+  nextIntent.audioFlux = clampNumber(Number(nextIntent.audioFlux ?? t?.audioFlux), 0, 1, 0);
+  nextIntent.audioPeak = clampNumber(Number(nextIntent.audioPeak ?? t?.audioPeak), 0, 1.5, 0);
+  nextIntent.audioTransient = clampNumber(Number(nextIntent.audioTransient ?? t?.audioTransient), 0, 1.2, 0);
+  nextIntent.beatConfidence = clampNumber(
+    Number(nextIntent.beatConfidence ?? t?.beatConfidence),
+    0,
+    1,
+    nextIntent.beat ? 0.62 : 0
+  );
+  nextIntent.phrase = String(nextIntent.phrase || t?.phrase || "").trim().toLowerCase();
+  nextIntent.scene = resolvedScene;
+  return nextIntent;
+}
+
+function getRawPercussiveBody(telemetry = {}) {
+  const t = telemetry && typeof telemetry === "object" ? telemetry : {};
+  const baseline = clamp01(t.audioSourceLevel, clamp01(t.rms, 0));
+  const energyValue = clamp01(t.energy, baseline);
+  const low = clamp01(t.audioBandLow, baseline);
+  const mid = clamp01(t.audioBandMid, baseline);
+  const high = clamp01(t.audioBandHigh, baseline);
+  const transient = clamp01(t.audioTransient ?? t.transient, 0);
+  const flux = clamp01(t.audioFlux, clamp01(t.spectralFlux, 0));
+  const beat = clamp01(t.beatConfidence, t.beat ? 0.62 : 0);
+  const drums = clamp01(
+    (low * 0.56) +
+    (transient * 0.27) +
+    (flux * 0.17) +
+    (beat * 0.08),
+    0
+  );
+  const body = clamp01(
+    Math.max(
+      (energyValue * 0.68) + (baseline * 0.32),
+      (baseline * 0.58) + (low * 0.24) + (mid * 0.18),
+      (drums * 0.82) + (mid * 0.16),
+      (high * 0.18) + (drums * 0.68) + (baseline * 0.22)
+    ),
+    baseline
+  );
+  const activity = clamp01(
+    Math.max(
+      body,
+      drums * 0.96,
+      (transient * 0.84) + (flux * 0.16),
+      beat * 0.8
+    ),
+    body
+  );
+  return {
+    baseline,
+    drums,
+    body,
+    activity
+  };
+}
+
 function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
   if (!intent || typeof intent !== "object") return intent;
   if (!intent.state || typeof intent.state !== "object") return intent;
   const profile = getAudioReactivityDrive("hue", telemetry);
   if (!profile.enabled) return { ...intent, drop: false };
   const motionProfile = getAudioTelemetryMotionProfile(telemetry);
+  const raw = getRawPercussiveBody(telemetry);
+  const dropActive = Boolean(audioReactivityMapRuntime.dropEnabled && intent.drop);
 
   const statePatch = { ...intent.state };
   const baseBri = clampNumber(statePatch.bri, 1, 254, 160);
   const floorPercent = clampNumber(
-    0.36 +
-      (profile.character * 0.12) -
-      (motionProfile.quietMix * 0.22) -
-      (motionProfile.hushMix * 0.12),
-    0.06,
-    0.62,
-    0.22
+    0.24 +
+      (profile.character * 0.16) +
+      (raw.body * 0.2) +
+      (raw.drums * 0.14) -
+      (motionProfile.quietMix * 0.09) -
+      (motionProfile.hushMix * 0.05),
+    0.1,
+    0.76,
+    0.26
   );
   const floorBri = Math.max(3, Math.min(170, Math.round(baseBri * floorPercent)));
   const boundedDrive = Math.max(
-    0.18,
+    0.22,
     Math.min(
-      1.58,
-      profile.drive - (motionProfile.quietMix * 0.08) - (clamp01(profile.vocalOverhang, 0) * 0.1)
+      1.64,
+      profile.drive -
+        (motionProfile.quietMix * 0.04) -
+        (clamp01(profile.vocalOverhang, 0) * 0.06) +
+        (raw.drums * 0.24) +
+        (raw.body * 0.16)
     )
   );
   let nextBri = floorBri + ((baseBri - floorBri) * Math.min(1.04, boundedDrive));
@@ -6945,53 +7664,94 @@ function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
   if (Number.isFinite(Number(statePatch.transitiontime))) {
     const flowMode = Boolean(intent.forceDelta);
     const baseTransition = clampNumber(statePatch.transitiontime, 0, 30, 3);
-    const trim = Math.max(0, Math.round(((boundedDrive - 0.42) * 2.4) + (profile.character * 1.05)));
-    const quietHold = Math.round(
-      (motionProfile.quietMix * 2.4) +
-      (motionProfile.hushMix * 3.2) +
-      (clamp01(profile.vocalOverhang, 0) * 1.8)
+    const trim = Math.max(
+      0,
+      Math.round(
+        ((boundedDrive - 0.36) * 3.1) +
+        (profile.character * 1.2) +
+        (raw.drums * 1.6) +
+        (raw.body * 0.9)
+      )
     );
-    const floor = flowMode ? 1 : 0;
-    statePatch.transitiontime = Math.max(floor, Math.min(30, baseTransition - trim + quietHold));
+    const quietHold = Math.round(Math.max(
+      0,
+      (clamp01(profile.vocalOverhang, 0) * 0.9) -
+      (raw.drums * 1.8) -
+      (raw.activity * 1.2)
+    ));
+    const transitionCap = flowMode || raw.activity > 0.26
+      ? 2
+      : 4;
+    const floor = flowMode || raw.activity > 0.18 ? 1 : 0;
+    statePatch.transitiontime = Math.max(
+      floor,
+      Math.min(transitionCap, baseTransition - trim + quietHold)
+    );
   }
   if (Number.isFinite(Number(statePatch.sat)) && statePatch.on !== false) {
     const satBase = clampNumber(statePatch.sat, 1, 254, 180);
     const satBoost = Math.round(
       (profile.character * 16) +
-      (Math.max(0, boundedDrive - 1) * 22) -
-      (clamp01(profile.vocalOverhang, 0) * 10)
+      (Math.max(0, boundedDrive - 1) * 22) +
+      (raw.drums * 8) -
+      (clamp01(profile.vocalOverhang, 0) * 8)
     );
     statePatch.sat = Math.max(1, Math.min(254, satBase + satBoost));
   }
   const baseRateMs = clampNumber(intent.rateMs, 55, 1200, 0);
-  const quietRateBoost = Math.round(
-    (motionProfile.quietMix * 64) +
-    (motionProfile.hushMix * 84) +
-    (clamp01(profile.vocalOverhang, 0) * 48)
+  const rhythmRateSignal = clampNumber(
+    Math.max(
+      raw.drums,
+      raw.activity * 0.88,
+      profile.transient * 0.92,
+      profile.peak * 0.72,
+      profile.beat * 0.7
+    ),
+    0,
+    1,
+    0
   );
-  const beatRateTrim = Math.round(profile.beat * 24);
-  const nextRateMs = baseRateMs > 0
-    ? clampNumber(baseRateMs + quietRateBoost - beatRateTrim, 55, 1200, baseRateMs)
+  const rhythmTargetRateMs = Math.round(240 - (rhythmRateSignal * 150));
+  let nextRateMs = baseRateMs > 0
+    ? clampNumber(Math.min(baseRateMs, rhythmTargetRateMs), 55, 1200, baseRateMs)
     : intent.rateMs;
-  const quietMaxSilenceMs = motionProfile.quietMix > 0.18
-    ? Math.round(
-      780 +
-      (motionProfile.quietMix * 260) +
-      (motionProfile.hushMix * 300)
-    )
-    : null;
+  if (dropActive) {
+    nextRateMs = Math.min(nextRateMs, 82);
+  } else if (rhythmRateSignal > 0.72) {
+    nextRateMs = Math.min(nextRateMs, 102);
+  } else if (rhythmRateSignal > 0.5) {
+    nextRateMs = Math.min(nextRateMs, 132);
+  }
+  const quietMaxSilenceMs = null;
+  const forcedDeltaByBody = raw.drums > 0.2 || raw.activity > 0.28 || profile.transient > 0.22;
+  const baseDeltaScale = clampNumber(
+    Number(intent.deltaScale),
+    0.35,
+    1.2,
+    Boolean(intent.forceDelta) ? 0.72 : 1
+  );
+  const nextDeltaScale = clampNumber(
+    baseDeltaScale - (raw.drums * 0.32) - (raw.activity * 0.18),
+    0.4,
+    1.05,
+    baseDeltaScale
+  );
 
-  return {
+  return appendPaletteSignalToIntentOutput({
     ...intent,
-    drop: Boolean(audioReactivityMapRuntime.dropEnabled && intent.drop),
+    drop: dropActive,
+    forceDelta: Boolean(intent.forceDelta || forcedDeltaByBody),
+    deltaScale: nextDeltaScale,
     rateMs: nextRateMs,
     ...(Number.isFinite(quietMaxSilenceMs) ? { maxSilenceMs: quietMaxSilenceMs } : {}),
     audioDrive: Number(profile.drive.toFixed(3)),
     audioSourceLevel: Number(profile.level.toFixed(3)),
     audioMotion: Number(motionProfile.motion.toFixed(3)),
+    audioDrums: Number(raw.drums.toFixed(3)),
+    audioBody: Number(raw.body.toFixed(3)),
     audioSources: profile.sources,
     state: statePatch
-  };
+  }, telemetry);
 }
 
 function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
@@ -6999,6 +7759,7 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   const profile = getAudioReactivityDrive("wiz", telemetry);
   if (!profile.enabled) return { ...intent, drop: false };
   const motionProfile = getAudioTelemetryMotionProfile(telemetry);
+  const raw = getRawPercussiveBody(telemetry);
   const sceneName = String(
     intent.scene ||
     telemetry?.wizScene ||
@@ -7021,7 +7782,14 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   const beatAttack = clamp01(
     (profile.beat * 0.56) +
     (profile.transient * 0.28) +
-    (profile.peak * 0.16),
+    (profile.peak * 0.16) +
+    (raw.drums * 0.18),
+    0
+  );
+  const drumAttack = clamp01(
+    (raw.drums * 0.72) +
+    (profile.transient * 0.22) +
+    (motionProfile.motion * 0.06),
     0
   );
   if (dropActive) {
@@ -7031,25 +7799,36 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
       wizReactiveDynamics.beatPulse,
       0.72 + (beatAttack * 0.24)
     );
+  } else if (drumAttack > 0.28) {
+    wizReactiveDynamics.beatPulse = Math.max(
+      wizReactiveDynamics.beatPulse,
+      0.34 + (drumAttack * 0.42)
+    );
   }
   const beatPulse = clamp01(wizReactiveDynamics.beatPulse, 0);
   const baseBrightness = clampNumber(next.brightness, 0.06, 1, 0.65);
   const boundedDrive = Math.max(
-    0.18,
+    0.2,
     Math.min(
-      1.58,
-      profile.drive - (motionProfile.quietMix * 0.1) - (clamp01(profile.vocalOverhang, 0) * 0.12)
+      1.62,
+      profile.drive -
+        (motionProfile.quietMix * 0.05) -
+        (clamp01(profile.vocalOverhang, 0) * 0.08) +
+        (raw.drums * 0.26) +
+        (raw.body * 0.14)
     )
   );
   const driveNorm = clampNumber((boundedDrive - 0.34) / 1.06, 0, 1, 0);
   const floorPercent = clampNumber(
-    0.36 +
-      (profile.character * 0.12) -
-      (motionProfile.quietMix * 0.22) -
-      (motionProfile.hushMix * 0.12),
+    0.26 +
+      (profile.character * 0.16) +
+      (raw.body * 0.16) +
+      (raw.drums * 0.12) -
+      (motionProfile.quietMix * 0.08) -
+      (motionProfile.hushMix * 0.04),
     0.08,
-    0.62,
-    0.24
+    0.72,
+    0.28
   );
   const floor = Math.max(0.03, Math.min(0.62, baseBrightness * floorPercent));
   let brightness = floor + ((baseBrightness - floor) * Math.min(1.04, boundedDrive));
@@ -7065,6 +7844,7 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   }
   const highEvidence = clampNumber(
     (driveNorm * 0.58) +
+    (raw.drums * 0.2) +
     (profile.peak * 0.22) +
     (profile.beat * 0.2),
     0,
@@ -7072,9 +7852,11 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
     driveNorm
   );
   const lowEvidence = clampNumber(
-    (motionProfile.quietMix * 0.56) +
-    (motionProfile.hushMix * 0.44) +
-    ((1 - driveNorm) * 0.32),
+    (motionProfile.quietMix * 0.4) +
+    (motionProfile.hushMix * 0.28) +
+    ((1 - driveNorm) * 0.22) -
+    (raw.drums * 0.42) -
+    (raw.body * 0.28),
     0,
     1,
     0
@@ -7111,13 +7893,13 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   }
   if (!dropActive) {
     const quietDimmer = Math.max(
-      0.18,
+      0.3,
       pulseScene
-        ? 1 - (motionProfile.quietMix * 0.16) - (motionProfile.hushMix * 0.2) + (beatPulse * 0.16)
-        : 1 - (motionProfile.quietMix * 0.4) - (motionProfile.hushMix * 0.46) + (beatPulse * 0.08)
+        ? 1 - (motionProfile.quietMix * 0.1) - (motionProfile.hushMix * 0.12) + (beatPulse * 0.14) + (raw.drums * 0.18)
+        : 1 - (motionProfile.quietMix * 0.18) - (motionProfile.hushMix * 0.22) + (beatPulse * 0.1) + (raw.drums * 0.22) + (raw.body * 0.12)
     );
     brightness *= quietDimmer;
-    if (!beatActive && lowEvidence > 0.8) {
+    if (!beatActive && drumAttack < 0.24 && lowEvidence > 0.84) {
       const quietCap = 0.14 + ((1 - lowEvidence) * 0.18);
       brightness = Math.min(brightness, quietCap);
     }
@@ -7130,16 +7912,22 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
     wizReactiveDynamics.brightnessEma = brightnessTarget;
   }
   const riseAlpha = clampNumber(
-    (pulseScene ? 0.36 : 0.24) + (beatPulse * (pulseScene ? 0.2 : 0.12)) + (dropActive ? (pulseScene ? 0.18 : 0.14) : 0),
+    (pulseScene ? 0.42 : 0.3) +
+      (beatPulse * (pulseScene ? 0.2 : 0.12)) +
+      (dropActive ? (pulseScene ? 0.18 : 0.14) : 0) +
+      (raw.drums * 0.16) +
+      (raw.body * 0.1),
     0.16,
-    0.74,
-    0.32
+    0.86,
+    0.38
   );
   const fallAlpha = clampNumber(
-    (pulseScene ? 0.22 : 0.1) + ((1 - clamp01(motionProfile.motion, 0)) * (pulseScene ? 0.06 : 0.08)),
+    (pulseScene ? 0.24 : 0.12) +
+      ((1 - clamp01(motionProfile.motion, 0)) * (pulseScene ? 0.05 : 0.06)) +
+      (raw.drums * 0.06),
     0.06,
-    0.28,
-    0.14
+    0.34,
+    0.16
   );
   const brightnessAlpha = brightnessTarget >= wizReactiveDynamics.brightnessEma
     ? riseAlpha
@@ -7148,21 +7936,29 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   next.brightness = Math.max(0.03, Math.min(1, wizReactiveDynamics.brightnessEma));
   const minRateMs = pulseScene ? 68 : 55;
   const baseRateMs = clampNumber(next.rateMs, minRateMs, 1200, 0);
-  const quietRateBoost = Math.round(
-    (motionProfile.quietMix * 56) +
-    (motionProfile.hushMix * 74) +
-    (clamp01(profile.vocalOverhang, 0) * 46)
+  const rhythmRateSignal = clampNumber(
+    Math.max(
+      raw.drums,
+      raw.activity * 0.9,
+      profile.transient * 0.92,
+      profile.peak * 0.74,
+      profile.beat * 0.7,
+      beatPulse * 0.82
+    ),
+    0,
+    1,
+    0
   );
-  const beatRateTrim = Math.round(beatPulse * (dropActive ? 42 : 28));
+  const rhythmTargetRateMs = Math.round((pulseScene ? 188 : 205) - (rhythmRateSignal * (pulseScene ? 118 : 130)));
   next.rateMs = baseRateMs > 0
-    ? clampNumber(baseRateMs + quietRateBoost - beatRateTrim, minRateMs, 1200, baseRateMs)
+    ? clampNumber(Math.min(baseRateMs, rhythmTargetRateMs), minRateMs, 1200, baseRateMs)
     : next.rateMs;
-  if (motionProfile.quietMix > 0.18 && beatPulse < 0.2) {
-    next.maxSilenceMs = Math.round(
-      900 +
-      (motionProfile.quietMix * 220) +
-      (motionProfile.hushMix * 280)
-    );
+  if (dropActive) {
+    next.rateMs = Math.min(next.rateMs, pulseScene ? 72 : 84);
+  } else if (rhythmRateSignal > 0.72) {
+    next.rateMs = Math.min(next.rateMs, pulseScene ? 82 : 96);
+  } else if (rhythmRateSignal > 0.5) {
+    next.rateMs = Math.min(next.rateMs, pulseScene ? 92 : 112);
   }
   const saturationBoost = 1;
   if (next.color && typeof next.color === "object") {
@@ -7239,12 +8035,28 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
     };
     }
   }
+  const forcedDeltaByBody = raw.drums > 0.2 || raw.activity > 0.28 || drumAttack > 0.3;
+  const baseDeltaScale = clampNumber(
+    Number(next.deltaScale),
+    0.35,
+    1.2,
+    pulseScene ? 1 : (flowScene ? 0.9 : 0.92)
+  );
+  next.forceDelta = Boolean(next.forceDelta || dropActive || beatActive || forcedDeltaByBody);
+  next.deltaScale = clampNumber(
+    baseDeltaScale - (raw.drums * 0.34) - (raw.activity * 0.2),
+    0.4,
+    1.04,
+    baseDeltaScale
+  );
   next.drop = dropActive;
   next.audioDrive = Number(profile.drive.toFixed(3));
   next.audioSourceLevel = Number(profile.level.toFixed(3));
   next.audioMotion = Number(motionProfile.motion.toFixed(3));
+  next.audioDrums = Number(raw.drums.toFixed(3));
+  next.audioBody = Number(raw.body.toFixed(3));
   next.audioSources = profile.sources;
-  return next;
+  return appendPaletteSignalToIntentOutput(next, telemetry, sceneName);
 }
 
 function parseColorTarget(raw, fallback = "both") {
@@ -7795,21 +8607,13 @@ app.get("/obs/dock", (req, res) => {
   res.redirect(302, dockUrl);
 });
 
-if (ALLOW_LEGACY_MUTATING_GET_RUNTIME) {
-  app.get("/teach", (req, res) => {
-    const text = getCompatText(req);
-    const ok = teachColor(text);
-    res.json({ ok, text });
+app.get("/teach", (_, res) => {
+  res.status(405).json({
+    ok: false,
+    error: "method_not_allowed",
+    detail: "Use POST /teach."
   });
-} else {
-  app.get("/teach", (_, res) => {
-    res.status(405).json({
-      ok: false,
-      error: "method_not_allowed",
-      detail: "Use POST /teach. Legacy mutating GET routes are disabled by default."
-    });
-  });
-}
+});
 
 app.post("/teach", (req, res) => {
   const text = getCompatText(req);
@@ -7936,26 +8740,13 @@ app.post("/color/prefixes", (req, res) => {
   });
 });
 
-if (ALLOW_LEGACY_MUTATING_GET_RUNTIME) {
-  app.get("/color", (req, res) => {
-    const text = getCompatText(req);
-    applyColorText(text, getColorRequestOptions(req))
-      .then(result => {
-        res.json({ ok: result.ok, text, ...result });
-      })
-      .catch(err => {
-        res.status(500).json({ ok: false, text, error: err.message || String(err) });
-      });
+app.get("/color", (_, res) => {
+  res.status(405).json({
+    ok: false,
+    error: "method_not_allowed",
+    detail: "Use POST /color."
   });
-} else {
-  app.get("/color", (_, res) => {
-    res.status(405).json({
-      ok: false,
-      error: "method_not_allowed",
-      detail: "Use POST /color. Legacy mutating GET routes are disabled by default."
-    });
-  });
-}
+});
 
 app.post("/color", (req, res) => {
   const text = getCompatText(req);
@@ -8013,6 +8804,54 @@ function collectPalettePatch(req) {
   const disorderAggressionRaw = read("disorderAggression");
   if (disorderAggressionRaw !== undefined) {
     patch.disorderAggression = Number(disorderAggressionRaw);
+  }
+
+  const cycleModeRaw = read("cycleMode");
+  if (cycleModeRaw !== undefined) {
+    patch.cycleMode = String(cycleModeRaw || "").trim().toLowerCase();
+  }
+
+  const timedIntervalRaw = read("timedIntervalSec");
+  if (timedIntervalRaw !== undefined) {
+    patch.timedIntervalSec = Number(timedIntervalRaw);
+  }
+
+  const beatLockRaw = read("beatLock");
+  if (beatLockRaw !== undefined) {
+    const parsed = parseBoolean(beatLockRaw, null);
+    if (parsed !== null) patch.beatLock = parsed;
+  }
+
+  const beatLockGraceRaw = read("beatLockGraceSec");
+  if (beatLockGraceRaw !== undefined) {
+    patch.beatLockGraceSec = Number(beatLockGraceRaw);
+  }
+
+  const reactiveMarginRaw = read("reactiveMargin");
+  if (reactiveMarginRaw !== undefined) {
+    patch.reactiveMargin = Number(reactiveMarginRaw);
+  }
+
+  const spectrumMapModeRaw = read("spectrumMapMode");
+  if (spectrumMapModeRaw !== undefined) {
+    patch.spectrumMapMode = String(spectrumMapModeRaw || "").trim().toLowerCase();
+  }
+
+  const spectrumFeatureMapRaw = read("spectrumFeatureMap");
+  if (spectrumFeatureMapRaw !== undefined) {
+    if (Array.isArray(spectrumFeatureMapRaw)) {
+      patch.spectrumFeatureMap = spectrumFeatureMapRaw
+        .map(item => String(item || "").trim().toLowerCase())
+        .filter(Boolean);
+    } else {
+      const asText = String(spectrumFeatureMapRaw || "").trim();
+      if (asText) {
+        patch.spectrumFeatureMap = asText
+          .split(",")
+          .map(item => String(item || "").trim().toLowerCase())
+          .filter(Boolean);
+      }
+    }
   }
 
   const brandRaw = read("brand");
@@ -8169,19 +9008,48 @@ function collectFixtureRoutingClearPatch(req) {
 function buildPaletteRuntimeSnapshot(configOverride = null) {
   const fixtures = fixtureRegistry.getFixtures?.() || [];
   prunePaletteFixtureOverrides(fixtures);
+  const defaultConfig = {
+    colorsPerFamily: PALETTE_CONFIG_DEFAULT.colorsPerFamily,
+    families: PALETTE_CONFIG_DEFAULT.families.slice(),
+    disorder: PALETTE_CONFIG_DEFAULT.disorder,
+    disorderAggression: PALETTE_CONFIG_DEFAULT.disorderAggression,
+    cycleMode: PALETTE_CONFIG_DEFAULT.cycleMode,
+    timedIntervalSec: PALETTE_CONFIG_DEFAULT.timedIntervalSec,
+    beatLock: PALETTE_CONFIG_DEFAULT.beatLock,
+    beatLockGraceSec: PALETTE_CONFIG_DEFAULT.beatLockGraceSec,
+    reactiveMargin: PALETTE_CONFIG_DEFAULT.reactiveMargin,
+    spectrumMapMode: PALETTE_CONFIG_DEFAULT.spectrumMapMode,
+    spectrumFeatureMap: PALETTE_CONFIG_DEFAULT.spectrumFeatureMap.slice()
+  };
   return {
     ok: true,
-    config: configOverride || engine.getPaletteConfig?.() || {
-      colorsPerFamily: 3,
-      families: ["blue", "purple"],
-      disorder: false,
-      disorderAggression: 0.35
-    },
+    config: normalizePaletteConfigSnapshot(
+      configOverride || engine.getPaletteConfig?.() || defaultConfig,
+      defaultConfig
+    ),
     catalog: engine.getPaletteCatalog?.() || [],
     options: {
-      colorsPerFamily: [1, 3, 5],
+      colorsPerFamily: PALETTE_COLOR_COUNT_OPTIONS.slice(),
       families: PALETTE_FAMILY_ORDER.slice(),
-      brands: PALETTE_SUPPORTED_BRANDS.slice()
+      brands: PALETTE_SUPPORTED_BRANDS.slice(),
+      cycleModes: PALETTE_CYCLE_MODE_ORDER.slice(),
+      spectrumMapModes: PALETTE_SPECTRUM_MAP_MODE_ORDER.slice(),
+      audioFeatures: PALETTE_AUDIO_FEATURE_KEYS.slice(),
+      timedIntervalSec: {
+        min: PALETTE_TIMED_INTERVAL_MIN_SEC,
+        max: PALETTE_TIMED_INTERVAL_MAX_SEC,
+        default: PALETTE_CONFIG_DEFAULT.timedIntervalSec
+      },
+      beatLockGraceSec: {
+        min: PALETTE_BEAT_LOCK_GRACE_MIN_SEC,
+        max: PALETTE_BEAT_LOCK_GRACE_MAX_SEC,
+        default: PALETTE_CONFIG_DEFAULT.beatLockGraceSec
+      },
+      reactiveMargin: {
+        min: PALETTE_REACTIVE_MARGIN_MIN,
+        max: PALETTE_REACTIVE_MARGIN_MAX,
+        default: PALETTE_CONFIG_DEFAULT.reactiveMargin
+      }
     },
     metricRouting: buildFixtureMetricRoutingSnapshot(fixtures),
     brandFixtures: buildPaletteBrandFixtureCatalog(fixtures),
@@ -8213,28 +9081,6 @@ registerRavePaletteMetricRoutes(app, {
   buildPaletteBrandFixtureCatalog,
   fixtureRegistry,
   getEngine: () => engine
-});
-
-function respondLegacyPaletteRouteRemoved(res, routePath) {
-  res.status(410).json({
-    ok: false,
-    removed: true,
-    route: routePath,
-    replacement: "/rave/palette",
-    detail: "Legacy genre/decade routes were removed. Use /rave/palette with explicit palette controls."
-  });
-}
-
-app.post("/rave/genre", (_, res) => {
-  respondLegacyPaletteRouteRemoved(res, "/rave/genre");
-});
-
-app.post("/rave/genre/decade", (_, res) => {
-  respondLegacyPaletteRouteRemoved(res, "/rave/genre/decade");
-});
-
-app.get("/rave/genre/decade", (_, res) => {
-  respondLegacyPaletteRouteRemoved(res, "/rave/genre/decade");
 });
 
 app.post("/rave/mode", (req, res) => {
@@ -8271,25 +9117,6 @@ app.post("/rave/scene/auto", (_, res) => {
   res.sendStatus(200);
 });
 
-
-/* ======================================================
-   MODE — COMPETITIVE / INTERPRET (EXPLICIT)
-   ====================================================== */
-app.post("/rave/mode/competitive/on", (_, res) => {
-  res.status(410).json({
-    ok: false,
-    error: "competitive mode removed",
-    replacement: "/rave/mode?name=bpm"
-  });
-});
-
-app.post("/rave/mode/competitive/off", (_, res) => {
-  res.status(410).json({
-    ok: false,
-    error: "competitive mode removed",
-    replacement: "/rave/mode?name=bpm"
-  });
-});
 
 /* ======================================================
    MIDI CONTROL
@@ -8597,7 +9424,7 @@ app.get("/rave/overclock/tiers", (_, res) => {
 });
 
 /* ======================================================
-   LEGACY / GENERIC OVERCLOCK (KEEP)
+   GENERIC OVERCLOCK
    ====================================================== */
 app.post("/rave/overclock", (req, res) => {
   const enabled = req.query.enabled === "true";
@@ -9296,10 +10123,6 @@ app.post("/rave/meta/auto/off", (_, res) => {
   res.json({ ok: true, enabled: Boolean(next) });
 });
 
-app.get("/rave/genres", (_, res) => {
-  respondLegacyPaletteRouteRemoved(res, "/rave/genres");
-});
-
 app.get("/rave/telemetry", (_, res) => {
   const telemetry = engine.getTelemetry();
   fireModHook("onTelemetry", { telemetry });
@@ -9542,18 +10365,31 @@ function sanitizeImportedRelativePath(rawPath) {
   const raw = String(rawPath || "").replace(/\\/g, "/").trim();
   if (!raw) return "";
   if (raw.includes("\0")) return "";
+  // Block Windows ADS and drive-letter style paths early.
+  if (raw.includes(":")) return "";
+  if (raw.length > 240) return "";
   const normalized = path.posix.normalize(raw).replace(/^\/+/, "");
   if (!normalized || normalized === "." || normalized === "..") return "";
   if (path.posix.isAbsolute(normalized)) return "";
   if (normalized.startsWith("../") || normalized.includes("/../")) return "";
+  if (/^[a-zA-Z]:/.test(normalized)) return "";
+  const parts = normalized.split("/");
+  if (parts.some(part => !part || part.length > 100)) return "";
   return normalized;
 }
 
 function decodeImportedContentBase64(raw) {
-  const input = String(raw || "").trim();
+  const input = String(raw || "").trim().replace(/\s+/g, "");
   if (!input) return null;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(input)) return null;
+  if (input.length % 4 !== 0) return null;
   try {
-    return Buffer.from(input, "base64");
+    const decoded = Buffer.from(input, "base64");
+    if (!decoded || !decoded.length) return null;
+    const canonicalInput = input.replace(/=+$/, "");
+    const canonicalDecoded = decoded.toString("base64").replace(/=+$/, "");
+    if (canonicalInput !== canonicalDecoded) return null;
+    return decoded;
   } catch {
     return null;
   }
@@ -9820,7 +10656,7 @@ function normalizeModIdList(value) {
   const out = [];
   for (const item of value) {
     const id = String(item || "").trim();
-    if (!id || seen.has(id)) continue;
+    if (!id || !MOD_IMPORT_ID_RE.test(id) || seen.has(id)) continue;
     seen.add(id);
     out.push(id);
   }
@@ -10864,7 +11700,6 @@ function getSystemConfigSnapshot() {
     autoLaunchBrowser: systemConfigRuntime?.autoLaunchBrowser !== false,
     browserLaunchDelayMs: clampSystemBrowserLaunchDelayMs(systemConfigRuntime?.browserLaunchDelayMs),
     unsafeExposeSensitiveLogs: systemConfigRuntime?.unsafeExposeSensitiveLogs === true,
-    legacyComponentsEnabled: systemConfigRuntime?.legacyComponentsEnabled === true,
     hueTransportPreference: sanitizeHueTransportPreference(
       systemConfigRuntime?.hueTransportPreference,
       SYSTEM_CONFIG_DEFAULT.hueTransportPreference
@@ -10899,21 +11734,12 @@ function patchSystemConfig(patch = {}) {
     }
     merged.unsafeExposeSensitiveLogs = requested;
   }
-  if (Object.prototype.hasOwnProperty.call(rawPatch, "legacyComponentsEnabled")) {
-    merged.legacyComponentsEnabled = rawPatch.legacyComponentsEnabled;
-  }
   if (Object.prototype.hasOwnProperty.call(rawPatch, "hueTransportPreference")) {
     merged.hueTransportPreference = rawPatch.hueTransportPreference;
   }
 
   systemConfigRuntime = writeSystemConfig(merged);
   setUnsafeExposeSensitiveLogsRuntime(Boolean(systemConfigRuntime?.unsafeExposeSensitiveLogs));
-  if (engine?.setLegacyComponentsEnabled) {
-    engine.setLegacyComponentsEnabled(Boolean(systemConfigRuntime?.legacyComponentsEnabled));
-  }
-  if (systemConfigRuntime?.legacyComponentsEnabled !== true) {
-    engine.setBehavior?.("interpret");
-  }
   return { ok: true, config: getSystemConfigSnapshot() };
 }
 

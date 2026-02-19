@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.5.1 - Security Hardening + Reactivity Polish (2026-02-19)
+
+### Security + Sanity
+- Hardened mod import file-path sanitization to block Windows ADS/drive-style paths and overlong path segments.
+- Tightened mod import base64 validation so malformed payloads are rejected earlier.
+- `/mods/config` now accepts only valid mod IDs when saving enabled/order/disabled lists.
+- Redistributable export now skips symlink/junction entries to avoid packaging files outside the repo tree.
+- Production dependency audit is clean at release time (`npm audit --omit=dev` reports 0 vulnerabilities).
+
+### Reactivity + Color
+- Brightness smoothing was softened to reduce over-aggressive fluctuations.
+- Palette output now skews more saturated for stronger visual fidelity while preserving occasional softer tones.
+- Hue scene saturation floors and WiZ palette vibrancy were tuned for clearer color separation.
+
+### UI + Routing Stability
+- Improved per-brand/per-fixture routing panel stability by deferring background re-renders during active interaction.
+- Fixed interaction interruptions that made fixture dropdown selection and override edits feel laggy or inconsistent.
+
 ## v1.5.0 - Sanitized Baseline + Startup Bootstrap (2026-02-19)
 
 ### Startup Bootstrap
@@ -94,7 +112,7 @@
 
 1. Open releases:
    - `https://github.com/NameSRoby/ravelink-bridge/releases`
-2. Download the latest `RaveLink-Bridge-Windows-v1.5.0.zip`.
+2. Download the latest `RaveLink-Bridge-Windows-v1.5.1.zip`.
 3. Extract the zip.
 4. Install dependencies if needed:
    - `npm install`

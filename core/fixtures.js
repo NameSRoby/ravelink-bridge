@@ -317,16 +317,10 @@ function isFixtureConfiguredForTransport(fixture = {}) {
 }
 
 // [TITLE] Section: Fixture Coupling + Derived Binding
-function normalizeFixtureModeFlags(input = {}, fallbackControlMode = "engine") {
-  const legacyControlMode = normalizeControlMode(
-    Object.prototype.hasOwnProperty.call(input, "controlMode")
-      ? input.controlMode
-      : fallbackControlMode
-  );
-
-  const engineEnabled = normalizeBoolean(input.engineEnabled, legacyControlMode === "engine");
+function normalizeFixtureModeFlags(input = {}) {
+  const engineEnabled = normalizeBoolean(input.engineEnabled, true);
   const twitchEnabled = normalizeBoolean(input.twitchEnabled, true);
-  let customEnabled = normalizeBoolean(input.customEnabled, legacyControlMode === "standalone");
+  let customEnabled = normalizeBoolean(input.customEnabled, false);
 
   // Standalone custom control and live engine mode are mutually exclusive.
   if (engineEnabled && customEnabled) {
@@ -388,7 +382,7 @@ function validateFixtureCoupling({
 
 function isEngineCoupledFixture(fixture = {}) {
   const brand = normalizeBrand(fixture.brand);
-  const modeFlags = normalizeFixtureModeFlags(fixture, fixture.controlMode);
+  const modeFlags = normalizeFixtureModeFlags(fixture);
   const binding = String(
     fixture.engineBinding || (modeFlags.engineEnabled ? brand : "standalone")
   ).trim().toLowerCase();
@@ -407,7 +401,7 @@ function normalizeFixture(fixture, index) {
     return null;
   }
 
-  const modeFlags = normalizeFixtureModeFlags(fixture, fixture.controlMode);
+  const modeFlags = normalizeFixtureModeFlags(fixture);
   const controlMode = modeFlags.engineEnabled ? "engine" : "standalone";
   const requestedBinding = normalizeRequestedEngineBinding(fixture.engineBinding);
   const engineBinding = deriveEngineBinding({
@@ -468,7 +462,7 @@ function getDerivedIntentZones(fixtures, binding) {
     if (!fixture || fixture.enabled === false) continue;
     if (normalizeBrand(fixture.brand) !== targetBrand) continue;
 
-    const modeFlags = normalizeFixtureModeFlags(fixture, fixture.controlMode);
+    const modeFlags = normalizeFixtureModeFlags(fixture);
     const modeEnabled = mode === "twitch"
       ? modeFlags.twitchEnabled
       : mode === "custom"
@@ -714,7 +708,7 @@ function sanitizeFixtureForConfig(input = {}, fallbackIndex = 0, options = {}) {
   const id = String(input.id || `${brand}-${Date.now()}-${fallbackIndex}`).trim();
   const zone = normalizeZone(input.zone, getCanonicalZoneForBrand(brand, "custom"));
   const enabled = input.enabled !== false;
-  const modeFlags = normalizeFixtureModeFlags(input, input.controlMode || "engine");
+  const modeFlags = normalizeFixtureModeFlags(input);
   const controlMode = modeFlags.engineEnabled ? "engine" : "standalone";
   const requestedBinding = normalizeRequestedEngineBinding(input.engineBinding);
   const couplingError = validateFixtureCoupling({

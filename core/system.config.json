@@ -3,6 +3,5 @@
   "autoLaunchBrowser": true,
   "browserLaunchDelayMs": 1200,
   "unsafeExposeSensitiveLogs": false,
-  "hueTransportPreference": "auto",
-  "legacyComponentsEnabled": false
+  "hueTransportPreference": "auto"
 }

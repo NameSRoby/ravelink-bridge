@@ -131,12 +131,24 @@ test("palette + fixture metric routing endpoints stay consistent", { concurrency
   assert.equal(clear.data?.scope, "brand");
 });
 
-test("legacy genre route contract stays removed", { concurrency: false }, async () => {
+test("genre routes are fully removed", { concurrency: false }, async () => {
   const removed = await requestJson(`${BASE_URL}/rave/genres`, { method: "GET" });
-  assert.equal(removed.response.status, 410);
-  assert.equal(Boolean(removed.data?.ok), false);
-  assert.equal(Boolean(removed.data?.removed), true);
-  assert.equal(String(removed.data?.replacement || ""), "/rave/palette");
+  assert.equal(removed.response.status, 404);
+  assert.equal(removed.data, null);
+});
+
+test("mutating command GET routes stay disabled", { concurrency: false }, async () => {
+  const raveOn = await requestJson(`${BASE_URL}/rave/on`, { method: "GET" });
+  assert.equal(raveOn.response.status, 405);
+  assert.equal(raveOn.data?.error, "method_not_allowed");
+
+  const teach = await requestJson(`${BASE_URL}/teach`, { method: "GET" });
+  assert.equal(teach.response.status, 405);
+  assert.equal(teach.data?.error, "method_not_allowed");
+
+  const color = await requestJson(`${BASE_URL}/color`, { method: "GET" });
+  assert.equal(color.response.status, 405);
+  assert.equal(color.data?.error, "method_not_allowed");
 });
 
 test("audio config supports strict app isolation + custom check interval", { concurrency: false }, async () => {

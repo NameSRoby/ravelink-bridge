@@ -19,6 +19,7 @@ const SKIP_DIRS = new Set([
   ".husky",
   ".idea",
   ".vscode",
+  "backup",
   "node_modules",
   "backups",
   "release"
@@ -86,7 +87,9 @@ function prepareOutDir(baseOutDir) {
 }
 
 function copyRecursive(srcPath, dstPath, relPath = "") {
-  const stat = fs.statSync(srcPath);
+  const stat = fs.lstatSync(srcPath);
+  // Never follow symlinks/junctions in release export.
+  if (stat.isSymbolicLink()) return;
   if (stat.isDirectory()) {
     const base = path.basename(srcPath);
     const normalizedRelPath = String(relPath || "").replace(/\\/g, "/");

@@ -11,16 +11,26 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.5.0): https://github.com/NameSRoby/ravelink-bridge/releases/latest
+- Current Windows release (v1.5.1): https://github.com/NameSRoby/ravelink-bridge/releases/latest
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
-This repository state is aligned to `v1.5.0`:
+This repository state is aligned to `v1.5.1`:
 - Full security hardening passes applied
 - Code structure/title indexing improved for faster maintenance
 
-## Update Log (v1.5.0 Baseline)
+## Update Log (v1.5.1)
 
-- New palette-first control flow: build shows by color families (`blue`, `purple`, `red`, `green`, `yellow`) with `1/3/5` colors, `ORDERED` sequencing, or `DISORDER` chaos.
+- Security hardening pass:
+  - stricter mod-import path and payload validation
+  - stricter mod ID validation for `/mods/config`
+  - redistributable export now skips symlink/junction entries
+- Reactivity/color polish:
+  - brightness smoothing is less aggressive
+  - palette output is more saturated by default for stronger visual fidelity
+- Per-fixture routing UI stability improved (less interaction lag while editing custom overrides).
+
+v1.5 baseline features retained:
+- New palette-first control flow: build shows by spectrum families (`red`, `green`, `blue`) with `1/3/5/8/12` colors, `ORDERED` sequencing, or `DISORDER` chaos.
 - Per-brand and per-fixture routing is now first-class: Hue and WiZ can run different palette/metric behavior at the same time, and single fixtures can be overridden independently.
 - Added fixture metric controls for `MANUAL` vs `META AUTO` plus harmony grouping and fixture rotation options.
 - Added per-target max update-rate clamp (`maxHz`) so you can cap aggressive fixtures while preserving proportional motion from the song.
@@ -45,21 +55,20 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 - MIDI controller mapping tab (learn + bindings + trigger tests)
 - Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
 
-## Security Defaults (v1.5.0)
+## Security Defaults (v1.5.1)
 
 RaveLink Bridge is local-first and now ships with stricter default protections:
 
 - Mutating API routes are loopback-only by default.
 - Privileged read routes (fixture/config/discovery/device inventory) are loopback-only by default.
-- Legacy mutating `GET` routes (`/rave/on`, `/rave/off`, `/teach`) are disabled by default; use `POST`.
+- Mutating command routes (`/rave/on`, `/rave/off`, `/teach`, `/color`) require `POST`.
 - Hue Entertainment transport keeps TLS certificate verification enabled.
 - Sensitive values are redacted in logs by default; unsafe raw logging requires explicit ack.
 - Rate limits are applied across high-risk and high-churn endpoints.
 
-Optional compatibility env flags (advanced users only):
+Optional network-access env flags (advanced users only):
 - `RAVELINK_ALLOW_REMOTE_WRITE=1`
 - `RAVELINK_ALLOW_REMOTE_PRIVILEGED_READ=1`
-- `RAVELINK_ALLOW_LEGACY_MUTATING_GET=1`
 
 ## Streamer Quick Start
 
@@ -227,10 +236,10 @@ The routes below are available in the bridge API, but anything beyond the 3 defa
 | Stop show | `POST /rave/off` | `http://127.0.0.1:5050/rave/off` |
 | Force drop pulse | `POST /rave/drop` | `http://127.0.0.1:5050/rave/drop` |
 | Teach color alias (`<name> <#RRGGBB>`) | `POST /teach` | body: `{"value1":"toxic_green #39ff14"}` |
-| Apply named color | `GET or POST /color` | `/color?value1=hot+pink` |
-| Color only Hue | `GET or POST /color` | `/color?value1=cyan&target=hue` |
-| Color only WiZ | `GET or POST /color` | `/color?value1=orange&target=wiz` |
-| Color specific route zone | `GET or POST /color` | `/color?value1=red&zone=wiz` |
+| Apply named color | `POST /color` | `/color?value1=hot+pink` |
+| Color only Hue | `POST /color` | `/color?value1=cyan&target=hue` |
+| Color only WiZ | `POST /color` | `/color?value1=orange&target=wiz` |
+| Color specific route zone | `POST /color` | `/color?value1=red&zone=wiz` |
 | Get palette runtime | `GET /rave/palette` | `/rave/palette` |
 | Update palette config | `POST /rave/palette` | body: `{"families":["blue","purple"],"colorsPerFamily":3,"disorder":false}` |
 | Set behavior mode (interpret only) | `POST /rave/mode?name=bpm` | `/rave/mode?name=bpm` |
@@ -321,23 +330,18 @@ Notes:
 - The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
 - Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
 
-## Version 1.5.0 Notes
+## Version 1.5.1 Notes
 
 - Daily-use workflow changes:
-  - The control model is now centered on palette sequencing + song-metric routing instead of legacy genre/decade buttons.
-  - Brand menus and fixture targeting allow split-task behavior (for example, one fixture follows `peaks` while another follows `flux`).
-  - Meta Auto can still drive assignments automatically, while manual mode gives explicit per-target control.
+  - Per-brand/per-fixture routing interactions are more stable during live edits.
+  - Palette output now emphasizes richer saturation for clearer color distinction.
 - Audio and fixture behavior:
-  - App isolation flow is more practical for stream setups with multiple apps open (priority/fallback + process-aware capture support).
-  - Hue/WiZ behavior tuning focused on reducing indecisive/stale transitions and improving visual contrast/brightness usage.
-  - Per-target `maxHz` clamps let you tame overly fast fixtures without killing musical movement.
-- Startup and setup:
-  - New-system first launch now auto-installs required dependencies before starting.
-  - Onboarding and UI guidance were updated to match the v1.5 control model.
+  - Brightness smoothing is slightly calmer to reduce nervous overreaction.
+  - Hue and WiZ maintain the same reactive architecture from v1.5 with tuned output polish.
 - Safety and distribution:
-  - Release build sanitization wipes sensitive/local runtime data before packaging.
-  - API remains local-first with protected defaults and explicit opt-in overrides.
-  - Sensitive logs stay redacted by default.
+  - Mod import validation is stricter (path + payload checks).
+  - Mod config writes now keep only valid mod IDs.
+  - Redistributable packaging now excludes symlink/junction traversal.
 
 For older major feature lists, see tag history under Releases.
 
@@ -497,11 +501,11 @@ npm run export:redistributable
 3. Zip:
 
 ```powershell
-Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.0\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.5.0.zip -Force
+Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.1\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.5.1.zip -Force
 ```
 
 Output:
-- `release/RaveLink-Bridge-Windows-v1.5.0`
+- `release/RaveLink-Bridge-Windows-v1.5.1`
 
 ## Security And Data Hygiene
 

@@ -917,40 +917,6 @@ textarea{
   background:linear-gradient(180deg,#101a34,#0a1223);
   box-shadow:inset 0 0 0 1px #213e70;
 }
-.legacyNoticePanel{
-  border:1px solid #6a5a2a;
-  border-radius:10px;
-  background:linear-gradient(180deg,#231b08,#171105);
-  padding:10px;
-}
-.legacyNoticeTitle{
-  font-size:11px;
-  letter-spacing:1.1px;
-  color:#ffd98a;
-  margin:0 0 6px;
-}
-.legacyNoticeText{
-  margin:0;
-  font-size:12px;
-  color:#e8dcc0;
-  line-height:1.35;
-}
-.legacyNoticeActions{
-  margin-top:8px;
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-.legacyAutomationWrap{
-  margin-top:10px;
-}
-.legacyAutomationWrap.legacyLocked{
-  opacity:.42;
-  filter:saturate(.55) grayscale(.2);
-}
-.legacyAutomationWrap.legacyLocked *{
-  pointer-events:none;
-}
 
 .liveMainCluster .subcluster{
   margin-top:14px;
@@ -1337,6 +1303,68 @@ canvas{width:100%;height:160px}
   letter-spacing:.8px;
 }
 
+.paletteScopeRow{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin:8px 0 10px;
+}
+
+.paletteGlobalPanel.isDisabled{
+  opacity:.46;
+  filter:saturate(.58);
+  pointer-events:none;
+}
+
+.paletteCustomPanel.hidden{
+  display:none;
+}
+
+.paletteCustomBrandTabs{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin:8px 0 10px;
+}
+
+.paletteModeNotice{
+  margin:6px 0 0;
+  min-height:14px;
+  color:#9fb0db;
+}
+
+.paletteCycleGrid{
+  margin-top:6px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+  gap:6px;
+}
+
+.paletteControlWrap{
+  margin-top:8px;
+}
+
+.paletteControlWrap.hidden{
+  display:none;
+}
+
+.paletteSpectrumGrid{
+  margin-top:6px;
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:6px;
+}
+
+.paletteSpectrumGrid select{
+  width:100%;
+}
+
+@media (max-width:980px){
+  .paletteSpectrumGrid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
 #dropOverlay{
   position:absolute;
   inset:0;
@@ -1456,23 +1484,106 @@ canvas{width:100%;height:160px}
 
 .twitchPrefixGrid{
   margin-top:8px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.prefixQuickGrid{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(3,minmax(0,1fr));
   gap:8px;
   align-items:end;
 }
 
-.prefixFixtureMapRow{
+.prefixActions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+
+.prefixSection{
+  border:1px solid #20355f;
+  border-radius:10px;
+  background:#091125;
+  overflow:hidden;
+}
+
+.prefixSection > summary{
+  list-style:none;
+  cursor:pointer;
+  padding:8px 10px;
+  font-size:11px;
+  letter-spacing:1px;
+  color:#d7e2ff;
+  text-transform:uppercase;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.prefixSection > summary::-webkit-details-marker{
+  display:none;
+}
+
+.prefixSection > summary::after{
+  content:"+";
+  color:#9cb3e5;
+  font-weight:700;
+}
+
+.prefixSection[open] > summary{
+  border-bottom:1px solid #20355f;
+}
+
+.prefixSection[open] > summary::after{
+  content:"-";
+}
+
+.prefixSectionBody{
+  padding:10px;
+  display:grid;
+  gap:10px;
+}
+
+.prefixAdvancedGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  align-items:end;
+}
+
+.prefixFullRow{
   grid-column:1 / -1;
 }
 
-.prefixReadonly{
-  opacity:.86;
+.prefixSyntax{
+  margin:0;
+  font-size:11px;
+  color:#afbedf;
+}
+
+.prefixSyntax code{
+  color:#d5e3ff;
 }
 
 .prefixDisabled{
   opacity:.45;
   filter:grayscale(.35);
+}
+
+@media (max-width:1180px){
+  .prefixQuickGrid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media (max-width:980px){
+  .prefixQuickGrid,
+  .prefixAdvancedGrid,
+  .prefixActions{
+    grid-template-columns:1fr;
+  }
 }
 
 .fixtureModBrandStatus{
@@ -2143,7 +2254,7 @@ tr:last-child td{
       <button id="panicBtn" type="button" class="bad">PANIC</button>
     </div>
 
-    <h3>MODE <span class="infoTip" title="BPM (INTERPRET) is always active. Legacy mode switching was removed.">?</span></h3>
+    <h3>MODE <span class="infoTip" title="BPM (INTERPRET) is always active. Old mode switching was removed.">?</span></h3>
     <p class="hint">BPM (INTERPRET) is enforced globally.</p>
 
     <div class="subcluster collapsible livePriorityPanel" data-collapsible-key="livePriorityControls">
@@ -2257,11 +2368,22 @@ tr:last-child td{
         <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide palette and fixture-routing controls.">COLLAPSE</button>
       </div>
       <div class="clusterBody">
-        <h3>COLOR PALETTE SEQUENCER <span class="infoTip" title="Manual color sequencing only. Pick 1/3/5 colors per family, combine families, and optionally disorder sequence order.">?</span></h3>
-        <div class="grid3">
+        <h3>COLOR PALETTE SEQUENCER <span class="infoTip" title="Manual color sequencing only. Pick 1/3/5/8/12 colors per spectrum family (RED/GREEN/BLUE). ORDER keeps family handoffs spectrally smooth; DISORDER adds chaos.">?</span></h3>
+        <p class="advancedSubTitle">EDIT SCOPE</p>
+        <div class="paletteScopeRow">
+          <button id="paletteScopeGlobalBtn" type="button">GLOBAL SETTINGS</button>
+          <button id="paletteScopeCustomBtn" type="button">CUSTOM PER FIXTURE</button>
+        </div>
+        <p class="hint">Custom mode enables Hue/WiZ fixture tabs and per-fixture overrides. While custom mode is active, global controls are grayed out.</p>
+        <p id="paletteModeNotice" class="paletteModeNotice"></p>
+
+        <div id="paletteGlobalPanel" class="paletteGlobalPanel">
+        <div class="grid5">
           <button type="button" data-palette-count="1">1 COLOR/FAMILY</button>
           <button type="button" data-palette-count="3">3 COLORS/FAMILY</button>
           <button type="button" data-palette-count="5">5 COLORS/FAMILY</button>
+          <button type="button" data-palette-count="8">8 COLORS/FAMILY</button>
+          <button type="button" data-palette-count="12">12 COLORS/FAMILY</button>
         </div>
 
         <p class="advancedSubTitle">QUICK PRESETS</p>
@@ -2274,12 +2396,10 @@ tr:last-child td{
         <p class="hint">Use ORDERED/DISORDER below to control how presets play out.</p>
 
         <p class="advancedSubTitle">FAMILIES</p>
-        <div id="paletteFamilyGrid" class="grid5 paletteFamilyGrid">
-          <button type="button" data-palette-family="blue">BLUE</button>
-          <button type="button" data-palette-family="purple">PURPLE</button>
+        <div id="paletteFamilyGrid" class="grid3 paletteFamilyGrid">
           <button type="button" data-palette-family="red">RED</button>
           <button type="button" data-palette-family="green">GREEN</button>
-          <button type="button" data-palette-family="yellow">YELLOW</button>
+          <button type="button" data-palette-family="blue">BLUE</button>
         </div>
 
         <p class="advancedSubTitle">SEQUENCE ORDER</p>
@@ -2299,9 +2419,123 @@ tr:last-child td{
         </div>
         <p class="hint">Higher aggression increases out-of-order jumps between both colors and families.</p>
 
-        <p class="advancedSubTitle">BRAND + FIXTURE MENUS</p>
+        <p class="advancedSubTitle">COLOR ENGINE MODE</p>
+        <div class="paletteCycleGrid">
+          <button type="button" data-palette-cycle-mode="on_trigger" title="Advance to the next palette group on beat/drop triggers. Colors inside the active group continue to move.">ON TRIGGER</button>
+          <button type="button" data-palette-cycle-mode="timed_cycle" title="Advance to the next palette group every interval. Colors inside the active group continue to move between advances.">TIMED CYCLE</button>
+          <button type="button" data-palette-cycle-mode="reactive_shift" title="Advance to the next palette group when tempo/progression changes pass margin. Colors inside the active group continue to move.">REACTIVE SHIFT</button>
+          <button type="button" data-palette-cycle-mode="spectrum_mapper" title="Choose active palette group from mapped audio features (lows/mids/highs/etc). Colors still move inside the selected group.">SPECTRUM MAPPER</button>
+        </div>
+
+        <div id="paletteTimedControls" class="paletteControlWrap hidden">
+          <div class="slider">
+            <label>
+              <span>CYCLE INTERVAL</span>
+              <span id="paletteTimedIntervalSecVal" class="sliderValue">5s</span>
+            </label>
+            <input id="paletteTimedIntervalSec" type="range" min="2" max="60" step="1" value="5">
+          </div>
+          <p class="advancedSubTitle">BEAT LOCK</p>
+          <div class="grid2">
+            <button type="button" data-palette-beat-lock="false">OFF</button>
+            <button type="button" data-palette-beat-lock="true">ON</button>
+          </div>
+          <div class="slider">
+            <label>
+              <span>BEAT LOCK GRACE</span>
+              <span id="paletteBeatLockGraceSecVal" class="sliderValue">+2s</span>
+            </label>
+            <input id="paletteBeatLockGraceSec" type="range" min="0" max="8" step="1" value="2">
+          </div>
+        </div>
+
+        <div id="paletteReactiveControls" class="paletteControlWrap hidden">
+          <div class="slider">
+            <label>
+              <span>CHANGE MARGIN</span>
+              <span id="paletteReactiveMarginVal" class="sliderValue">28</span>
+            </label>
+            <input id="paletteReactiveMargin" type="range" min="5" max="100" step="1" value="28">
+          </div>
+        </div>
+
+        <div id="paletteSpectrumControls" class="paletteControlWrap hidden">
+          <p class="hint">Spectrum Mapper picks the active palette group from audio features. Color motion inside that group still follows ORDER/DISORDER.</p>
+          <p class="advancedSubTitle">MAP MODE</p>
+          <div class="grid2">
+            <button type="button" data-palette-spectrum-mode="auto">AUTO ASSIGN</button>
+            <button type="button" data-palette-spectrum-mode="manual">MANUAL ASSIGN</button>
+          </div>
+          <div class="paletteSpectrumGrid">
+            <select data-palette-spectrum-feature-slot="0">
+              <option value="lows">SLOT 1: LOWS</option>
+              <option value="mids">SLOT 1: MIDS</option>
+              <option value="highs">SLOT 1: HIGHS</option>
+              <option value="rms">SLOT 1: RMS</option>
+              <option value="energy">SLOT 1: ENERGY</option>
+              <option value="flux">SLOT 1: FLUX</option>
+              <option value="peaks">SLOT 1: PEAKS</option>
+              <option value="transients">SLOT 1: TRANSIENTS</option>
+              <option value="beat">SLOT 1: BEAT</option>
+            </select>
+            <select data-palette-spectrum-feature-slot="1">
+              <option value="lows">SLOT 2: LOWS</option>
+              <option value="mids">SLOT 2: MIDS</option>
+              <option value="highs">SLOT 2: HIGHS</option>
+              <option value="rms">SLOT 2: RMS</option>
+              <option value="energy">SLOT 2: ENERGY</option>
+              <option value="flux">SLOT 2: FLUX</option>
+              <option value="peaks">SLOT 2: PEAKS</option>
+              <option value="transients">SLOT 2: TRANSIENTS</option>
+              <option value="beat">SLOT 2: BEAT</option>
+            </select>
+            <select data-palette-spectrum-feature-slot="2">
+              <option value="lows">SLOT 3: LOWS</option>
+              <option value="mids">SLOT 3: MIDS</option>
+              <option value="highs">SLOT 3: HIGHS</option>
+              <option value="rms">SLOT 3: RMS</option>
+              <option value="energy">SLOT 3: ENERGY</option>
+              <option value="flux">SLOT 3: FLUX</option>
+              <option value="peaks">SLOT 3: PEAKS</option>
+              <option value="transients">SLOT 3: TRANSIENTS</option>
+              <option value="beat">SLOT 3: BEAT</option>
+            </select>
+            <select data-palette-spectrum-feature-slot="3">
+              <option value="lows">SLOT 4: LOWS</option>
+              <option value="mids">SLOT 4: MIDS</option>
+              <option value="highs">SLOT 4: HIGHS</option>
+              <option value="rms">SLOT 4: RMS</option>
+              <option value="energy">SLOT 4: ENERGY</option>
+              <option value="flux">SLOT 4: FLUX</option>
+              <option value="peaks">SLOT 4: PEAKS</option>
+              <option value="transients">SLOT 4: TRANSIENTS</option>
+              <option value="beat">SLOT 4: BEAT</option>
+            </select>
+            <select data-palette-spectrum-feature-slot="4">
+              <option value="lows">SLOT 5: LOWS</option>
+              <option value="mids">SLOT 5: MIDS</option>
+              <option value="highs">SLOT 5: HIGHS</option>
+              <option value="rms">SLOT 5: RMS</option>
+              <option value="energy">SLOT 5: ENERGY</option>
+              <option value="flux">SLOT 5: FLUX</option>
+              <option value="peaks">SLOT 5: PEAKS</option>
+              <option value="transients">SLOT 5: TRANSIENTS</option>
+              <option value="beat">SLOT 5: BEAT</option>
+            </select>
+          </div>
+        </div>
+        </div>
+
+        <div id="paletteCustomPanel" class="paletteCustomPanel hidden">
+        <p class="advancedSubTitle">FIXTURE TYPE</p>
+        <div id="paletteCustomBrandTabs" class="paletteCustomBrandTabs">
+          <button type="button" data-palette-custom-brand="hue">HUE</button>
+          <button type="button" data-palette-custom-brand="wiz">WIZ</button>
+        </div>
+        <p class="advancedSubTitle">CUSTOM ROUTING + OVERRIDES</p>
         <div id="paletteBrandMenus" class="paletteBrandMenus"></div>
         <p class="hint">Per-brand/per-fixture menus control both palette sequence and song-metric routing (MANUAL vs META AUTO) without affecting other fixtures.</p>
+        </div>
       </div>
     </div>
 
@@ -2633,58 +2867,84 @@ tr:last-child td{
       <p class="hint">These route values are read-only and updated automatically from fixture toggles.</p>
 
       <div class="twitchPrefixPanel">
-        <h3>TWITCH COLOR COMMAND PREFIXES</h3>
+        <h3>TWITCH COLOR COMMAND ROUTING</h3>
         <div class="twitchPrefixGrid">
-          <div>
-            <label for="colorPrefixHue">HUE PREFIX (OPTIONAL)</label>
-            <input id="colorPrefixHue" type="text" value="hue" placeholder="hue">
+          <p class="prefixSyntax">
+            Quick setup:
+            use <code>/color hue red</code> and <code>/color wiz blue</code> style prefixes,
+            or leave command unprefixed and route it below.
+          </p>
+          <div class="prefixQuickGrid">
+            <div>
+              <label for="colorPrefixHue">HUE COMMAND PREFIX (OPTIONAL)</label>
+              <input id="colorPrefixHue" type="text" value="hue" placeholder="hue">
+            </div>
+            <div>
+              <label for="colorPrefixWiz">WIZ COMMAND PREFIX (OPTIONAL)</label>
+              <input id="colorPrefixWiz" type="text" value="wiz" placeholder="wiz">
+            </div>
+            <div>
+              <label for="colorPrefixDefaultTarget">UNPREFIXED /color GOES TO</label>
+              <select id="colorPrefixDefaultTarget">
+                <option value="both">both (Hue + WiZ sync)</option>
+                <option value="hue">hue only</option>
+                <option value="wiz">wiz only</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label for="colorPrefixWiz">WIZ PREFIX (OPTIONAL)</label>
-            <input id="colorPrefixWiz" type="text" value="wiz" placeholder="wiz">
-          </div>
-          <div>
-            <label for="colorPrefixDefaultTarget">UNPREFIXED /color TARGET</label>
-            <select id="colorPrefixDefaultTarget">
-              <option value="both">both brands (sync)</option>
-              <option value="hue">hue only</option>
-              <option value="wiz">wiz only</option>
-            </select>
-          </div>
-          <div id="colorPrefixOtherWrap" class="prefixDisabled">
-            <label for="colorPrefixOther">MOD-BRAND PREFIX (OPTIONAL)</label>
-            <input id="colorPrefixOther" type="text" placeholder="e.g. lifx">
-          </div>
-          <div class="prefixFixtureMapRow">
-            <label for="colorPrefixFixtureMap">PER-FIXTURE PREFIXES (OPTIONAL) <span class="infoTip" title="One line per fixture: fixtureId=prefix. These override brand prefixes.">?</span></label>
-            <textarea id="colorPrefixFixtureMap" placeholder="hue-main-1=desk&#10;wiz-background-1=back"></textarea>
-          </div>
-          <div class="prefixFixtureMapRow">
-            <label for="colorRaveOffEnabled">RAVE OFF END COLOR PROFILE</label>
-            <select id="colorRaveOffEnabled">
-              <option value="1">enabled</option>
-              <option value="0">disabled</option>
-            </select>
-          </div>
-          <div class="prefixFixtureMapRow">
-            <label for="colorRaveOffDefault">RAVE OFF DEFAULT COMMAND</label>
-            <input id="colorRaveOffDefault" type="text" placeholder="e.g. dim blue">
-          </div>
-          <div class="prefixFixtureMapRow">
-            <label for="colorRaveOffGroupMap">RAVE OFF GROUP OVERRIDES (OPTIONAL) <span class="infoTip" title="One line per group: key=command. key can be hue, wiz, hue:zone, or wiz:zone.">?</span></label>
-            <textarea id="colorRaveOffGroupMap" placeholder="hue=dim blue&#10;wiz=dim blue&#10;hue:desk=purple"></textarea>
-          </div>
-          <div class="prefixFixtureMapRow">
-            <label for="colorRaveOffFixtureMap">RAVE OFF FIXTURE OVERRIDES (OPTIONAL) <span class="infoTip" title="One line per fixture: fixtureId=command. Fixture override wins over group/default.">?</span></label>
-            <textarea id="colorRaveOffFixtureMap" placeholder="hue-main-1=dim red&#10;wiz-background-1=blue"></textarea>
-          </div>
-          <div class="grid2">
+          <div class="prefixActions">
             <button id="colorPrefixSaveBtn" type="button">SAVE PREFIX CONFIG</button>
             <button id="colorPrefixResetBtn" type="button">RESET PREFIX DEFAULTS</button>
           </div>
+
+          <details class="prefixSection">
+            <summary>Advanced Prefix Rules (Optional)</summary>
+            <div class="prefixSectionBody">
+              <div class="prefixAdvancedGrid">
+                <div id="colorPrefixOtherWrap" class="prefixDisabled">
+                  <label for="colorPrefixOther">MOD-BRAND PREFIX (OPTIONAL)</label>
+                  <input id="colorPrefixOther" type="text" placeholder="e.g. lifx">
+                </div>
+                <div class="prefixFullRow">
+                  <label for="colorPrefixFixtureMap">PER-FIXTURE PREFIX RULES (OPTIONAL) <span class="infoTip" title="One line per fixture: fixtureId=prefix. These override brand prefixes.">?</span></label>
+                  <textarea id="colorPrefixFixtureMap" placeholder="hue-main-1=desk&#10;wiz-background-1=back"></textarea>
+                  <p class="prefixSyntax">Syntax: <code>fixtureId=prefix</code> (one rule per line).</p>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details class="prefixSection" open>
+            <summary>RAVE OFF End Color Profile</summary>
+            <div class="prefixSectionBody">
+              <div class="prefixAdvancedGrid">
+                <div>
+                  <label for="colorRaveOffEnabled">RAVE OFF PROFILE</label>
+                  <select id="colorRaveOffEnabled">
+                    <option value="1">enabled</option>
+                    <option value="0">disabled</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="colorRaveOffDefault">DEFAULT RAVE OFF COMMAND</label>
+                  <input id="colorRaveOffDefault" type="text" placeholder="e.g. dim blue">
+                </div>
+                <div class="prefixFullRow">
+                  <label for="colorRaveOffGroupMap">GROUP RULES (OPTIONAL) <span class="infoTip" title="One line per group: key=command. key can be hue, wiz, hue:zone, or wiz:zone.">?</span></label>
+                  <textarea id="colorRaveOffGroupMap" placeholder="hue=dim blue&#10;wiz=dim blue&#10;hue:desk=purple"></textarea>
+                  <p class="prefixSyntax">Syntax: <code>hue=command</code>, <code>wiz=command</code>, or <code>hue:zone=command</code>.</p>
+                </div>
+                <div class="prefixFullRow">
+                  <label for="colorRaveOffFixtureMap">FIXTURE RULES (OPTIONAL) <span class="infoTip" title="One line per fixture: fixtureId=command. Fixture override wins over group/default.">?</span></label>
+                  <textarea id="colorRaveOffFixtureMap" placeholder="hue-main-1=dim red&#10;wiz-background-1=blue"></textarea>
+                  <p class="prefixSyntax">Syntax: <code>fixtureId=command</code> (one rule per line).</p>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
         <p id="colorPrefixStatus" class="hint">
-          Prefixes are optional. Per-fixture prefixes override brand prefixes; unprefixed commands use the selected default target.
+          Set optional prefixes for Hue/WiZ, choose where unprefixed <code>/color</code> goes, then save.
         </p>
       </div>
     </div>
@@ -2698,15 +2958,15 @@ tr:last-child td{
       <div class="audioGuideGrid">
         <div class="audioGuideCard">
           <strong>1) Quick setup first</strong>
-          <span>Pick <b>INPUT DEVICES</b>, then start with a quality profile. Most setups only need this section.</span>
+          <span>Pick <b>INPUT DEVICES</b>, then set <b>SOURCE ROUTING + APP ISOLATION</b> right below. Most setups only need this section.</span>
         </div>
         <div class="audioGuideCard">
           <strong>2) Apply + verify</strong>
-          <span>Click <b>APPLY AUDIO CFG</b>, then check <b>AUDIO PIPELINE</b> values rise when music plays.</span>
+          <span>Click <b>APPLY AUDIO CFG</b>, then check <b>AUDIO PIPELINE</b> and <b>APP ISO STATUS</b> while your app is playing.</span>
         </div>
         <div class="audioGuideCard">
           <strong>3) Use advanced only if needed</strong>
-          <span>Expand <b>ADVANCED AUDIO TUNING</b> for detailed thresholds, limiter behavior, and watchdog tuning.</span>
+          <span>Expand <b>ADVANCED AUDIO TUNING</b> only for thresholds, limiter behavior, and watchdog/debug controls.</span>
         </div>
       </div>
     </div>
@@ -2751,6 +3011,77 @@ tr:last-child td{
         <div>
           <label for="aGain">GAIN <span class="infoTip" title="Input amplification before feature extraction. Increase if levels stay low; reduce if clipping/overreaction.">?</span></label>
           <input id="aGain" type="number" step="0.01" min="0.2" max="3.0" value="1.00" />
+        </div>
+      </div>
+      <div class="subcluster collapsible" data-collapsible-key="audioSourceIsolationQuick" data-collapsed-default="0" data-collapsed-default-mobile="0">
+        <div class="clusterHeaderRow">
+          <h3>SOURCE ROUTING + APP ISOLATION</h3>
+          <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide source routing and app isolation setup.">COLLAPSE</button>
+        </div>
+        <div class="clusterBody">
+          <p class="hint">Easy setup: 1) pick backend + input source, 2) add isolated cable sources, 3) select priority/fallback app, 4) apply audio config.</p>
+          <div class="controlRow">
+            <div>
+              <label for="aInputBackend">INPUT BACKEND <span class="infoTip" title="AUTO uses PortAudio unless an FFmpeg input device is configured. Use FFMPEG for app-isolated virtual-device capture.">?</span></label>
+              <select id="aInputBackend">
+                <option value="auto">auto</option>
+                <option value="portaudio">portaudio</option>
+                <option value="ffmpeg">ffmpeg</option>
+              </select>
+            </div>
+            <div>
+              <label for="aFfmpegFormat">FFMPEG INPUT FORMAT <span class="infoTip" title="Windows usually uses dshow for virtual cables.">?</span></label>
+              <select id="aFfmpegFormat">
+                <option value="dshow">dshow</option>
+                <option value="wasapi">wasapi</option>
+              </select>
+            </div>
+            <div>
+              <label for="aFfmpegDevice">FFMPEG INPUT DEVICE <span class="infoTip" title="For dshow, use device display name (example: CABLE Output (VB-Audio Virtual Cable)).">?</span></label>
+              <input id="aFfmpegDevice" type="text" value="" placeholder="CABLE Output (VB-Audio Virtual Cable)">
+            </div>
+            <div>
+              <label for="aFfmpegSources">DEFAULT ISOLATED SOURCES <span class="infoTip" title="One source per line (or comma-separated). First source is used by default.">?</span></label>
+              <textarea id="aFfmpegSources" rows="3" placeholder="CABLE Output (VB-Audio Virtual Cable)"></textarea>
+            </div>
+          </div>
+          <div class="controlRow">
+            <div>
+              <label><input id="aAppIsolationEnabled" type="checkbox"> APP ISOLATION AUTO SWITCH (RECOMMENDED)</label>
+              <label><input id="aAppIsolationMultiSource" type="checkbox"> MIX MULTIPLE SOURCES (AMIX)</label>
+              <label><input id="aAppIsolationStrict" type="checkbox"> STRICT APP ISOLATION (NO FALLBACK)</label>
+              <label for="aAppIsolationCheckMs">APP ISO CHECK INTERVAL</label>
+              <select id="aAppIsolationCheckMs">
+                <option value="60000">1 MIN</option>
+                <option value="120000">2 MIN</option>
+                <option value="300000" selected>5 MIN</option>
+                <option value="600000">10 MIN</option>
+                <option value="900000">15 MIN</option>
+              </select>
+              <p class="hint">When MIX is OFF, only the first source is used. When ON, all listed sources are mixed.</p>
+            </div>
+            <div>
+              <label for="aAppPrimary">PRIORITY APP (RUNNING APPS)</label>
+              <select id="aAppPrimary"></select>
+            </div>
+            <div>
+              <label for="aAppFallback">FALLBACK APP (RUNNING APPS)</label>
+              <select id="aAppFallback"></select>
+            </div>
+            <div>
+              <label for="aAppPrimarySources">PRIORITY APP SOURCES <span class="infoTip" title="Optional override source list for the priority app. Leave blank to use DEFAULT ISOLATED SOURCES.">?</span></label>
+              <textarea id="aAppPrimarySources" rows="3" placeholder="optional override"></textarea>
+            </div>
+            <div>
+              <label for="aAppFallbackSources">FALLBACK APP SOURCES <span class="infoTip" title="Optional override source list for fallback app or fallback mode when priority app is missing.">?</span></label>
+              <textarea id="aAppFallbackSources" rows="3" placeholder="optional fallback override"></textarea>
+            </div>
+          </div>
+          <div class="grid2 audioQuickActionRow">
+            <button id="aAppsRefreshBtn" type="button" title="Refresh running app list for app-isolation selectors.">REFRESH RUNNING APPS</button>
+            <input id="aAppIsolationStatus" class="audioAppSearchStatus" type="text" value="App isolation scan idle." readonly>
+          </div>
+          <p class="hint">Windows workflow: route each target app to a virtual cable in App Volume & Device Preferences, then map those cable device names here.</p>
         </div>
       </div>
       <div>
@@ -2901,72 +3232,10 @@ tr:last-child td{
         </div>
         <div class="controlRow">
           <div>
-            <label for="aInputBackend">INPUT BACKEND <span class="infoTip" title="AUTO uses PortAudio unless an FFmpeg input device is configured. Use FFMPEG for app-isolated virtual-device capture.">?</span></label>
-            <select id="aInputBackend">
-              <option value="auto">auto</option>
-              <option value="portaudio">portaudio</option>
-              <option value="ffmpeg">ffmpeg</option>
-            </select>
-          </div>
-          <div>
             <label for="aFfmpegPath">FFMPEG PATH <span class="infoTip" title="Executable path or command name for ffmpeg.">?</span></label>
             <input id="aFfmpegPath" type="text" value="ffmpeg" placeholder="ffmpeg">
           </div>
-          <div>
-            <label for="aFfmpegFormat">FFMPEG INPUT FORMAT <span class="infoTip" title="Windows usually uses dshow for virtual cables.">?</span></label>
-            <select id="aFfmpegFormat">
-              <option value="dshow">dshow</option>
-              <option value="wasapi">wasapi</option>
-            </select>
-          </div>
-          <div>
-            <label for="aFfmpegDevice">FFMPEG INPUT DEVICE <span class="infoTip" title="For dshow, use device display name (example: CABLE Output (VB-Audio Virtual Cable)).">?</span></label>
-            <input id="aFfmpegDevice" type="text" value="" placeholder="CABLE Output (VB-Audio Virtual Cable)">
-          </div>
         </div>
-        <div class="controlRow">
-          <div>
-            <label for="aFfmpegSources">DEFAULT ISOLATED SOURCES <span class="infoTip" title="One source per line (or comma-separated). First source is used by default.">?</span></label>
-            <textarea id="aFfmpegSources" rows="3" placeholder="CABLE Output (VB-Audio Virtual Cable)"></textarea>
-          </div>
-          <div>
-            <label><input id="aAppIsolationEnabled" type="checkbox"> APP ISOLATION AUTO SWITCH (5 MIN CHECK)</label>
-            <label><input id="aAppIsolationMultiSource" type="checkbox"> MIX MULTIPLE SOURCES (AMIX)</label>
-            <label><input id="aAppIsolationStrict" type="checkbox"> STRICT APP ISOLATION (NO FALLBACK)</label>
-            <label for="aAppIsolationCheckMs">APP ISO CHECK INTERVAL</label>
-            <select id="aAppIsolationCheckMs">
-              <option value="60000">1 MIN</option>
-              <option value="120000">2 MIN</option>
-              <option value="300000" selected>5 MIN</option>
-              <option value="600000">10 MIN</option>
-              <option value="900000">15 MIN</option>
-            </select>
-            <p class="hint">When OFF, only the first source is used. When ON, all listed sources are mixed.</p>
-          </div>
-        </div>
-        <div class="controlRow">
-          <div>
-            <label for="aAppPrimary">PRIORITY APP (RUNNING APPS)</label>
-            <select id="aAppPrimary"></select>
-          </div>
-          <div>
-            <label for="aAppFallback">FALLBACK APP (RUNNING APPS)</label>
-            <select id="aAppFallback"></select>
-          </div>
-          <div>
-            <label for="aAppPrimarySources">PRIORITY APP SOURCES <span class="infoTip" title="Optional override source list for the priority app. Leave blank to use DEFAULT ISOLATED SOURCES.">?</span></label>
-            <textarea id="aAppPrimarySources" rows="3" placeholder="optional override"></textarea>
-          </div>
-          <div>
-            <label for="aAppFallbackSources">FALLBACK APP SOURCES <span class="infoTip" title="Optional override source list for fallback app or fallback mode when priority app is missing.">?</span></label>
-            <textarea id="aAppFallbackSources" rows="3" placeholder="optional fallback override"></textarea>
-          </div>
-        </div>
-        <div class="grid2 audioQuickActionRow">
-          <button id="aAppsRefreshBtn" type="button" title="Refresh running app list for app-isolation selectors.">REFRESH RUNNING APPS</button>
-          <input id="aAppIsolationStatus" class="audioAppSearchStatus" type="text" value="App isolation scan idle." readonly>
-        </div>
-        <p class="hint">Windows workflow: route each target app to a virtual cable in App Volume & Device Preferences, then map those cable device names here.</p>
         <div class="controlRow">
           <div>
             <label for="aBandLowHz">BAND LOW HZ <span class="infoTip" title="Upper edge of low-frequency band used by reactive analysis.">?</span></label>
@@ -3306,13 +3575,6 @@ tr:last-child td{
             <option value="true">expose sensitive logs (DEV RISK)</option>
           </select>
         </div>
-        <div>
-          <label for="systemLegacyComponents">LEGACY COMPONENTS</label>
-          <select id="systemLegacyComponents">
-            <option value="false">disabled (modern default)</option>
-            <option value="true">enabled (legacy behavior controls)</option>
-          </select>
-        </div>
         <div class="grid2">
           <button id="systemSettingsSaveBtn" type="button">SAVE SYSTEM SETTINGS</button>
           <button id="systemSettingsResetBtn" type="button">RESET SYSTEM DEFAULTS</button>
@@ -3338,7 +3600,6 @@ tr:last-child td{
       </div>
       <p class="hint">System settings include browser-local controls plus server browser auto-launch behavior.</p>
       <p class="hint">Set <code>HUE TRANSPORT DEFAULT</code> to <code>rest only</code> if you want to avoid Entertainment mode auto-switching.</p>
-      <p class="hint">Set <code>LEGACY COMPONENTS</code> to <code>enabled</code> only if you need legacy automation compatibility controls.</p>
       <p class="hint">Danger: disabling log redaction can expose usernames, client keys, bridge IDs, area IDs, bearer tokens, and network addresses in plain text logs.</p>
       <p class="hint">Use API BASE if this UI runs on a different host than the bridge server.</p>
     </div>
@@ -3516,16 +3777,6 @@ tr:last-child td{
       <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide automation rule editor.">COLLAPSE</button>
     </div>
     <div class="clusterBody">
-    <div class="legacyNoticePanel">
-      <p class="legacyNoticeTitle">LEGACY / DEPRECATED</p>
-      <p class="legacyNoticeText">This section is legacy and replaced by <b>CUSTOM FIXTURE CONTROL</b>. Keep disabled unless you explicitly need old automation behavior.</p>
-      <div class="legacyNoticeActions">
-        <button id="legacyAutomationUnlockBtn" type="button" class="warn">OPEN LEGACY CONTROLS</button>
-        <button id="legacyAutomationLockBtn" type="button" class="hidden">HIDE LEGACY CONTROLS</button>
-        <button id="legacyAutomationJumpCustomBtn" type="button">GO TO CUSTOM FIXTURE CONTROL</button>
-      </div>
-    </div>
-    <div id="legacyAutomationWrap" class="legacyAutomationWrap legacyLocked">
     <div class="controlRow">
       <div>
         <label for="autoRulesEnabled">AUTOMATION</label>
@@ -3603,7 +3854,6 @@ tr:last-child td{
       <div>CFG VER<br><span id="autoRulesVersion">0</span></div>
       <div>LOADED<br><span id="autoRulesLoadedAt">-</span></div>
       <div>LAST BACKUP<br><span id="autoRulesBackup">-</span></div>
-    </div>
     </div>
     </div>
   </div>
@@ -3786,7 +4036,6 @@ tr:last-child td{
 // [TITLE] - Mods Dashboard + Embedded Mod UI
 const THEME_STORAGE_KEY = "ravelink_ui_theme_v1";
 const OBS_DOCK_COMPACT_KEY = "ravelink_obs_dock_compact_v1";
-const LEGACY_AUTOMATION_UNLOCK_KEY = "ravelink_legacy_automation_unlocked_v1";
 const PALETTE_FIXTURE_SELECTION_KEY = "ravelink_palette_fixture_selection_v1";
 const DEFAULT_THEME_NAME = "midnight";
 
@@ -3898,11 +4147,22 @@ const ui = {
   limiterPreset: "balanced",
   activeTab: "live",
   paletteColorsPerFamily: 3,
-  paletteFamilies: ["blue", "purple"],
+  paletteFamilies: ["red", "green", "blue"],
   paletteDisorder: false,
   paletteDisorderAggression: 0.35,
+  paletteCycleMode: "on_trigger",
+  paletteTimedIntervalSec: 5,
+  paletteBeatLock: false,
+  paletteBeatLockGraceSec: 2,
+  paletteReactiveMargin: 28,
+  paletteSpectrumMapMode: "auto",
+  paletteSpectrumFeatureMap: ["lows", "mids", "highs", "rms", "flux"],
   paletteBrandOverrides: { hue: null, wiz: null },
   paletteFixtureOverrides: {},
+  paletteControlScope: "global",
+  paletteCustomBrand: "hue",
+  paletteGlobalModeNotice: "",
+  paletteBrandModeNotices: { hue: "", wiz: "" },
   fixtureMetricConfig: { mode: "manual", metric: "baseline", metaAutoFlip: false, harmonySize: 1, maxHz: null },
   fixtureMetricBrandOverrides: { hue: null, wiz: null },
   fixtureMetricFixtureOverrides: {},
@@ -3934,7 +4194,6 @@ const ui = {
   midiSnapshot: null,
   midiTabForced: localStorage.getItem("ravelink_midi_tab_forced_v1") === "1",
   automationConfigLoaded: false,
-  legacyAutomationUnlocked: localStorage.getItem(LEGACY_AUTOMATION_UNLOCK_KEY) === "1",
   modsLoadedAt: 0,
   modsTotal: 0,
   modsActive: 0,
@@ -3990,8 +4249,6 @@ const ui = {
   serverHueTransportPreference: "auto",
   serverUnsafeSensitiveLogs: false,
   serverUnsafeSensitiveLogsBaseline: false,
-  serverLegacyComponents: false,
-  serverLegacyComponentsBaseline: false,
   themeName: DEFAULT_THEME_NAME,
   themeConfig: { ...THEME_PRESETS[DEFAULT_THEME_NAME] }
 };
@@ -4059,8 +4316,7 @@ const UI_STORAGE_RESET_KEYS = Object.freeze([
   AUDIO_REACT_FORCE_LOCK_KEY,
   AUDIO_REACT_FORCE_OVERRIDE_KEY,
   MIDI_TAB_FORCE_KEY,
-  PALETTE_FIXTURE_SELECTION_KEY,
-  LEGACY_AUTOMATION_UNLOCK_KEY
+  PALETTE_FIXTURE_SELECTION_KEY
 ]);
 const UI_STORAGE_RESET_PREFIXES = Object.freeze([
   "ravelink_ui_collapsed_",
@@ -4165,17 +4421,12 @@ const el = {
   autoRulesVersion: document.getElementById("autoRulesVersion"),
   autoRulesLoadedAt: document.getElementById("autoRulesLoadedAt"),
   autoRulesBackup: document.getElementById("autoRulesBackup"),
-  legacyAutomationWrap: document.getElementById("legacyAutomationWrap"),
-  legacyAutomationUnlockBtn: document.getElementById("legacyAutomationUnlockBtn"),
-  legacyAutomationLockBtn: document.getElementById("legacyAutomationLockBtn"),
-  legacyAutomationJumpCustomBtn: document.getElementById("legacyAutomationJumpCustomBtn"),
   systemStartTab: document.getElementById("systemStartTab"),
   systemConfirmActions: document.getElementById("systemConfirmActions"),
   systemPollingMode: document.getElementById("systemPollingMode"),
   systemAutoLaunchBrowser: document.getElementById("systemAutoLaunchBrowser"),
   systemHueTransportPreference: document.getElementById("systemHueTransportPreference"),
   systemUnsafeSensitiveLogs: document.getElementById("systemUnsafeSensitiveLogs"),
-  systemLegacyComponents: document.getElementById("systemLegacyComponents"),
   systemSettingsSaveBtn: document.getElementById("systemSettingsSaveBtn"),
   systemSettingsResetBtn: document.getElementById("systemSettingsResetBtn"),
   systemPollNowBtn: document.getElementById("systemPollNowBtn"),
@@ -4578,11 +4829,26 @@ const el = {
   scopeBehav: document.getElementById("scopeBehav"),
   canvas: document.getElementById("canvas"),
   telemetryCanvas: document.getElementById("telemetryCanvas"),
+  paletteScopeGlobalBtn: document.getElementById("paletteScopeGlobalBtn"),
+  paletteScopeCustomBtn: document.getElementById("paletteScopeCustomBtn"),
+  paletteGlobalPanel: document.getElementById("paletteGlobalPanel"),
+  paletteCustomPanel: document.getElementById("paletteCustomPanel"),
+  paletteCustomBrandTabs: document.getElementById("paletteCustomBrandTabs"),
+  paletteModeNotice: document.getElementById("paletteModeNotice"),
   paletteFamilyGrid: document.getElementById("paletteFamilyGrid"),
   paletteBrandMenus: document.getElementById("paletteBrandMenus"),
   paletteDisorderAggression: document.getElementById("paletteDisorderAggression"),
   paletteDisorderAggressionVal: document.getElementById("paletteDisorderAggressionVal"),
-  paletteDisorderAggressionResetBtn: document.getElementById("paletteDisorderAggressionResetBtn")
+  paletteDisorderAggressionResetBtn: document.getElementById("paletteDisorderAggressionResetBtn"),
+  paletteTimedControls: document.getElementById("paletteTimedControls"),
+  paletteTimedIntervalSec: document.getElementById("paletteTimedIntervalSec"),
+  paletteTimedIntervalSecVal: document.getElementById("paletteTimedIntervalSecVal"),
+  paletteBeatLockGraceSec: document.getElementById("paletteBeatLockGraceSec"),
+  paletteBeatLockGraceSecVal: document.getElementById("paletteBeatLockGraceSecVal"),
+  paletteReactiveControls: document.getElementById("paletteReactiveControls"),
+  paletteReactiveMargin: document.getElementById("paletteReactiveMargin"),
+  paletteReactiveMarginVal: document.getElementById("paletteReactiveMarginVal"),
+  paletteSpectrumControls: document.getElementById("paletteSpectrumControls")
 };
 
 const tabButtons = Array.from(document.querySelectorAll("[data-tab-btn]"));
@@ -4594,6 +4860,12 @@ const audioQuickPresetButtons = Array.from(document.querySelectorAll("[data-audi
 const paletteCountButtons = Array.from(document.querySelectorAll("[data-palette-count]"));
 const palettePresetButtons = Array.from(document.querySelectorAll("[data-palette-preset]"));
 const paletteDisorderButtons = Array.from(document.querySelectorAll("[data-palette-disorder]"));
+const paletteCycleModeButtons = Array.from(document.querySelectorAll("[data-palette-cycle-mode]"));
+const paletteBeatLockButtons = Array.from(document.querySelectorAll("[data-palette-beat-lock]"));
+const paletteSpectrumModeButtons = Array.from(document.querySelectorAll("[data-palette-spectrum-mode]"));
+const paletteCustomBrandButtons = Array.from(document.querySelectorAll("[data-palette-custom-brand]"));
+const getPaletteSpectrumFeatureSelectors = () =>
+  Array.from(document.querySelectorAll("[data-palette-spectrum-feature-slot]"));
 const limiterPresetButtons = Array.from(document.querySelectorAll("[data-limiter-preset]"));
 const getPaletteFamilyButtons = () =>
   el.paletteFamilyGrid
@@ -4834,11 +5106,13 @@ const MIDI_ACTION_LABELS = Object.freeze({
   palette_colors_1: "PALETTE 1 COLOR",
   palette_colors_3: "PALETTE 3 COLORS",
   palette_colors_5: "PALETTE 5 COLORS",
-  palette_family_blue: "PALETTE BLUE",
-  palette_family_purple: "PALETTE PURPLE",
+  palette_colors_8: "PALETTE 8 COLORS",
+  palette_colors_12: "PALETTE 12 COLORS",
   palette_family_red: "PALETTE RED",
   palette_family_green: "PALETTE GREEN",
-  palette_family_yellow: "PALETTE YELLOW",
+  palette_family_blue: "PALETTE BLUE",
+  palette_family_purple: "PALETTE RED TONE",
+  palette_family_yellow: "PALETTE GREEN TONE",
   palette_preset_all_1: "PALETTE PRESET ALL x1",
   palette_preset_all_3: "PALETTE PRESET ALL x3",
   palette_preset_duo_cool: "PALETTE PRESET DUO COOL",
@@ -4957,29 +5231,29 @@ function applyUiTooltips() {
     el.reactorRiskNotice,
     "High MASTER and DROP values can reduce quality and increase instability, especially with high OVERCLOCK."
   );
-  setNodeTitle(el.colorPrefixHue, "Optional Hue color prefix. Leave blank to disable prefix matching.");
-  setNodeTitle(el.colorPrefixWiz, "Optional WiZ color prefix. Leave blank to disable prefix matching.");
-  setNodeTitle(el.colorPrefixDefaultTarget, "Where unprefixed /color commands are sent by default.");
+  setNodeTitle(el.colorPrefixHue, "Quick setup: Hue prefix token for /color (example: /color hue red). Leave blank to disable.");
+  setNodeTitle(el.colorPrefixWiz, "Quick setup: WiZ prefix token for /color (example: /color wiz blue). Leave blank to disable.");
+  setNodeTitle(el.colorPrefixDefaultTarget, "Where unprefixed /color commands are sent.");
   setNodeTitle(
     el.colorPrefixOther,
-    "Prefix for future mod-brand Twitch color commands. Enabled when mod-brand Twitch fixtures are available."
+    "Optional prefix for mod-brand Twitch fixtures. Enabled only when mod brands are available."
   );
   setNodeTitle(
     el.colorPrefixFixtureMap,
-    "Optional per-fixture prefixes. One line per fixture using fixtureId=prefix. Fixture prefixes override brand prefixes."
+    "Advanced rule list. One line per rule: fixtureId=prefix. These override brand prefixes."
   );
-  setNodeTitle(el.colorRaveOffEnabled, "Enable/disable automatic end-color profile applied only when RAVE turns OFF.");
-  setNodeTitle(el.colorRaveOffDefault, "Default /color command used for RAVE OFF when no fixture/group override matches.");
+  setNodeTitle(el.colorRaveOffEnabled, "Enable automatic RAVE OFF end-color profile.");
+  setNodeTitle(el.colorRaveOffDefault, "Default /color command for RAVE OFF when no override matches.");
   setNodeTitle(
     el.colorRaveOffGroupMap,
-    "Optional group overrides using key=command, where key is hue, wiz, hue:zone, or wiz:zone."
+    "Advanced group rules. One line per rule: key=command where key is hue, wiz, hue:zone, or wiz:zone."
   );
   setNodeTitle(
     el.colorRaveOffFixtureMap,
-    "Optional fixture overrides using fixtureId=command. Fixture override wins over group/default."
+    "Advanced fixture rules. One line per rule: fixtureId=command. Fixture rules override group/default."
   );
-  setNodeTitle(el.colorPrefixSaveBtn, "Save Twitch color prefix/default-target config.");
-  setNodeTitle(el.colorPrefixResetBtn, "Reset Twitch color prefix config to defaults.");
+  setNodeTitle(el.colorPrefixSaveBtn, "Save all Twitch color routing settings on this panel.");
+  setNodeTitle(el.colorPrefixResetBtn, "Reset Twitch color routing settings to defaults.");
   setNodeTitle(el.modUiSelect, "Choose a loaded mod UI package.");
   setNodeTitle(el.modUiRefreshBtn, "Refresh UI catalog from mod loader routes.");
   setNodeTitle(el.modUiReloadBtn, "Reload selected mod UI frame.");
@@ -4988,9 +5262,6 @@ function applyUiTooltips() {
   setNodeTitle(el.modUiFrame, "Sandboxed mod UI frame.");
   setNodeTitle(el.customFixtureSelect, "Custom-routed fixtures from both Hue and WiZ brands.");
   setNodeTitle(el.customFixtureSyncBtn, "Use selected custom fixture as active device control target.");
-  setNodeTitle(el.legacyAutomationUnlockBtn, "Open deprecated automation controls.");
-  setNodeTitle(el.legacyAutomationLockBtn, "Hide deprecated automation controls.");
-  setNodeTitle(el.legacyAutomationJumpCustomBtn, "Jump to Custom Fixture Control (recommended replacement).");
   setNodeTitle(el.modDropZone, "Drop a mod folder here to import directly.");
   setNodeTitle(el.modImportStatus, "Current drag/drop import status.");
   setNodeTitle(el.modImportBrowseBtn, "Pick a mod folder from disk and import it.");
@@ -5006,11 +5277,7 @@ function applyUiTooltips() {
     el.systemUnsafeSensitiveLogs,
     "Dangerous DEV option: disable server-side redaction and allow sensitive credentials/ids/tokens to appear in logs."
   );
-  setNodeTitle(
-    el.systemLegacyComponents,
-    "Enable legacy automation compatibility controls."
-  );
-  setNodeTitle(el.systemSettingsSaveBtn, "Persist local settings plus server browser-launch/log-redaction/legacy-component settings.");
+  setNodeTitle(el.systemSettingsSaveBtn, "Persist local settings plus server browser-launch and log-redaction settings.");
   setNodeTitle(el.systemSettingsResetBtn, "Reset system settings back to defaults.");
   setNodeTitle(el.systemPollNowBtn, "Run one immediate telemetry/config poll.");
   setNodeTitle(el.systemClearCacheBtn, "Clear UI local/session/cache memory and reload this page.");
@@ -5135,18 +5402,89 @@ function setBadge(node, state, text) {
   node.textContent = nextText;
 }
 
-const PALETTE_FAMILY_ORDER = Object.freeze(["blue", "purple", "red", "green", "yellow"]);
+const PALETTE_FAMILY_ORDER = Object.freeze(["red", "green", "blue"]);
 const PALETTE_FAMILY_ALIASES = Object.freeze({
-  magenta: "purple",
-  amber: "yellow"
+  magenta: "red",
+  purple: "red",
+  pink: "red",
+  amber: "green",
+  yellow: "green",
+  lime: "green",
+  cyan: "blue",
+  aqua: "blue",
+  teal: "blue"
 });
-const PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5]);
+const PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5, 8, 12]);
 const PALETTE_SUPPORTED_BRANDS = Object.freeze(["hue", "wiz"]);
 const PALETTE_BRAND_LABELS = Object.freeze({
   hue: "HUE",
   wiz: "WIZ"
 });
 const PALETTE_ALL_FIXTURES_VALUE = "__all__";
+const PALETTE_CYCLE_MODE_ORDER = Object.freeze([
+  "on_trigger",
+  "timed_cycle",
+  "reactive_shift",
+  "spectrum_mapper"
+]);
+const PALETTE_CYCLE_MODE_LABELS = Object.freeze({
+  on_trigger: "ON TRIGGER",
+  timed_cycle: "TIMED CYCLE",
+  reactive_shift: "REACTIVE SHIFT",
+  spectrum_mapper: "SPECTRUM MAPPER"
+});
+const PALETTE_SPECTRUM_MAP_MODE_ORDER = Object.freeze(["auto", "manual"]);
+const PALETTE_AUDIO_FEATURE_KEYS = Object.freeze([
+  "lows",
+  "mids",
+  "highs",
+  "rms",
+  "energy",
+  "flux",
+  "peaks",
+  "transients",
+  "beat"
+]);
+const PALETTE_AUDIO_FEATURE_LABELS = Object.freeze({
+  lows: "LOWS",
+  mids: "MIDS",
+  highs: "HIGHS",
+  rms: "RMS",
+  energy: "ENERGY",
+  flux: "FLUX",
+  peaks: "PEAKS",
+  transients: "TRANSIENTS",
+  beat: "BEAT"
+});
+const PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP = Object.freeze([
+  "lows",
+  "mids",
+  "highs",
+  "rms",
+  "flux"
+]);
+const PALETTE_TIMED_INTERVAL_MIN_SEC = 2;
+const PALETTE_TIMED_INTERVAL_MAX_SEC = 60;
+const PALETTE_BEAT_LOCK_GRACE_MIN_SEC = 0;
+const PALETTE_BEAT_LOCK_GRACE_MAX_SEC = 8;
+const PALETTE_REACTIVE_MARGIN_MIN = 5;
+const PALETTE_REACTIVE_MARGIN_MAX = 100;
+
+function normalizePaletteControlScopeUi(value, fallback = "global") {
+  const mode = String(value || "").trim().toLowerCase();
+  if (mode === "custom") return "custom";
+  if (mode === "global") return "global";
+  const fallbackMode = String(fallback || "").trim().toLowerCase();
+  return fallbackMode === "custom" ? "custom" : "global";
+}
+
+function normalizePaletteCustomBrandMemoryUi(value, fallback = "hue") {
+  const brand = String(value || "").trim().toLowerCase();
+  if (PALETTE_SUPPORTED_BRANDS.includes(brand)) return brand;
+  const fallbackBrand = String(fallback || "").trim().toLowerCase();
+  return PALETTE_SUPPORTED_BRANDS.includes(fallbackBrand) ? fallbackBrand : "hue";
+}
+
 function normalizePaletteFixtureSelectionByBrandMemory(value = null) {
   const base = {
     hue: PALETTE_ALL_FIXTURES_VALUE,
@@ -5173,30 +5511,37 @@ function persistPaletteFixtureSelectionMemory() {
 ui.paletteFixtureSelectionByBrand = normalizePaletteFixtureSelectionByBrandMemory(
   ui.paletteFixtureSelectionByBrand
 );
+let paletteGlobalModeNoticeTimer = null;
+const paletteBrandModeNoticeTimers = {
+  hue: null,
+  wiz: null
+};
+let paletteBrandMenusDeferredRenderTimer = null;
+let paletteBrandMenusInteractionUntil = 0;
 
 const PALETTE_PRESETS = Object.freeze({
   all_1: Object.freeze({
     id: "all_1",
     label: "ALL COLORS x1",
-    families: Object.freeze(["blue", "purple", "red", "green", "yellow"]),
+    families: Object.freeze(["red", "green", "blue"]),
     colorsPerFamily: 1
   }),
   all_3: Object.freeze({
     id: "all_3",
     label: "ALL COLORS x3",
-    families: Object.freeze(["blue", "purple", "red", "green", "yellow"]),
+    families: Object.freeze(["red", "green", "blue"]),
     colorsPerFamily: 3
   }),
   duo_cool: Object.freeze({
     id: "duo_cool",
     label: "DUO COOL",
-    families: Object.freeze(["blue", "purple"]),
+    families: Object.freeze(["green", "blue"]),
     colorsPerFamily: null
   }),
   duo_warm: Object.freeze({
     id: "duo_warm",
     label: "DUO WARM",
-    families: Object.freeze(["red", "yellow"]),
+    families: Object.freeze(["red", "green"]),
     colorsPerFamily: null
   })
 });
@@ -5240,8 +5585,8 @@ function normalizePaletteBrandUi(value) {
 }
 
 function paletteFamiliesSetEqualUi(a, b) {
-  const aa = normalizePaletteFamiliesUi(a, ["blue", "purple"]);
-  const bb = normalizePaletteFamiliesUi(b, ["blue", "purple"]);
+  const aa = normalizePaletteFamiliesUi(a, ["red", "green", "blue"]);
+  const bb = normalizePaletteFamiliesUi(b, ["red", "green", "blue"]);
   if (aa.length !== bb.length) return false;
   return aa.every(name => bb.includes(name));
 }
@@ -5257,7 +5602,7 @@ function isPalettePresetActiveUi(presetId) {
   return true;
 }
 
-function normalizePaletteFamiliesUi(value, fallback = ["blue", "purple"]) {
+function normalizePaletteFamiliesUi(value, fallback = ["red", "green", "blue"]) {
   const list = Array.isArray(value)
     ? value
     : String(value || "")
@@ -5275,7 +5620,7 @@ function normalizePaletteFamiliesUi(value, fallback = ["blue", "purple"]) {
   if (out.length) return out;
   return Array.isArray(fallback) && fallback.length
     ? normalizePaletteFamiliesUi(fallback, PALETTE_FAMILY_ORDER)
-    : ["blue"];
+    : ["red"];
 }
 
 function normalizePaletteColorCountUi(value, fallback = 3) {
@@ -5291,6 +5636,112 @@ function normalizePaletteDisorderAggressionUi(value, fallback = 0.35) {
   return clampNumber(normalized, 0, 1, fallback);
 }
 
+function normalizePaletteCycleModeUi(value, fallback = "on_trigger") {
+  const mode = String(value || "").trim().toLowerCase();
+  if (PALETTE_CYCLE_MODE_ORDER.includes(mode)) return mode;
+  const fallbackMode = String(fallback || "").trim().toLowerCase();
+  return PALETTE_CYCLE_MODE_ORDER.includes(fallbackMode) ? fallbackMode : "on_trigger";
+}
+
+function normalizePaletteTimedIntervalSecUi(value, fallback = 5) {
+  const parsed = Number(value);
+  const normalize = raw => {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    if (n <= 3.5) return PALETTE_TIMED_INTERVAL_MIN_SEC;
+    return clampNumber(
+      Math.round(n / 5) * 5,
+      5,
+      PALETTE_TIMED_INTERVAL_MAX_SEC,
+      5
+    );
+  };
+  const normalized = normalize(parsed);
+  if (Number.isFinite(normalized)) return normalized;
+  const fallbackNormalized = normalize(fallback);
+  return Number.isFinite(fallbackNormalized) ? fallbackNormalized : 5;
+}
+
+function normalizePaletteBeatLockGraceSecUi(value, fallback = 2) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(
+      Math.round(parsed),
+      PALETTE_BEAT_LOCK_GRACE_MIN_SEC,
+      PALETTE_BEAT_LOCK_GRACE_MAX_SEC,
+      2
+    );
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(
+      Math.round(fallbackNum),
+      PALETTE_BEAT_LOCK_GRACE_MIN_SEC,
+      PALETTE_BEAT_LOCK_GRACE_MAX_SEC,
+      2
+    );
+  }
+  return 2;
+}
+
+function normalizePaletteReactiveMarginUi(value, fallback = 28) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(
+      Math.round(parsed),
+      PALETTE_REACTIVE_MARGIN_MIN,
+      PALETTE_REACTIVE_MARGIN_MAX,
+      28
+    );
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(
+      Math.round(fallbackNum),
+      PALETTE_REACTIVE_MARGIN_MIN,
+      PALETTE_REACTIVE_MARGIN_MAX,
+      28
+    );
+  }
+  return 28;
+}
+
+function normalizePaletteSpectrumMapModeUi(value, fallback = "auto") {
+  const mode = String(value || "").trim().toLowerCase();
+  if (PALETTE_SPECTRUM_MAP_MODE_ORDER.includes(mode)) return mode;
+  const fallbackMode = String(fallback || "").trim().toLowerCase();
+  return PALETTE_SPECTRUM_MAP_MODE_ORDER.includes(fallbackMode) ? fallbackMode : "auto";
+}
+
+function normalizePaletteAudioFeatureUi(value, fallback = "rms") {
+  const key = String(value || "").trim().toLowerCase();
+  if (PALETTE_AUDIO_FEATURE_KEYS.includes(key)) return key;
+  const fallbackKey = String(fallback || "").trim().toLowerCase();
+  return PALETTE_AUDIO_FEATURE_KEYS.includes(fallbackKey) ? fallbackKey : "rms";
+}
+
+function normalizePaletteSpectrumFeatureMapUi(value, fallback = PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP) {
+  const list = Array.isArray(value)
+    ? value
+    : String(value || "")
+      .split(",")
+      .map(item => item.trim())
+      .filter(Boolean);
+  const fallbackList = Array.isArray(fallback) && fallback.length
+    ? fallback
+    : PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP;
+  const out = [];
+  for (let i = 0; i < 5; i += 1) {
+    const raw = Object.prototype.hasOwnProperty.call(list, i)
+      ? list[i]
+      : fallbackList[i % fallbackList.length];
+    out.push(
+      normalizePaletteAudioFeatureUi(raw, fallbackList[i % fallbackList.length])
+    );
+  }
+  return out;
+}
+
 function getPaletteFamiliesLabelUi(families) {
   const normalized = normalizePaletteFamiliesUi(families, ui.paletteFamilies);
   return normalized.map(name => String(name || "").toUpperCase()).join("+");
@@ -5301,20 +5752,51 @@ function normalizePaletteConfigUi(config = {}, fallback = null) {
     ? fallback
     : {
         colorsPerFamily: ui.paletteColorsPerFamily || 3,
-        families: ui.paletteFamilies || ["blue", "purple"],
+        families: ui.paletteFamilies || ["red", "green", "blue"],
         disorder: ui.paletteDisorder,
-        disorderAggression: ui.paletteDisorderAggression || 0.35
+        disorderAggression: ui.paletteDisorderAggression || 0.35,
+        cycleMode: ui.paletteCycleMode || "on_trigger",
+        timedIntervalSec: ui.paletteTimedIntervalSec || 5,
+        beatLock: ui.paletteBeatLock === true,
+        beatLockGraceSec: ui.paletteBeatLockGraceSec || 2,
+        reactiveMargin: ui.paletteReactiveMargin || 28,
+        spectrumMapMode: ui.paletteSpectrumMapMode || "auto",
+        spectrumFeatureMap: ui.paletteSpectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
       };
   const source = config && typeof config === "object" ? config : {};
   return {
     colorsPerFamily: normalizePaletteColorCountUi(source.colorsPerFamily, base.colorsPerFamily || 3),
-    families: normalizePaletteFamiliesUi(source.families, base.families || ["blue", "purple"]),
+    families: normalizePaletteFamiliesUi(source.families, base.families || ["red", "green", "blue"]),
     disorder: Object.prototype.hasOwnProperty.call(source, "disorder")
       ? Boolean(source.disorder)
       : Boolean(base.disorder),
     disorderAggression: normalizePaletteDisorderAggressionUi(
       source.disorderAggression,
       base.disorderAggression || 0.35
+    ),
+    cycleMode: normalizePaletteCycleModeUi(source.cycleMode, base.cycleMode || "on_trigger"),
+    timedIntervalSec: normalizePaletteTimedIntervalSecUi(
+      source.timedIntervalSec,
+      base.timedIntervalSec || 5
+    ),
+    beatLock: Object.prototype.hasOwnProperty.call(source, "beatLock")
+      ? parseBooleanUi(source.beatLock, Boolean(base.beatLock))
+      : Boolean(base.beatLock),
+    beatLockGraceSec: normalizePaletteBeatLockGraceSecUi(
+      source.beatLockGraceSec,
+      base.beatLockGraceSec || 2
+    ),
+    reactiveMargin: normalizePaletteReactiveMarginUi(
+      source.reactiveMargin,
+      base.reactiveMargin || 28
+    ),
+    spectrumMapMode: normalizePaletteSpectrumMapModeUi(
+      source.spectrumMapMode,
+      base.spectrumMapMode || "auto"
+    ),
+    spectrumFeatureMap: normalizePaletteSpectrumFeatureMapUi(
+      source.spectrumFeatureMap,
+      base.spectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
     )
   };
 }
@@ -5532,15 +6014,32 @@ function applyPaletteSnapshotToUi(config = {}, options = {}) {
     next,
     {
       colorsPerFamily: ui.paletteColorsPerFamily || 3,
-      families: ui.paletteFamilies || ["blue", "purple"],
+      families: ui.paletteFamilies || ["red", "green", "blue"],
       disorder: ui.paletteDisorder,
-      disorderAggression: ui.paletteDisorderAggression || 0.35
+      disorderAggression: ui.paletteDisorderAggression || 0.35,
+      cycleMode: ui.paletteCycleMode || "on_trigger",
+      timedIntervalSec: ui.paletteTimedIntervalSec || 5,
+      beatLock: ui.paletteBeatLock === true,
+      beatLockGraceSec: ui.paletteBeatLockGraceSec || 2,
+      reactiveMargin: ui.paletteReactiveMargin || 28,
+      spectrumMapMode: ui.paletteSpectrumMapMode || "auto",
+      spectrumFeatureMap: ui.paletteSpectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
     }
   );
   ui.paletteColorsPerFamily = normalizedGlobal.colorsPerFamily;
   ui.paletteFamilies = normalizedGlobal.families.slice();
   ui.paletteDisorder = Boolean(normalizedGlobal.disorder);
   ui.paletteDisorderAggression = normalizedGlobal.disorderAggression;
+  ui.paletteCycleMode = normalizedGlobal.cycleMode;
+  ui.paletteTimedIntervalSec = normalizedGlobal.timedIntervalSec;
+  ui.paletteBeatLock = normalizedGlobal.beatLock === true;
+  ui.paletteBeatLockGraceSec = normalizedGlobal.beatLockGraceSec;
+  ui.paletteReactiveMargin = normalizedGlobal.reactiveMargin;
+  ui.paletteSpectrumMapMode = normalizedGlobal.spectrumMapMode;
+  ui.paletteSpectrumFeatureMap = normalizePaletteSpectrumFeatureMapUi(
+    normalizedGlobal.spectrumFeatureMap,
+    PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
+  );
 
   ui.paletteBrandOverrides = normalizePaletteBrandOverridesUi(
     next.brands,
@@ -5568,7 +6067,14 @@ function getPaletteGlobalConfigUi() {
     colorsPerFamily: ui.paletteColorsPerFamily,
     families: ui.paletteFamilies,
     disorder: ui.paletteDisorder,
-    disorderAggression: ui.paletteDisorderAggression
+    disorderAggression: ui.paletteDisorderAggression,
+    cycleMode: ui.paletteCycleMode,
+    timedIntervalSec: ui.paletteTimedIntervalSec,
+    beatLock: ui.paletteBeatLock,
+    beatLockGraceSec: ui.paletteBeatLockGraceSec,
+    reactiveMargin: ui.paletteReactiveMargin,
+    spectrumMapMode: ui.paletteSpectrumMapMode,
+    spectrumFeatureMap: ui.paletteSpectrumFeatureMap
   });
 }
 
@@ -5618,8 +6124,7 @@ function getPaletteBrandFixturesUi(brand) {
       const fixtureBrand = normalizePaletteBrandUi(fixture.brand);
       if (fixtureBrand !== brandKey) return false;
       if (fixture.enabled === false) return false;
-      const legacyMode = String(fixture.controlMode || "engine").trim().toLowerCase();
-      return parseBooleanUi(fixture.engineEnabled, legacyMode === "engine");
+      return parseBooleanUi(fixture.engineEnabled, false);
     })
     .map(fixture => {
       const id = String(fixture.id || "").trim();
@@ -5667,9 +6172,20 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
   const selectedFixture = getPaletteBrandSelectionUi(brandKey, fixtures);
   const config = getPaletteScopedConfigUi(brandKey, selectedFixture);
   const colorsPerFamily = normalizePaletteColorCountUi(config.colorsPerFamily, 3);
-  const families = normalizePaletteFamiliesUi(config.families, ["blue", "purple"]);
+  const families = normalizePaletteFamiliesUi(config.families, ["red", "green", "blue"]);
   const disorder = Boolean(config.disorder);
   const aggressionPct = Math.round(normalizePaletteDisorderAggressionUi(config.disorderAggression, 0.35) * 100);
+  const cycleMode = normalizePaletteCycleModeUi(config.cycleMode, "on_trigger");
+  const timedIntervalSec = normalizePaletteTimedIntervalSecUi(config.timedIntervalSec, 5);
+  const beatLock = parseBooleanUi(config.beatLock, false) === true;
+  const beatLockGraceSec = normalizePaletteBeatLockGraceSecUi(config.beatLockGraceSec, 2);
+  const reactiveMargin = normalizePaletteReactiveMarginUi(config.reactiveMargin, 28);
+  const spectrumMapMode = normalizePaletteSpectrumMapModeUi(config.spectrumMapMode, "auto");
+  const spectrumFeatureMap = normalizePaletteSpectrumFeatureMapUi(
+    config.spectrumFeatureMap,
+    PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
+  );
+  const modeNotice = String(ui.paletteBrandModeNotices?.[brandKey] || "").trim();
   const metricConfig = getFixtureMetricScopedConfigUi(brandKey, selectedFixture);
   const metricMode = normalizeFixtureMetricModeUi(metricConfig.mode, FIXTURE_METRIC_CONFIG_DEFAULT.mode);
   const metricKey = normalizeFixtureMetricKeyUi(metricConfig.metric, FIXTURE_METRIC_CONFIG_DEFAULT.metric);
@@ -5708,6 +6224,36 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
   const metricButtons = FIXTURE_METRIC_KEYS.map(metric => (
     `<button type="button" data-fixture-metric-key="${brandKey}" data-metric="${metric}" class="${metricKey === metric ? "active" : ""}" title="${metric === "baseline" ? "Drive behavior from overall loudness level." : metric === "peaks" ? "Drive behavior from short peak hits." : metric === "transients" ? "Drive behavior from sharp attack changes." : "Drive behavior from spectral movement (flux)."}">${(FIXTURE_METRIC_LABELS[metric] || metric).toUpperCase()}</button>`
   )).join("");
+  const cycleButtons = PALETTE_CYCLE_MODE_ORDER.map(mode => {
+    const modeTitle = mode === "on_trigger"
+      ? "Advance to the next palette group on beat/drop triggers. Colors inside the active group continue to move."
+      : mode === "timed_cycle"
+        ? "Advance to the next palette group every interval. Colors inside the active group continue to move between advances."
+        : mode === "reactive_shift"
+          ? "Advance to the next palette group when tempo/progression changes pass margin. Colors inside the active group continue to move."
+          : "Choose active palette group from mapped audio features (lows/mids/highs/etc). Colors still move inside the selected group.";
+    return `<button type="button" data-palette-brand-cycle-mode="${brandKey}" data-mode="${mode}" class="${cycleMode === mode ? "active" : ""}" title="${modeTitle}">${(PALETTE_CYCLE_MODE_LABELS[mode] || mode).toUpperCase()}</button>`;
+  }).join("");
+  const beatLockButtons = [
+    `<button type="button" data-palette-brand-beat-lock="${brandKey}" data-enabled="false" class="${!beatLock ? "active" : ""}" title="Advance exactly on the timer interval.">OFF</button>`,
+    `<button type="button" data-palette-brand-beat-lock="${brandKey}" data-enabled="true" class="${beatLock ? "active" : ""}" title="Wait for beat/drop near interval, then advance.">ON</button>`
+  ].join("");
+  const spectrumModeButtons = PALETTE_SPECTRUM_MAP_MODE_ORDER.map(mode => (
+    `<button type="button" data-palette-brand-spectrum-mode="${brandKey}" data-mode="${mode}" class="${spectrumMapMode === mode ? "active" : ""}" title="${mode === "manual" ? "Choose which audio feature maps to each slot." : "Use built-in auto mapping across slots."}">${mode === "manual" ? "MANUAL ASSIGN" : "AUTO ASSIGN"}</button>`
+  )).join("");
+  const spectrumSelectors = Array.from({ length: 5 }, (_, slot) => {
+    const selectedFeature = normalizePaletteAudioFeatureUi(
+      spectrumFeatureMap[slot],
+      PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP[slot % PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP.length]
+    );
+    const options = PALETTE_AUDIO_FEATURE_KEYS.map(feature => (
+      `<option value="${feature}" ${selectedFeature === feature ? "selected" : ""}>SLOT ${slot + 1}: ${(PALETTE_AUDIO_FEATURE_LABELS[feature] || feature).toUpperCase()}</option>`
+    )).join("");
+    return `<select data-palette-brand-spectrum="${brandKey}" data-palette-brand-spectrum-slot="${slot}" ${spectrumMapMode === "manual" ? "" : "disabled"}>${options}</select>`;
+  }).join("");
+  const timedWrapClass = cycleMode === "timed_cycle" ? "" : "hidden";
+  const reactiveWrapClass = cycleMode === "reactive_shift" ? "" : "hidden";
+  const spectrumWrapClass = cycleMode === "spectrum_mapper" ? "" : "hidden";
 
   return (
     `<div class="paletteBrandCard" data-palette-brand-card="${brandKey}">` +
@@ -5748,6 +6294,46 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
                 `<span class="paletteBrandValue" data-palette-brand-aggression-val="${brandKey}">${aggressionPct}%</span>` +
               `</label>` +
               `<input type="range" min="0" max="100" step="1" value="${aggressionPct}" data-palette-brand-aggression="${brandKey}" title="Set how strongly disorder jumps between colors and families.">` +
+            `</div>` +
+          `</div>` +
+        `</details>` +
+        `<details class="paletteBrandSection" open>` +
+          `<summary>COLOR ENGINE MODE</summary>` +
+          `<div class="paletteBrandSectionBody">` +
+            `<p class="paletteModeNotice" data-palette-brand-mode-notice="${brandKey}">${escapeHtmlUi(modeNotice)}</p>` +
+            `<div class="paletteCycleGrid">${cycleButtons}</div>` +
+            `<div class="paletteControlWrap ${timedWrapClass}" data-palette-brand-timed-wrap="${brandKey}">` +
+              `<div class="paletteBrandSlider">` +
+                `<label>` +
+                  `<span>CYCLE INTERVAL</span>` +
+                  `<span class="paletteBrandValue" data-palette-brand-timed-val="${brandKey}">${timedIntervalSec}s</span>` +
+                `</label>` +
+                `<input type="range" min="${PALETTE_TIMED_INTERVAL_MIN_SEC}" max="${PALETTE_TIMED_INTERVAL_MAX_SEC}" step="1" value="${timedIntervalSec}" data-palette-brand-timed="${brandKey}" title="How often to advance in TIMED CYCLE mode.">` +
+              `</div>` +
+              `<p class="paletteBrandSubLabel">BEAT LOCK</p>` +
+              `<div class="paletteBrandOrderGrid">${beatLockButtons}</div>` +
+              `<div class="paletteBrandSlider">` +
+                `<label>` +
+                  `<span>BEAT LOCK GRACE</span>` +
+                  `<span class="paletteBrandValue" data-palette-brand-beat-grace-val="${brandKey}">+${beatLockGraceSec}s</span>` +
+                `</label>` +
+                `<input type="range" min="${PALETTE_BEAT_LOCK_GRACE_MIN_SEC}" max="${PALETTE_BEAT_LOCK_GRACE_MAX_SEC}" step="1" value="${beatLockGraceSec}" data-palette-brand-beat-grace="${brandKey}" title="Maximum extra wait for next beat before forced advance.">` +
+              `</div>` +
+            `</div>` +
+            `<div class="paletteControlWrap ${reactiveWrapClass}" data-palette-brand-reactive-wrap="${brandKey}">` +
+              `<div class="paletteBrandSlider">` +
+                `<label>` +
+                  `<span>CHANGE MARGIN</span>` +
+                  `<span class="paletteBrandValue" data-palette-brand-reactive-margin-val="${brandKey}">${reactiveMargin}</span>` +
+                `</label>` +
+                `<input type="range" min="${PALETTE_REACTIVE_MARGIN_MIN}" max="${PALETTE_REACTIVE_MARGIN_MAX}" step="1" value="${reactiveMargin}" data-palette-brand-reactive-margin="${brandKey}" title="Higher margin requires stronger tempo/progression change before advancing.">` +
+              `</div>` +
+            `</div>` +
+            `<div class="paletteControlWrap ${spectrumWrapClass}" data-palette-brand-spectrum-wrap="${brandKey}">` +
+              `<p class="hint">Spectrum Mapper picks the active palette group from audio features. Color motion inside that group still follows ORDER/DISORDER.</p>` +
+              `<p class="paletteBrandSubLabel">MAP MODE</p>` +
+              `<div class="paletteBrandOrderGrid">${spectrumModeButtons}</div>` +
+              `<div class="paletteSpectrumGrid">${spectrumSelectors}</div>` +
             `</div>` +
           `</div>` +
         `</details>` +
@@ -5799,18 +6385,66 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
   );
 }
 
-function renderPaletteBrandMenus() {
+function markPaletteBrandMenusInteraction(holdMs = 1200) {
+  const nextUntil = Date.now() + Math.max(250, Number(holdMs) || 1200);
+  if (nextUntil > paletteBrandMenusInteractionUntil) {
+    paletteBrandMenusInteractionUntil = nextUntil;
+  }
+}
+
+function isPaletteBrandMenusInteractionActive() {
+  if (!el.paletteBrandMenus) return false;
+  const active = document.activeElement;
+  if (active && el.paletteBrandMenus.contains(active)) return true;
+  return Date.now() < Number(paletteBrandMenusInteractionUntil || 0);
+}
+
+function schedulePaletteBrandMenusDeferredRender(options = {}) {
+  if (paletteBrandMenusDeferredRenderTimer) return;
+  paletteBrandMenusDeferredRenderTimer = setTimeout(() => {
+    paletteBrandMenusDeferredRenderTimer = null;
+    renderPaletteBrandMenus(options);
+  }, 200);
+}
+
+function renderPaletteBrandMenus(options = {}) {
   if (!el.paletteBrandMenus) return;
-  const cards = [];
+  const opts = options && typeof options === "object" ? options : {};
+  const force = opts.force === true;
+  if (!force && isPaletteBrandMenusInteractionActive()) {
+    schedulePaletteBrandMenusDeferredRender(opts);
+    return;
+  }
+  if (paletteBrandMenusDeferredRenderTimer) {
+    clearTimeout(paletteBrandMenusDeferredRenderTimer);
+    paletteBrandMenusDeferredRenderTimer = null;
+  }
+  const fixturesByBrand = {};
+  const availableBrands = [];
   for (const brand of PALETTE_SUPPORTED_BRANDS) {
     const fixtures = getPaletteBrandFixturesUi(brand);
     if (!fixtures.length) continue;
-    cards.push(buildPaletteBrandCardUi(brand, fixtures));
+    fixturesByBrand[brand] = fixtures;
+    availableBrands.push(brand);
   }
-  if (!cards.length) {
+  if (!availableBrands.length) {
     el.paletteBrandMenus.innerHTML = `<div class="hint">No engine-routed Hue/WiZ fixtures detected for per-brand menus.</div>`;
     return;
   }
+
+  const customScopeActive = normalizePaletteControlScopeUi(ui.paletteControlScope, "global") === "custom";
+  if (!availableBrands.includes(ui.paletteCustomBrand)) {
+    ui.paletteCustomBrand = availableBrands[0];
+  }
+
+  if (customScopeActive) {
+    const activeBrand = normalizePaletteCustomBrandMemoryUi(ui.paletteCustomBrand, availableBrands[0]);
+    const fixtures = fixturesByBrand[activeBrand] || fixturesByBrand[availableBrands[0]] || [];
+    el.paletteBrandMenus.innerHTML = buildPaletteBrandCardUi(activeBrand, fixtures);
+    return;
+  }
+
+  const cards = availableBrands.map(brand => buildPaletteBrandCardUi(brand, fixturesByBrand[brand] || []));
   el.paletteBrandMenus.innerHTML = cards.join("");
 }
 
@@ -5824,7 +6458,7 @@ function applyPaletteRuntimeSnapshotToUi(snapshot = {}) {
     brandFixtures: data.brandFixtures || {}
   });
   applyFixtureMetricRoutingSnapshotToUi(data.metricRouting || {});
-  renderPaletteBrandMenus();
+  renderPaletteBrandMenus({ reason: "palette_runtime_snapshot" });
 }
 
 function normalizeHexColor(value, fallback = "#8b001f") {
@@ -6464,6 +7098,18 @@ function getSelectedModUiDescriptor() {
   return ui.modUiCatalog.find(item => item.id === selectedId) || null;
 }
 
+function syncModUiSelectionToHotswapTarget(options = {}) {
+  if (!el.modEnableId) return;
+  const explicitId = normalizeModUiId(options.modId);
+  const selectedId = explicitId || normalizeModUiId(ui.modUiSelectedId);
+  if (!selectedId) return;
+  const current = String(el.modEnableId.value || "").trim();
+  const force = options.force === true;
+  if (!current || force) {
+    el.modEnableId.value = selectedId;
+  }
+}
+
 function buildModUiFrameUrl(descriptor, options = {}) {
   const baseUrl = String(descriptor?.url || "").trim();
   if (!baseUrl) return "";
@@ -6501,6 +7147,7 @@ function renderModUiFrame(options = {}) {
   }
 
   if (!descriptor.loaded || !descriptor.url) {
+    syncModUiSelectionToHotswapTarget({ modId: descriptor.id });
     if (frame) frame.src = "about:blank";
     if (frameWrap) frameWrap.classList.add("hidden");
     if (empty) {
@@ -6567,13 +7214,14 @@ function applyModUiCatalog(catalog = [], options = {}) {
       const opt = document.createElement("option");
       opt.value = item.id;
       const stateWord = item.loaded ? "LIVE" : "OFFLINE";
-      opt.textContent = `${item.title} (${item.id}) [${stateWord}]`;
-      opt.disabled = !item.loaded;
+      const enabledWord = item.enabled ? "ENABLED" : "DISABLED";
+      opt.textContent = `${item.title} (${item.id}) [${stateWord} | ${enabledWord}]`;
       el.modUiSelect.appendChild(opt);
     }
     el.modUiSelect.value = nextSelectedId || "";
   }
 
+  syncModUiSelectionToHotswapTarget();
   rebuildDynamicModUiTabs();
   renderModUiFrame({ forceReload: options.forceReload === true });
 }
@@ -6830,7 +7478,7 @@ function normalizeApiBaseInput(raw) {
   const value = String(raw || "").trim();
   if (!value) return "";
   let candidate = value;
-  // Backward-compatible: allow legacy "host:port" values by assuming http.
+  // Allow "host:port" shorthand by assuming http.
   if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(candidate)) {
     candidate = `http://${candidate}`;
   }
@@ -6897,8 +7545,7 @@ function renderSystemSettingsStatus() {
     ? "HUE REST ONLY"
     : "HUE AUTO";
   const logsMode = ui.serverUnsafeSensitiveLogs ? "LOG REDACTION OFF (DEV RISK)" : "LOG REDACTION ON";
-  const legacyMode = ui.serverLegacyComponents ? "LEGACY COMPONENTS ON" : "LEGACY COMPONENTS OFF";
-  el.systemSettingsStatus.value = `${startTab} | ${confirms} | ${polling} | ${browserLaunch} | ${hueTransport} | ${logsMode} | ${legacyMode}`;
+  el.systemSettingsStatus.value = `${startTab} | ${confirms} | ${polling} | ${browserLaunch} | ${hueTransport} | ${logsMode}`;
 }
 
 function applySystemSettingsUi() {
@@ -6920,15 +7567,12 @@ function applySystemSettingsUi() {
   if (el.systemUnsafeSensitiveLogs) {
     el.systemUnsafeSensitiveLogs.value = ui.serverUnsafeSensitiveLogs ? "true" : "false";
   }
-  if (el.systemLegacyComponents) {
-    el.systemLegacyComponents.value = ui.serverLegacyComponents ? "true" : "false";
-  }
   updatePollIndicator();
   if (ui.pollPaused && el.netBadge) {
     setBadge(el.netBadge, "warn", "POLL PAUSED");
   }
   renderSystemSettingsStatus();
-  applyModeLegacyUiPolicy();
+  applyModeUiPolicy();
 }
 
 function saveSystemSettingsFromUi() {
@@ -6939,7 +7583,6 @@ function saveSystemSettingsFromUi() {
   ui.serverAutoLaunchBrowser = String(el.systemAutoLaunchBrowser?.value || "true").trim().toLowerCase() !== "false";
   ui.serverHueTransportPreference = normalizeHueTransportPreference(el.systemHueTransportPreference?.value || "auto");
   ui.serverUnsafeSensitiveLogs = String(el.systemUnsafeSensitiveLogs?.value || "false").trim().toLowerCase() === "true";
-  ui.serverLegacyComponents = String(el.systemLegacyComponents?.value || "false").trim().toLowerCase() === "true";
 
   localStorage.setItem(UI_START_TAB_KEY, ui.startTabPreference);
   localStorage.setItem(UI_CONFIRM_DANGER_KEY, ui.confirmDangerousActions ? "1" : "0");
@@ -6956,8 +7599,6 @@ function resetSystemSettingsToDefaults() {
   ui.serverHueTransportPreference = "auto";
   ui.serverUnsafeSensitiveLogs = false;
   ui.serverUnsafeSensitiveLogsBaseline = false;
-  ui.serverLegacyComponents = false;
-  ui.serverLegacyComponentsBaseline = false;
   localStorage.removeItem(UI_START_TAB_KEY);
   localStorage.removeItem(UI_CONFIRM_DANGER_KEY);
   localStorage.removeItem(UI_POLL_PAUSED_KEY);
@@ -6971,8 +7612,6 @@ async function loadSystemServerConfig() {
   ui.serverHueTransportPreference = normalizeHueTransportPreference(response.config.hueTransportPreference);
   ui.serverUnsafeSensitiveLogs = response.config.unsafeExposeSensitiveLogs === true;
   ui.serverUnsafeSensitiveLogsBaseline = ui.serverUnsafeSensitiveLogs;
-  ui.serverLegacyComponents = response.config.legacyComponentsEnabled === true;
-  ui.serverLegacyComponentsBaseline = ui.serverLegacyComponents;
   applySystemSettingsUi();
   return true;
 }
@@ -6984,7 +7623,6 @@ async function saveSystemServerSettingsFromUi() {
     const ack = confirmUnsafeSensitiveLogEnable();
     if (!ack.ok) {
       ui.serverUnsafeSensitiveLogs = ui.serverUnsafeSensitiveLogsBaseline === true;
-      ui.serverLegacyComponents = ui.serverLegacyComponentsBaseline === true;
       applySystemSettingsUi();
       return { ok: false, error: "unsafe sensitive log mode enable cancelled" };
     }
@@ -6994,14 +7632,12 @@ async function saveSystemServerSettingsFromUi() {
   const payload = {
     autoLaunchBrowser: ui.serverAutoLaunchBrowser,
     hueTransportPreference: normalizeHueTransportPreference(ui.serverHueTransportPreference),
-    unsafeExposeSensitiveLogs: ui.serverUnsafeSensitiveLogs,
-    legacyComponentsEnabled: ui.serverLegacyComponents
+    unsafeExposeSensitiveLogs: ui.serverUnsafeSensitiveLogs
   };
   if (unsafeAck) payload.unsafeExposeSensitiveLogsAck = unsafeAck;
   const response = await postJson("/system/config", payload);
   if (!response.ok || response.data?.ok !== true) {
     ui.serverUnsafeSensitiveLogs = ui.serverUnsafeSensitiveLogsBaseline === true;
-    ui.serverLegacyComponents = ui.serverLegacyComponentsBaseline === true;
     applySystemSettingsUi();
     return {
       ok: false,
@@ -7013,8 +7649,6 @@ async function saveSystemServerSettingsFromUi() {
   ui.serverHueTransportPreference = normalizeHueTransportPreference(response.data?.config?.hueTransportPreference);
   ui.serverUnsafeSensitiveLogs = response.data?.config?.unsafeExposeSensitiveLogs === true;
   ui.serverUnsafeSensitiveLogsBaseline = ui.serverUnsafeSensitiveLogs;
-  ui.serverLegacyComponents = response.data?.config?.legacyComponentsEnabled === true;
-  ui.serverLegacyComponentsBaseline = ui.serverLegacyComponents;
   applySystemSettingsUi();
   return { ok: true };
 }
@@ -7787,23 +8421,22 @@ function applyColorPrefixSnapshot(snapshot = {}) {
   if (el.colorPrefixResetBtn) el.colorPrefixResetBtn.disabled = false;
 
   if (el.colorPrefixStatus) {
-    const hueWord = huePrefix ? `hue='${huePrefix}'` : "hue=<none>";
-    const wizWord = wizPrefix ? `wiz='${wizPrefix}'` : "wiz=<none>";
+    const hueWord = huePrefix ? huePrefix : "off";
+    const wizWord = wizPrefix ? wizPrefix : "off";
     const otherWord = otherEnabled
-      ? (otherPrefix ? `other='${otherPrefix}'` : "other=<none>")
-      : "other=<disabled>";
-    const defaultWord = `unprefixed -> ${defaultTarget.toUpperCase()}`;
-    const fixtureWord = `fixture prefixes=${Object.keys(fixturePrefixes).length}`;
-    const raveOffWord =
-      `rave-off=${raveOffEnabled ? "on" : "off"} ` +
-      `(groups=${Object.keys(raveOffGroups).length}, fixtures=${Object.keys(raveOffFixtures).length})`;
-    if (!otherEnabled) {
-      el.colorPrefixStatus.textContent =
-        `${hueWord} | ${wizWord} | ${otherWord} | ${fixtureWord} | ${raveOffWord} | ${defaultWord}. Mod-brand prefix unlocks when mod-brand Twitch fixtures are detected.`;
-    } else {
-      el.colorPrefixStatus.textContent =
-        `${hueWord} | ${wizWord} | ${otherWord} | ${fixtureWord} | ${raveOffWord} | ${defaultWord}.`;
-    }
+      ? (otherPrefix ? otherPrefix : "off")
+      : "locked";
+    const defaultWord = defaultTarget.toUpperCase();
+    const fixtureCount = Object.keys(fixturePrefixes).length;
+    const groupCount = Object.keys(raveOffGroups).length;
+    const raveFixtureCount = Object.keys(raveOffFixtures).length;
+    const modHint = otherEnabled
+      ? ""
+      : " Mod-brand prefix unlocks when mod-brand Twitch fixtures are detected.";
+    el.colorPrefixStatus.textContent =
+      `Unprefixed /color -> ${defaultWord}. Prefixes: HUE=${hueWord}, WIZ=${wizWord}, MOD=${otherWord}. ` +
+      `Per-fixture prefix rules: ${fixtureCount}. RAVE OFF profile: ${raveOffEnabled ? "ON" : "OFF"} ` +
+      `(group rules ${groupCount}, fixture rules ${raveFixtureCount}).${modHint}`;
   }
 }
 
@@ -7935,7 +8568,13 @@ async function runModAction() {
 }
 
 async function queueModStateFromUi(shouldEnable = true) {
-  const modId = String(el.modEnableId.value || "").trim();
+  let modId = String(el.modEnableId.value || "").trim();
+  if (!modId) {
+    modId = normalizeModUiId(ui.modUiSelectedId);
+    if (modId && el.modEnableId) {
+      el.modEnableId.value = modId;
+    }
+  }
   if (!modId) {
     setBadge(el.health, "warn", "MOD ID REQUIRED");
     return;
@@ -7955,7 +8594,18 @@ async function queueModStateFromUi(shouldEnable = true) {
     return;
   }
 
-  const exists = snapshot.mods.some(mod => String(mod?.id || "") === modId);
+  let exists = snapshot.mods.some(mod => String(mod?.id || "") === modId);
+  if (!exists) {
+    const selectedId = normalizeModUiId(ui.modUiSelectedId);
+    if (selectedId && selectedId !== modId) {
+      const selectedExists = snapshot.mods.some(mod => String(mod?.id || "") === selectedId);
+      if (selectedExists) {
+        modId = selectedId;
+        if (el.modEnableId) el.modEnableId.value = modId;
+        exists = true;
+      }
+    }
+  }
   if (!exists) {
     setBadge(el.health, "warn", "MOD ID NOT FOUND");
     return;
@@ -8294,11 +8944,7 @@ function isFixtureConfiguredForOutput(fixture = {}) {
 }
 
 function isFixtureEngineEnabled(fixture = {}) {
-  const legacyIsEngine = String(fixture?.controlMode || "engine").trim().toLowerCase() === "engine";
-  if (Object.prototype.hasOwnProperty.call(fixture, "engineEnabled")) {
-    return parseLooseBoolean(fixture.engineEnabled, legacyIsEngine);
-  }
-  return legacyIsEngine;
+  return parseLooseBoolean(fixture?.engineEnabled, false);
 }
 
 function isFixtureTwitchEnabled(fixture = {}) {
@@ -8309,11 +8955,7 @@ function isFixtureTwitchEnabled(fixture = {}) {
 }
 
 function isFixtureCustomEnabled(fixture = {}) {
-  const legacyIsStandalone = String(fixture?.controlMode || "engine").trim().toLowerCase() === "standalone";
-  if (Object.prototype.hasOwnProperty.call(fixture, "customEnabled")) {
-    return parseLooseBoolean(fixture.customEnabled, legacyIsStandalone);
-  }
-  return legacyIsStandalone;
+  return parseLooseBoolean(fixture?.customEnabled, false);
 }
 
 function readFixtureModeFields() {
@@ -8631,8 +9273,7 @@ function syncAutomationPercentLabels() {
 }
 
 function syncAutomationControlAccessibility() {
-  const legacyLocked = !ui.legacyAutomationUnlocked;
-  const enabled = boolFromSelect(el.autoRulesEnabled.value) && !legacyLocked;
+  const enabled = boolFromSelect(el.autoRulesEnabled.value);
   [
     el.autoRulesEnabled,
     el.autoRulesTargetZone,
@@ -8649,47 +9290,19 @@ function syncAutomationControlAccessibility() {
     el.autoRulesTestStopBtn
   ].forEach(node => {
     if (!node) return;
-    if (legacyLocked) {
-      node.disabled = true;
-    } else {
-      const requiresAutomationOn =
-        node === el.autoRulesTargetZone ||
-        node === el.autoRulesTransitionMs ||
-        node === el.autoStartEnabled ||
-        node === el.autoStartPercent ||
-        node === el.autoStartDelayMs ||
-        node === el.autoStopEnabled ||
-        node === el.autoStopPercent ||
-        node === el.autoStopDelayMs ||
-        node === el.autoRulesTestStartBtn ||
-        node === el.autoRulesTestStopBtn;
-      node.disabled = requiresAutomationOn ? !enabled : false;
-    }
+    const requiresAutomationOn =
+      node === el.autoRulesTargetZone ||
+      node === el.autoRulesTransitionMs ||
+      node === el.autoStartEnabled ||
+      node === el.autoStartPercent ||
+      node === el.autoStartDelayMs ||
+      node === el.autoStopEnabled ||
+      node === el.autoStopPercent ||
+      node === el.autoStopDelayMs ||
+      node === el.autoRulesTestStartBtn ||
+      node === el.autoRulesTestStopBtn;
+    node.disabled = requiresAutomationOn ? !enabled : false;
   });
-}
-
-function syncLegacyAutomationUi() {
-  const unlocked = ui.legacyAutomationUnlocked === true;
-  if (el.legacyAutomationWrap) {
-    el.legacyAutomationWrap.classList.toggle("legacyLocked", !unlocked);
-  }
-  if (el.legacyAutomationUnlockBtn) {
-    el.legacyAutomationUnlockBtn.classList.toggle("hidden", unlocked);
-  }
-  if (el.legacyAutomationLockBtn) {
-    el.legacyAutomationLockBtn.classList.toggle("hidden", !unlocked);
-  }
-}
-
-function setLegacyAutomationUnlocked(enabled, options = {}) {
-  const unlocked = Boolean(enabled);
-  ui.legacyAutomationUnlocked = unlocked;
-  if (options.persist !== false) {
-    if (unlocked) localStorage.setItem(LEGACY_AUTOMATION_UNLOCK_KEY, "1");
-    else localStorage.removeItem(LEGACY_AUTOMATION_UNLOCK_KEY);
-  }
-  syncLegacyAutomationUi();
-  syncAutomationControlAccessibility();
 }
 
 function refreshAutomationZoneOptions(fixtures = []) {
@@ -10634,6 +11247,7 @@ if (el.tabsBar) {
       ui.modUiSelectedId = modId;
       localStorage.setItem(MOD_UI_SELECTED_KEY, modId);
       if (el.modUiSelect) el.modUiSelect.value = modId;
+      syncModUiSelectionToHotswapTarget({ modId, force: true });
       showTab("mods");
       renderModUiFrame({ forceReload: true });
       return;
@@ -10649,6 +11263,7 @@ if (el.tabsBar) {
 if (el.modUiSelect) {
   el.modUiSelect.onchange = () => {
     ui.modUiSelectedId = normalizeModUiId(el.modUiSelect.value);
+    syncModUiSelectionToHotswapTarget({ force: true });
     if (ui.modUiSelectedId) {
       localStorage.setItem(MOD_UI_SELECTED_KEY, ui.modUiSelectedId);
     } else {
@@ -11358,24 +11973,6 @@ el.colorPrefixResetBtn.onclick = async () => {
   await saveColorPrefixConfigFromUi({ reset: true });
 };
 
-if (el.legacyAutomationUnlockBtn) {
-  el.legacyAutomationUnlockBtn.onclick = () => {
-    setLegacyAutomationUnlocked(true);
-    setBadge(el.health, "warn", "LEGACY AUTOMATION OPENED");
-  };
-}
-if (el.legacyAutomationLockBtn) {
-  el.legacyAutomationLockBtn.onclick = () => {
-    setLegacyAutomationUnlocked(false);
-    setBadge(el.health, "ok", "LEGACY AUTOMATION HIDDEN");
-  };
-}
-if (el.legacyAutomationJumpCustomBtn) {
-  el.legacyAutomationJumpCustomBtn.onclick = () => {
-    activateTabAndScroll("custom", "standCustomCluster");
-  };
-}
-
 el.autoStartPercent.oninput = syncAutomationPercentLabels;
 el.autoStopPercent.oninput = syncAutomationPercentLabels;
 el.autoRulesEnabled.onchange = () => {
@@ -11686,12 +12283,12 @@ limiterPresetButtons.forEach(btn => {
 });
 
 /* MODE */
-function applyModeLegacyUiPolicy() {
+function applyModeUiPolicy() {
   ui.mode = "interpret";
   ui.modeLock = "interpret";
 }
 
-applyModeLegacyUiPolicy();
+applyModeUiPolicy();
 
 function applyMetaAutoTempoTrackersState(trackers = {}, options = {}) {
   const normalized = normalizeMetaAutoTempoTrackersUi(
@@ -12143,7 +12740,7 @@ async function applyFixtureMetricPatch(patch = {}, badgePrefix = "FIXTURE METRIC
       wiz: Array.isArray(r.data.brandFixtures.wiz) ? r.data.brandFixtures.wiz.slice() : []
     };
   }
-  renderPaletteBrandMenus();
+  renderPaletteBrandMenus({ force: true, reason: "fixture_metric_patch" });
   sync();
   return true;
 }
@@ -12167,8 +12764,298 @@ function syncPaletteDisorderAggressionSliderUi() {
   if (el.paletteDisorderAggressionVal) el.paletteDisorderAggressionVal.textContent = `${pct}%`;
 }
 
+function isPaletteGlobalScopeActiveUi() {
+  return normalizePaletteControlScopeUi(ui.paletteControlScope, "global") === "global";
+}
+
+function formatPaletteCycleModeLabelUi(mode) {
+  const key = normalizePaletteCycleModeUi(mode, "on_trigger");
+  return PALETTE_CYCLE_MODE_LABELS[key] || key.toUpperCase();
+}
+
+function describePaletteCycleModeUi(mode) {
+  const key = normalizePaletteCycleModeUi(mode, "on_trigger");
+  if (key === "timed_cycle") {
+    return "Cycles to the next palette group on timer and keeps moving colors inside the active group.";
+  }
+  if (key === "reactive_shift") {
+    return "Cycles to the next palette group when song progression shifts enough; colors continue moving inside the active group.";
+  }
+  if (key === "spectrum_mapper") {
+    return "Chooses active palette group from mapped audio features; colors continue moving inside that selected group.";
+  }
+  return "Cycles to the next palette group on beat/drop triggers while colors continue moving inside the active group.";
+}
+
+function setPaletteGlobalModeNoticeUi(message = "", options = {}) {
+  const next = String(message || "").trim();
+  ui.paletteGlobalModeNotice = next;
+  if (paletteGlobalModeNoticeTimer) {
+    clearTimeout(paletteGlobalModeNoticeTimer);
+    paletteGlobalModeNoticeTimer = null;
+  }
+  const ttlMs = Number(options.ttlMs);
+  if (next && Number.isFinite(ttlMs) && ttlMs > 0) {
+    paletteGlobalModeNoticeTimer = setTimeout(() => {
+      ui.paletteGlobalModeNotice = "";
+      if (el.paletteModeNotice) el.paletteModeNotice.textContent = "";
+      sync();
+    }, ttlMs);
+  }
+  if (options.syncNow !== false) {
+    sync();
+  }
+}
+
+function setPaletteBrandModeNoticeUi(brand, message = "", options = {}) {
+  const brandKey = normalizePaletteBrandUi(brand);
+  if (!brandKey) return;
+  const next = String(message || "").trim();
+  if (!ui.paletteBrandModeNotices || typeof ui.paletteBrandModeNotices !== "object") {
+    ui.paletteBrandModeNotices = { hue: "", wiz: "" };
+  }
+  ui.paletteBrandModeNotices[brandKey] = next;
+  const existingTimer = paletteBrandModeNoticeTimers[brandKey];
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    paletteBrandModeNoticeTimers[brandKey] = null;
+  }
+  const ttlMs = Number(options.ttlMs);
+  if (next && Number.isFinite(ttlMs) && ttlMs > 0) {
+    paletteBrandModeNoticeTimers[brandKey] = setTimeout(() => {
+      if (!ui.paletteBrandModeNotices || typeof ui.paletteBrandModeNotices !== "object") return;
+      ui.paletteBrandModeNotices[brandKey] = "";
+      renderPaletteBrandMenus({ reason: "palette_brand_notice_timeout" });
+      sync();
+    }, ttlMs);
+  }
+  if (options.syncNow !== false) {
+    renderPaletteBrandMenus({ reason: "palette_brand_notice_update" });
+    sync();
+  }
+}
+
+function setPaletteControlScopeUi(scope, options = {}) {
+  const next = normalizePaletteControlScopeUi(scope, ui.paletteControlScope);
+  const changed = next !== ui.paletteControlScope;
+  ui.paletteControlScope = next;
+  if (next === "custom") {
+    ui.paletteCustomBrand = normalizePaletteCustomBrandMemoryUi(ui.paletteCustomBrand, "hue");
+  }
+  if (changed || options.forceRender === true) {
+    renderPaletteBrandMenus({ force: true, reason: "palette_scope_change" });
+  }
+  if (options.sync !== false) {
+    sync();
+  }
+}
+
+function setPaletteCustomBrandUi(brand, options = {}) {
+  const next = normalizePaletteCustomBrandMemoryUi(brand, ui.paletteCustomBrand);
+  const changed = next !== ui.paletteCustomBrand;
+  ui.paletteCustomBrand = next;
+  if (changed || options.forceRender === true) {
+    renderPaletteBrandMenus({ force: true, reason: "palette_custom_brand_change" });
+  }
+  if (options.sync !== false) {
+    sync();
+  }
+}
+
+function syncPaletteTimedIntervalSliderUi() {
+  const sec = normalizePaletteTimedIntervalSecUi(ui.paletteTimedIntervalSec, 5);
+  ui.paletteTimedIntervalSec = sec;
+  if (el.paletteTimedIntervalSec) el.paletteTimedIntervalSec.value = String(sec);
+  if (el.paletteTimedIntervalSecVal) el.paletteTimedIntervalSecVal.textContent = `${sec}s`;
+}
+
+function syncPaletteBeatLockGraceSliderUi() {
+  const sec = normalizePaletteBeatLockGraceSecUi(ui.paletteBeatLockGraceSec, 2);
+  ui.paletteBeatLockGraceSec = sec;
+  if (el.paletteBeatLockGraceSec) el.paletteBeatLockGraceSec.value = String(sec);
+  if (el.paletteBeatLockGraceSecVal) el.paletteBeatLockGraceSecVal.textContent = `+${sec}s`;
+}
+
+function syncPaletteReactiveMarginSliderUi() {
+  const margin = normalizePaletteReactiveMarginUi(ui.paletteReactiveMargin, 28);
+  ui.paletteReactiveMargin = margin;
+  if (el.paletteReactiveMargin) el.paletteReactiveMargin.value = String(margin);
+  if (el.paletteReactiveMarginVal) el.paletteReactiveMarginVal.textContent = String(margin);
+}
+
+function collectPaletteSpectrumFeatureMapFromSelectorsUi(selectors = getPaletteSpectrumFeatureSelectors()) {
+  const next = [];
+  const nodes = Array.isArray(selectors) ? selectors : [];
+  for (let i = 0; i < 5; i += 1) {
+    const node = nodes[i];
+    next.push(
+      normalizePaletteAudioFeatureUi(
+        node?.value,
+        PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP[i % PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP.length]
+      )
+    );
+  }
+  return next;
+}
+
+function syncPaletteSpectrumFeatureSelectorsUi() {
+  ui.paletteSpectrumFeatureMap = normalizePaletteSpectrumFeatureMapUi(
+    ui.paletteSpectrumFeatureMap,
+    PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
+  );
+  const selectors = getPaletteSpectrumFeatureSelectors();
+  const manualMode = normalizePaletteSpectrumMapModeUi(ui.paletteSpectrumMapMode, "auto") === "manual";
+  selectors.forEach((node, idx) => {
+    if (!node) return;
+    const value = ui.paletteSpectrumFeatureMap[idx % ui.paletteSpectrumFeatureMap.length];
+    if (node.value !== value) node.value = value;
+    node.disabled = !manualMode;
+  });
+}
+
+if (el.paletteScopeGlobalBtn) {
+  el.paletteScopeGlobalBtn.onclick = () => {
+    setPaletteControlScopeUi("global");
+  };
+}
+
+if (el.paletteScopeCustomBtn) {
+  el.paletteScopeCustomBtn.onclick = () => {
+    setPaletteControlScopeUi("custom");
+  };
+}
+
+paletteCustomBrandButtons.forEach(btn => {
+  btn.onclick = () => {
+    setPaletteCustomBrandUi(btn.dataset.paletteCustomBrand);
+  };
+});
+
+paletteCycleModeButtons.forEach(btn => {
+  btn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const nextMode = normalizePaletteCycleModeUi(btn.dataset.paletteCycleMode, ui.paletteCycleMode || "on_trigger");
+    const previousMode = normalizePaletteCycleModeUi(ui.paletteCycleMode, "on_trigger");
+    const ok = await applyPalettePatch({ cycleMode: nextMode }, "PALETTE MODE");
+    if (ok) {
+      if (nextMode !== previousMode) {
+        setPaletteGlobalModeNoticeUi(
+          `${formatPaletteCycleModeLabelUi(nextMode)} active. ${formatPaletteCycleModeLabelUi(previousMode)} was replaced. ${describePaletteCycleModeUi(nextMode)}`,
+          { ttlMs: 3600 }
+        );
+      }
+      setBadge(el.health, "ok", `PALETTE MODE ${formatPaletteCycleModeLabelUi(nextMode)}`);
+    }
+  };
+});
+
+paletteBeatLockButtons.forEach(btn => {
+  btn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const enabled = String(btn.dataset.paletteBeatLock || "").trim().toLowerCase() === "true";
+    const ok = await applyPalettePatch({ beatLock: enabled }, "PALETTE BEAT LOCK");
+    if (ok) {
+      setBadge(el.health, "ok", `PALETTE BEAT LOCK ${enabled ? "ON" : "OFF"}`);
+    }
+  };
+});
+
+paletteSpectrumModeButtons.forEach(btn => {
+  btn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const mode = normalizePaletteSpectrumMapModeUi(btn.dataset.paletteSpectrumMode, ui.paletteSpectrumMapMode || "auto");
+    const ok = await applyPalettePatch({ spectrumMapMode: mode }, "PALETTE SPECTRUM");
+    if (ok) {
+      setBadge(el.health, "ok", `PALETTE SPECTRUM ${mode === "manual" ? "MANUAL" : "AUTO"}`);
+    }
+  };
+});
+
+if (el.paletteTimedIntervalSec) {
+  el.paletteTimedIntervalSec.oninput = () => {
+    ui.paletteTimedIntervalSec = normalizePaletteTimedIntervalSecUi(
+      el.paletteTimedIntervalSec.value,
+      ui.paletteTimedIntervalSec || 5
+    );
+    syncPaletteTimedIntervalSliderUi();
+  };
+  el.paletteTimedIntervalSec.onchange = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const intervalSec = normalizePaletteTimedIntervalSecUi(
+      el.paletteTimedIntervalSec.value,
+      ui.paletteTimedIntervalSec || 5
+    );
+    ui.paletteTimedIntervalSec = intervalSec;
+    syncPaletteTimedIntervalSliderUi();
+    const ok = await applyPalettePatch({ timedIntervalSec: intervalSec }, "PALETTE TIMER");
+    if (ok) {
+      setBadge(el.health, "ok", `PALETTE TIMER ${intervalSec}s`);
+    }
+  };
+}
+
+if (el.paletteBeatLockGraceSec) {
+  el.paletteBeatLockGraceSec.oninput = () => {
+    ui.paletteBeatLockGraceSec = normalizePaletteBeatLockGraceSecUi(
+      el.paletteBeatLockGraceSec.value,
+      ui.paletteBeatLockGraceSec || 2
+    );
+    syncPaletteBeatLockGraceSliderUi();
+  };
+  el.paletteBeatLockGraceSec.onchange = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const graceSec = normalizePaletteBeatLockGraceSecUi(
+      el.paletteBeatLockGraceSec.value,
+      ui.paletteBeatLockGraceSec || 2
+    );
+    ui.paletteBeatLockGraceSec = graceSec;
+    syncPaletteBeatLockGraceSliderUi();
+    const ok = await applyPalettePatch({ beatLockGraceSec: graceSec }, "PALETTE BEAT LOCK");
+    if (ok) {
+      setBadge(el.health, "ok", `PALETTE BEAT LOCK +${graceSec}s`);
+    }
+  };
+}
+
+if (el.paletteReactiveMargin) {
+  el.paletteReactiveMargin.oninput = () => {
+    ui.paletteReactiveMargin = normalizePaletteReactiveMarginUi(
+      el.paletteReactiveMargin.value,
+      ui.paletteReactiveMargin || 28
+    );
+    syncPaletteReactiveMarginSliderUi();
+  };
+  el.paletteReactiveMargin.onchange = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const margin = normalizePaletteReactiveMarginUi(
+      el.paletteReactiveMargin.value,
+      ui.paletteReactiveMargin || 28
+    );
+    ui.paletteReactiveMargin = margin;
+    syncPaletteReactiveMarginSliderUi();
+    const ok = await applyPalettePatch({ reactiveMargin: margin }, "PALETTE REACTIVE");
+    if (ok) {
+      setBadge(el.health, "ok", `PALETTE REACTIVE MARGIN ${margin}`);
+    }
+  };
+}
+
+getPaletteSpectrumFeatureSelectors().forEach(node => {
+  node.onchange = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const nextMap = collectPaletteSpectrumFeatureMapFromSelectorsUi();
+    ui.paletteSpectrumFeatureMap = nextMap.slice();
+    syncPaletteSpectrumFeatureSelectorsUi();
+    const ok = await applyPalettePatch({ spectrumFeatureMap: nextMap }, "PALETTE SPECTRUM");
+    if (ok) {
+      setBadge(el.health, "ok", "PALETTE SPECTRUM MAP UPDATED");
+    }
+  };
+});
+
 paletteCountButtons.forEach(btn => {
   btn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
     const count = normalizePaletteColorCountUi(btn.dataset.paletteCount, ui.paletteColorsPerFamily || 3);
     const ok = await applyPalettePatch({ colorsPerFamily: count }, "PALETTE COUNT");
     if (ok) {
@@ -12179,6 +13066,7 @@ paletteCountButtons.forEach(btn => {
 
 palettePresetButtons.forEach(btn => {
   btn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
     const key = String(btn.dataset.palettePreset || "").trim().toLowerCase();
     const preset = PALETTE_PRESETS[key];
     if (!preset) return;
@@ -12200,11 +13088,12 @@ palettePresetButtons.forEach(btn => {
 
 if (el.paletteFamilyGrid) {
   el.paletteFamilyGrid.onclick = async e => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
     const btn = e.target.closest("[data-palette-family]");
     if (!btn) return;
     const selected = String(btn.dataset.paletteFamily || "").trim().toLowerCase();
     if (!selected || !PALETTE_FAMILY_ORDER.includes(selected)) return;
-    const current = normalizePaletteFamiliesUi(ui.paletteFamilies, ["blue", "purple"]);
+    const current = normalizePaletteFamiliesUi(ui.paletteFamilies, ["red", "green", "blue"]);
     const exists = current.includes(selected);
     let nextFamilies = exists
       ? current.filter(name => name !== selected)
@@ -12220,6 +13109,7 @@ if (el.paletteFamilyGrid) {
 
 paletteDisorderButtons.forEach(btn => {
   btn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
     const disorder = String(btn.dataset.paletteDisorder || "").toLowerCase() === "true";
     const ok = await applyPalettePatch({ disorder }, "PALETTE ORDER");
     if (ok) {
@@ -12234,6 +13124,7 @@ if (el.paletteDisorderAggression) {
     syncPaletteDisorderAggressionSliderUi();
   };
   el.paletteDisorderAggression.onchange = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
     const aggression = normalizePaletteDisorderAggressionUi(el.paletteDisorderAggression.value, ui.paletteDisorderAggression || 0.35);
     ui.paletteDisorderAggression = aggression;
     syncPaletteDisorderAggressionSliderUi();
@@ -12243,6 +13134,7 @@ if (el.paletteDisorderAggression) {
 }
 if (el.paletteDisorderAggressionResetBtn) {
   el.paletteDisorderAggressionResetBtn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
     ui.paletteDisorderAggression = 0.35;
     syncPaletteDisorderAggressionSliderUi();
     const ok = await applyPalettePatch({ disorderAggression: 0.35 }, "PALETTE CHAOS");
@@ -12271,6 +13163,11 @@ function getPaletteBrandScopePatchUi(brandKey) {
 }
 
 if (el.paletteBrandMenus) {
+  const markBrandMenusHot = () => markPaletteBrandMenusInteraction(1400);
+  ["pointerdown", "focusin", "keydown", "input", "change"].forEach(type => {
+    el.paletteBrandMenus.addEventListener(type, markBrandMenusHot, { capture: true });
+  });
+
   el.paletteBrandMenus.onchange = async e => {
     const fixtureSelect = e.target.closest("select[data-palette-brand-fixture]");
     if (!fixtureSelect) return;
@@ -12279,7 +13176,7 @@ if (el.paletteBrandMenus) {
     const selected = String(fixtureSelect.value || PALETTE_ALL_FIXTURES_VALUE).trim() || PALETTE_ALL_FIXTURES_VALUE;
     ui.paletteFixtureSelectionByBrand[brand] = selected;
     persistPaletteFixtureSelectionMemory();
-    renderPaletteBrandMenus();
+    renderPaletteBrandMenus({ force: true, reason: "fixture_select_change" });
     sync();
   };
 
@@ -12291,6 +13188,39 @@ if (el.paletteBrandMenus) {
       const pct = Math.round(normalizePaletteDisorderAggressionUi(chaosSlider.value, 0.35) * 100);
       const valueNode = el.paletteBrandMenus.querySelector(`[data-palette-brand-aggression-val="${brand}"]`);
       if (valueNode) valueNode.textContent = `${pct}%`;
+      return;
+    }
+
+    const timedSlider = e.target.closest("input[data-palette-brand-timed]");
+    if (timedSlider) {
+      const brand = normalizePaletteBrandUi(timedSlider.dataset.paletteBrandTimed);
+      if (!brand) return;
+      const intervalSec = normalizePaletteTimedIntervalSecUi(timedSlider.value, 5);
+      const valueNode = el.paletteBrandMenus.querySelector(`[data-palette-brand-timed-val="${brand}"]`);
+      if (valueNode) valueNode.textContent = `${intervalSec}s`;
+      timedSlider.value = String(intervalSec);
+      return;
+    }
+
+    const beatGraceSlider = e.target.closest("input[data-palette-brand-beat-grace]");
+    if (beatGraceSlider) {
+      const brand = normalizePaletteBrandUi(beatGraceSlider.dataset.paletteBrandBeatGrace);
+      if (!brand) return;
+      const graceSec = normalizePaletteBeatLockGraceSecUi(beatGraceSlider.value, 2);
+      const valueNode = el.paletteBrandMenus.querySelector(`[data-palette-brand-beat-grace-val="${brand}"]`);
+      if (valueNode) valueNode.textContent = `+${graceSec}s`;
+      beatGraceSlider.value = String(graceSec);
+      return;
+    }
+
+    const reactiveMarginSlider = e.target.closest("input[data-palette-brand-reactive-margin]");
+    if (reactiveMarginSlider) {
+      const brand = normalizePaletteBrandUi(reactiveMarginSlider.dataset.paletteBrandReactiveMargin);
+      if (!brand) return;
+      const margin = normalizePaletteReactiveMarginUi(reactiveMarginSlider.value, 28);
+      const valueNode = el.paletteBrandMenus.querySelector(`[data-palette-brand-reactive-margin-val="${brand}"]`);
+      if (valueNode) valueNode.textContent = String(margin);
+      reactiveMarginSlider.value = String(margin);
       return;
     }
 
@@ -12362,7 +13292,7 @@ if (el.paletteBrandMenus) {
       if (!scopePatch) return;
       const selectedFixture = scopePatch.fixtureId || PALETTE_ALL_FIXTURES_VALUE;
       const currentConfig = getPaletteScopedConfigUi(brand, selectedFixture);
-      const currentFamilies = normalizePaletteFamiliesUi(currentConfig.families, ["blue", "purple"]);
+      const currentFamilies = normalizePaletteFamiliesUi(currentConfig.families, ["red", "green", "blue"]);
       const exists = currentFamilies.includes(family);
       let nextFamilies = exists
         ? currentFamilies.filter(name => name !== family)
@@ -12392,6 +13322,67 @@ if (el.paletteBrandMenus) {
       );
       if (ok) {
         setBadge(el.health, "ok", `${brand.toUpperCase()} ${disorder ? "DISORDER" : "ORDERED"}`);
+      }
+      return;
+    }
+
+    const cycleModeBtn = e.target.closest("[data-palette-brand-cycle-mode]");
+    if (cycleModeBtn) {
+      const brand = normalizePaletteBrandUi(cycleModeBtn.dataset.paletteBrandCycleMode);
+      if (!brand) return;
+      const nextMode = normalizePaletteCycleModeUi(cycleModeBtn.dataset.mode, "on_trigger");
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const selectedFixture = scopePatch.fixtureId || PALETTE_ALL_FIXTURES_VALUE;
+      const scopedConfig = getPaletteScopedConfigUi(brand, selectedFixture);
+      const previousMode = normalizePaletteCycleModeUi(scopedConfig.cycleMode, "on_trigger");
+      const ok = await applyPalettePatch(
+        { ...scopePatch, cycleMode: nextMode },
+        `${brand.toUpperCase()} PALETTE MODE`
+      );
+      if (ok) {
+        if (nextMode !== previousMode) {
+          setPaletteBrandModeNoticeUi(
+            brand,
+            `${formatPaletteCycleModeLabelUi(nextMode)} active. ${formatPaletteCycleModeLabelUi(previousMode)} was replaced. ${describePaletteCycleModeUi(nextMode)}`,
+            { ttlMs: 3600 }
+          );
+        }
+        setBadge(el.health, "ok", `${brand.toUpperCase()} MODE ${formatPaletteCycleModeLabelUi(nextMode)}`);
+      }
+      return;
+    }
+
+    const beatLockBtn = e.target.closest("[data-palette-brand-beat-lock]");
+    if (beatLockBtn) {
+      const brand = normalizePaletteBrandUi(beatLockBtn.dataset.paletteBrandBeatLock);
+      if (!brand) return;
+      const enabled = String(beatLockBtn.dataset.enabled || "").trim().toLowerCase() === "true";
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const ok = await applyPalettePatch(
+        { ...scopePatch, beatLock: enabled },
+        `${brand.toUpperCase()} BEAT LOCK`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} BEAT LOCK ${enabled ? "ON" : "OFF"}`);
+      }
+      return;
+    }
+
+    const spectrumModeBtn = e.target.closest("[data-palette-brand-spectrum-mode]");
+    if (spectrumModeBtn) {
+      const brand = normalizePaletteBrandUi(spectrumModeBtn.dataset.paletteBrandSpectrumMode);
+      if (!brand) return;
+      const mode = normalizePaletteSpectrumMapModeUi(spectrumModeBtn.dataset.mode, "auto");
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const ok = await applyPalettePatch(
+        { ...scopePatch, spectrumMapMode: mode },
+        `${brand.toUpperCase()} SPECTRUM`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} SPECTRUM ${mode === "manual" ? "MANUAL" : "AUTO"}`);
       }
       return;
     }
@@ -12496,6 +13487,92 @@ if (el.paletteBrandMenus) {
       );
       if (ok) {
         setBadge(el.health, "ok", `${brand.toUpperCase()} CHAOS ${Math.round(aggression * 100)}%`);
+      }
+      return;
+    }
+
+    const timedSlider = e.target.closest("input[data-palette-brand-timed]");
+    if (timedSlider) {
+      const brand = normalizePaletteBrandUi(timedSlider.dataset.paletteBrandTimed);
+      if (!brand) return;
+      const intervalSec = normalizePaletteTimedIntervalSecUi(timedSlider.value, 5);
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const ok = await applyPalettePatch(
+        { ...scopePatch, timedIntervalSec: intervalSec },
+        `${brand.toUpperCase()} TIMER`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} TIMER ${intervalSec}s`);
+      }
+      return;
+    }
+
+    const beatGraceSlider = e.target.closest("input[data-palette-brand-beat-grace]");
+    if (beatGraceSlider) {
+      const brand = normalizePaletteBrandUi(beatGraceSlider.dataset.paletteBrandBeatGrace);
+      if (!brand) return;
+      const graceSec = normalizePaletteBeatLockGraceSecUi(beatGraceSlider.value, 2);
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const ok = await applyPalettePatch(
+        { ...scopePatch, beatLockGraceSec: graceSec },
+        `${brand.toUpperCase()} BEAT LOCK`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} BEAT LOCK +${graceSec}s`);
+      }
+      return;
+    }
+
+    const reactiveMarginSlider = e.target.closest("input[data-palette-brand-reactive-margin]");
+    if (reactiveMarginSlider) {
+      const brand = normalizePaletteBrandUi(reactiveMarginSlider.dataset.paletteBrandReactiveMargin);
+      if (!brand) return;
+      const margin = normalizePaletteReactiveMarginUi(reactiveMarginSlider.value, 28);
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const ok = await applyPalettePatch(
+        { ...scopePatch, reactiveMargin: margin },
+        `${brand.toUpperCase()} REACTIVE`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} REACTIVE MARGIN ${margin}`);
+      }
+      return;
+    }
+
+    const spectrumSlot = e.target.closest("select[data-palette-brand-spectrum-slot]");
+    if (spectrumSlot) {
+      const brand = normalizePaletteBrandUi(spectrumSlot.dataset.paletteBrandSpectrum);
+      if (!brand) return;
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const card = el.paletteBrandMenus.querySelector(`[data-palette-brand-card="${brand}"]`);
+      const selectors = card
+        ? Array.from(card.querySelectorAll(`select[data-palette-brand-spectrum="${brand}"][data-palette-brand-spectrum-slot]`))
+        : [];
+      selectors.sort((a, b) => {
+        const ai = Number(a.dataset.paletteBrandSpectrumSlot);
+        const bi = Number(b.dataset.paletteBrandSpectrumSlot);
+        return ai - bi;
+      });
+      const nextMap = [];
+      for (let i = 0; i < 5; i += 1) {
+        const node = selectors[i];
+        nextMap.push(
+          normalizePaletteAudioFeatureUi(
+            node?.value,
+            PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP[i % PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP.length]
+          )
+        );
+      }
+      const ok = await applyPalettePatch(
+        { ...scopePatch, spectrumFeatureMap: nextMap },
+        `${brand.toUpperCase()} SPECTRUM`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} SPECTRUM MAP UPDATED`);
       }
       return;
     }
@@ -13228,7 +14305,7 @@ function drawTelemetryScope() {
 function sync() {
   el.onBtn.classList.toggle("active", ui.raveOn);
   el.offBtn.classList.toggle("active", !ui.raveOn);
-  applyModeLegacyUiPolicy();
+  applyModeUiPolicy();
   el.metaAutoOnBtn.classList.toggle("active", ui.metaAutoEnabled);
   el.metaAutoOffBtn.classList.toggle("active", !ui.metaAutoEnabled);
   if (el.metaAutoTrackerAutoBtn) {
@@ -13395,6 +14472,47 @@ function sync() {
       : sceneSyncLabels.statusDesynced;
   }
 
+  const paletteScope = normalizePaletteControlScopeUi(ui.paletteControlScope, "global");
+  const customScopeActive = paletteScope === "custom";
+  ui.paletteControlScope = paletteScope;
+  if (el.paletteScopeGlobalBtn) {
+    el.paletteScopeGlobalBtn.classList.toggle("active", !customScopeActive);
+  }
+  if (el.paletteScopeCustomBtn) {
+    el.paletteScopeCustomBtn.classList.toggle("active", customScopeActive);
+  }
+  if (el.paletteGlobalPanel) {
+    el.paletteGlobalPanel.classList.toggle("isDisabled", customScopeActive);
+  }
+  if (el.paletteCustomPanel) {
+    el.paletteCustomPanel.classList.toggle("hidden", !customScopeActive);
+  }
+  if (el.paletteModeNotice) {
+    const globalNotice = String(ui.paletteGlobalModeNotice || "").trim();
+    const brandNotice = String(ui.paletteBrandModeNotices?.[ui.paletteCustomBrand] || "").trim();
+    el.paletteModeNotice.textContent = customScopeActive ? brandNotice : globalNotice;
+  }
+  paletteCustomBrandButtons.forEach(btn => {
+    const brand = normalizePaletteBrandUi(btn.dataset.paletteCustomBrand);
+    const active = brand === normalizePaletteBrandUi(ui.paletteCustomBrand);
+    btn.classList.toggle("active", active);
+    btn.disabled = !customScopeActive;
+  });
+  if (el.paletteBrandMenus) {
+    const cards = Array.from(el.paletteBrandMenus.querySelectorAll("[data-palette-brand-card]"));
+    const availableBrands = cards
+      .map(card => normalizePaletteBrandUi(card.dataset.paletteBrandCard))
+      .filter(Boolean);
+    if (customScopeActive && availableBrands.length && !availableBrands.includes(ui.paletteCustomBrand)) {
+      ui.paletteCustomBrand = availableBrands[0];
+    }
+    cards.forEach(card => {
+      const brand = normalizePaletteBrandUi(card.dataset.paletteBrandCard);
+      const visible = !customScopeActive || brand === ui.paletteCustomBrand;
+      card.classList.toggle("hidden", !visible);
+    });
+  }
+
   paletteCountButtons.forEach(btn => {
     const count = normalizePaletteColorCountUi(btn.dataset.paletteCount, ui.paletteColorsPerFamily || 3);
     btn.classList.toggle("active", count === ui.paletteColorsPerFamily);
@@ -13411,7 +14529,41 @@ function sync() {
     const disorder = String(btn.dataset.paletteDisorder || "").toLowerCase() === "true";
     btn.classList.toggle("active", disorder === Boolean(ui.paletteDisorder));
   });
+  paletteCycleModeButtons.forEach(btn => {
+    const mode = normalizePaletteCycleModeUi(btn.dataset.paletteCycleMode, "on_trigger");
+    btn.classList.toggle("active", mode === normalizePaletteCycleModeUi(ui.paletteCycleMode, "on_trigger"));
+  });
+  paletteBeatLockButtons.forEach(btn => {
+    const enabled = String(btn.dataset.paletteBeatLock || "").trim().toLowerCase() === "true";
+    btn.classList.toggle("active", enabled === (ui.paletteBeatLock === true));
+  });
+  paletteSpectrumModeButtons.forEach(btn => {
+    const mode = normalizePaletteSpectrumMapModeUi(btn.dataset.paletteSpectrumMode, "auto");
+    btn.classList.toggle("active", mode === normalizePaletteSpectrumMapModeUi(ui.paletteSpectrumMapMode, "auto"));
+  });
   syncPaletteDisorderAggressionSliderUi();
+  syncPaletteTimedIntervalSliderUi();
+  syncPaletteBeatLockGraceSliderUi();
+  syncPaletteReactiveMarginSliderUi();
+  syncPaletteSpectrumFeatureSelectorsUi();
+  const globalCycleMode = normalizePaletteCycleModeUi(ui.paletteCycleMode, "on_trigger");
+  const showTimed = globalCycleMode === "timed_cycle";
+  const showReactive = globalCycleMode === "reactive_shift";
+  const showSpectrum = globalCycleMode === "spectrum_mapper";
+  if (el.paletteTimedControls) {
+    el.paletteTimedControls.classList.toggle("hidden", !showTimed);
+  }
+  if (el.paletteReactiveControls) {
+    el.paletteReactiveControls.classList.toggle("hidden", !showReactive);
+  }
+  if (el.paletteSpectrumControls) {
+    el.paletteSpectrumControls.classList.toggle("hidden", !showSpectrum);
+  }
+  const canEditSpectrumMap = showSpectrum && normalizePaletteSpectrumMapModeUi(ui.paletteSpectrumMapMode, "auto") === "manual";
+  getPaletteSpectrumFeatureSelectors().forEach(node => {
+    if (!node) return;
+    node.disabled = !canEditSpectrumMap;
+  });
   if (el.paletteStat) {
     el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} x${ui.paletteColorsPerFamily}`;
   }
@@ -13465,7 +14617,7 @@ function updateFixtures(f) {
     : "-";
 
   applyFixtureCatalogToUi(fixtures);
-  renderPaletteBrandMenus();
+  renderPaletteBrandMenus({ reason: "fixtures_update" });
   renderStandaloneFixtures(standalone, { preserveDraft: true });
   ui.fixturesSnapshotLoaded = snapshotHasFixturesArray || fixtures.length > 0;
 }
@@ -14277,13 +15429,13 @@ function normalizeAudioReactivityMapUi(input = {}) {
     AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers,
     AUDIO_REACTIVITY_MAP_DEFAULT.metaAutoTempoTrackers
   );
-  const legacyBaseline = parseLooseBoolean(
+  const baselineBlend = parseLooseBoolean(
     raw.metaAutoHueWizBaselineBlend,
     parseLooseBoolean(fallbackTrackers.baseline, false)
   );
   const mergedTrackerRaw = {
     ...fallbackTrackers,
-    baseline: legacyBaseline,
+    baseline: baselineBlend,
     ...(
       raw.metaAutoTempoTrackers && typeof raw.metaAutoTempoTrackers === "object"
         ? raw.metaAutoTempoTrackers
@@ -14632,6 +15784,16 @@ function computeSmartMatchTelemetryFingerprint() {
     getPaletteFamiliesLabelUi(ui.paletteFamilies),
     ui.paletteDisorder ? "disorder" : "ordered",
     String(Math.round(normalizePaletteDisorderAggressionUi(ui.paletteDisorderAggression, 0.35) * 100)),
+    normalizePaletteCycleModeUi(ui.paletteCycleMode, "on_trigger"),
+    String(normalizePaletteTimedIntervalSecUi(ui.paletteTimedIntervalSec, 5)),
+    ui.paletteBeatLock ? "beatlock" : "free",
+    String(normalizePaletteBeatLockGraceSecUi(ui.paletteBeatLockGraceSec, 2)),
+    String(normalizePaletteReactiveMarginUi(ui.paletteReactiveMargin, 28)),
+    normalizePaletteSpectrumMapModeUi(ui.paletteSpectrumMapMode, "auto"),
+    normalizePaletteSpectrumFeatureMapUi(
+      ui.paletteSpectrumFeatureMap,
+      PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
+    ).join(","),
     getLiveOverclockBand(ui.overclockLevel),
     bucket(drive),
     bucket(motion, 0.2, 0.42, 0.66),
@@ -15146,7 +16308,7 @@ async function poll(options = {}) {
   if (Object.prototype.hasOwnProperty.call(t, "paletteFamilies")) {
     ui.paletteFamilies = normalizePaletteFamiliesUi(
       Array.isArray(t.paletteFamilies) ? t.paletteFamilies : String(t.paletteFamilies || ""),
-      ui.paletteFamilies || ["blue", "purple"]
+      ui.paletteFamilies || ["red", "green", "blue"]
     );
   }
   if (Number.isFinite(Number(t.paletteColorsPerFamily))) {
@@ -15162,6 +16324,45 @@ async function poll(options = {}) {
     ui.paletteDisorderAggression = normalizePaletteDisorderAggressionUi(
       t.paletteDisorderAggression,
       ui.paletteDisorderAggression || 0.35
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteCycleMode")) {
+    ui.paletteCycleMode = normalizePaletteCycleModeUi(
+      t.paletteCycleMode,
+      ui.paletteCycleMode || "on_trigger"
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteTimedIntervalSec")) {
+    ui.paletteTimedIntervalSec = normalizePaletteTimedIntervalSecUi(
+      t.paletteTimedIntervalSec,
+      ui.paletteTimedIntervalSec || 5
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteBeatLock")) {
+    ui.paletteBeatLock = parseBooleanUi(t.paletteBeatLock, ui.paletteBeatLock === true);
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteBeatLockGraceSec")) {
+    ui.paletteBeatLockGraceSec = normalizePaletteBeatLockGraceSecUi(
+      t.paletteBeatLockGraceSec,
+      ui.paletteBeatLockGraceSec || 2
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteReactiveMargin")) {
+    ui.paletteReactiveMargin = normalizePaletteReactiveMarginUi(
+      t.paletteReactiveMargin,
+      ui.paletteReactiveMargin || 28
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteSpectrumMapMode")) {
+    ui.paletteSpectrumMapMode = normalizePaletteSpectrumMapModeUi(
+      t.paletteSpectrumMapMode,
+      ui.paletteSpectrumMapMode || "auto"
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteSpectrumFeatureMap")) {
+    ui.paletteSpectrumFeatureMap = normalizePaletteSpectrumFeatureMapUi(
+      t.paletteSpectrumFeatureMap,
+      ui.paletteSpectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
     );
   }
   if (typeof t.metaAutoEnabled === "boolean") ui.metaAutoEnabled = t.metaAutoEnabled;
@@ -15350,7 +16551,6 @@ refreshStandaloneFixtures();
 refreshFixturesFromServer({ attempts: 3 });
 loadMods();
 loadColorPrefixConfig();
-setLegacyAutomationUnlocked(ui.legacyAutomationUnlocked, { persist: false });
 syncAutomationPercentLabels();
 loadAutomationConfig();
 updateMainScopeInput(

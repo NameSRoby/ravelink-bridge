@@ -40,6 +40,8 @@ const ACTIONS = Object.freeze([
   "palette_colors_1",
   "palette_colors_3",
   "palette_colors_5",
+  "palette_colors_8",
+  "palette_colors_12",
   "palette_family_blue",
   "palette_family_purple",
   "palette_family_red",
@@ -140,46 +142,6 @@ function normalizeDeviceIndex(value) {
   return parsed;
 }
 
-function parseLegacyBindings(raw) {
-  const bindings = {};
-
-  if (raw && typeof raw === "object") {
-    if (raw.drop && typeof raw.drop === "object") {
-      bindings.drop = normalizeBinding(raw.drop, DEFAULT_BINDINGS.drop);
-    }
-    if (raw.overclock && typeof raw.overclock === "object") {
-      bindings.overclock_toggle = normalizeBinding(raw.overclock, DEFAULT_BINDINGS.overclock_toggle);
-    }
-  }
-
-  const ccMap = raw && raw.cc && typeof raw.cc === "object" ? raw.cc : {};
-  const noteMap = raw && raw.note && typeof raw.note === "object" ? raw.note : {};
-
-  for (const [number, action] of Object.entries(ccMap)) {
-    const key = normalizeAction(action);
-    if (!key) continue;
-    bindings[key] = normalizeBinding({
-      type: "cc",
-      number: Number(number),
-      channel: null,
-      minValue: 64
-    }, DEFAULT_BINDINGS[key] || { type: "cc", number: 0, channel: null, minValue: 64 });
-  }
-
-  for (const [number, action] of Object.entries(noteMap)) {
-    const key = normalizeAction(action);
-    if (!key) continue;
-    bindings[key] = normalizeBinding({
-      type: "note",
-      number: Number(number),
-      channel: null,
-      minValue: 1
-    }, DEFAULT_BINDINGS[key] || { type: "note", number: 0, channel: null, minValue: 1 });
-  }
-
-  return bindings;
-}
-
 function normalizeConfig(rawConfig) {
   const raw = rawConfig && typeof rawConfig === "object" ? rawConfig : {};
   const base = safeClone(DEFAULT_CONFIG);
@@ -195,8 +157,7 @@ function normalizeConfig(rawConfig) {
 
   const defaultBindings = safeClone(DEFAULT_BINDINGS);
   const rawBindings = raw.bindings && typeof raw.bindings === "object" ? raw.bindings : {};
-  const legacyBindings = parseLegacyBindings(raw);
-  const merged = { ...defaultBindings, ...legacyBindings, ...rawBindings };
+  const merged = { ...defaultBindings, ...rawBindings };
 
   for (const [action, value] of Object.entries(merged)) {
     const key = normalizeAction(action);

@@ -340,7 +340,7 @@ function installBridgeDtlsStartOverride(bridgeRef, cfg, log = console) {
       type: "udp4",
       address: this.url,
       signal: this.abortionController.signal,
-      // node-dtls-client expects "ciphers". Keep legacy key too for compatibility.
+      // node-dtls-client expects "ciphers". Keep original key too for compatibility.
       ciphers: ["TLS_PSK_WITH_AES_128_GCM_SHA256"],
       cipherSuites: ["TLS_PSK_WITH_AES_128_GCM_SHA256"],
       psk: {
@@ -710,7 +710,7 @@ module.exports = function createHueEntertainmentTransport({ fixtureRegistry, log
       Number(options?.timeoutMs || options?.timeout || 3500)
     );
     const useOriginalStart = Boolean(options?.useOriginalStart);
-    const modeTag = useOriginalStart ? "legacy-start" : "forced-start";
+    const modeTag = useOriginalStart ? "original-start" : "forced-start";
     return new Promise((resolve, reject) => {
       let settled = false;
       let clearSocketGuard = () => {};
@@ -966,8 +966,8 @@ module.exports = function createHueEntertainmentTransport({ fixtureRegistry, log
         { timeoutMs: 8000, useOriginalStart: false, label: "forced-fallback-1" }
       ];
       if (HUE_ENT_ENABLE_ORIGINAL_START_FALLBACK) {
-        attemptsPrimary.push({ timeoutMs: 10000, useOriginalStart: true, label: "legacy-compat" });
-        attemptsFallback.push({ timeoutMs: 12000, useOriginalStart: true, label: "legacy-fallback" });
+        attemptsPrimary.push({ timeoutMs: 10000, useOriginalStart: true, label: "original-compat" });
+        attemptsFallback.push({ timeoutMs: 12000, useOriginalStart: true, label: "original-fallback" });
       }
       let started = false;
       let lastStartError = null;
@@ -1005,7 +1005,7 @@ module.exports = function createHueEntertainmentTransport({ fixtureRegistry, log
               area: getAreaDisplayName(candidateArea),
               areaIndex: areaIdx + 1,
               attempt: i + 1,
-              mode: attempt.useOriginalStart ? "legacy-start" : "forced-start",
+              mode: attempt.useOriginalStart ? "original-start" : "forced-start",
               timeoutMs: attempt.timeoutMs,
               at: Date.now()
             };
@@ -1021,13 +1021,13 @@ module.exports = function createHueEntertainmentTransport({ fixtureRegistry, log
               area: getAreaDisplayName(candidateArea),
               areaIndex: areaIdx + 1,
               attempt: i + 1,
-              mode: attempt.useOriginalStart ? "legacy-start" : "forced-start",
+              mode: attempt.useOriginalStart ? "original-start" : "forced-start",
               timeoutMs: attempt.timeoutMs,
               error: attemptDetail,
               at: Date.now()
             };
             log.warn?.(
-              `[HUE][ENT] start attempt area ${areaIdx + 1}/${maxAreaCandidates} try ${i + 1}/${attempts.length} (${attempt.useOriginalStart ? "legacy" : "forced"}) failed: ${attemptDetail}`
+              `[HUE][ENT] start attempt area ${areaIdx + 1}/${maxAreaCandidates} try ${i + 1}/${attempts.length} (${attempt.useOriginalStart ? "original" : "forced"}) failed: ${attemptDetail}`
             );
             await teardownBridge(
               attemptBridge,

@@ -28,7 +28,7 @@ Runtime defaults are now local-first with hardened boundaries:
 
 - Mutating routes are loopback-only unless `RAVELINK_ALLOW_REMOTE_WRITE=1`.
 - Privileged read routes are loopback-only unless `RAVELINK_ALLOW_REMOTE_PRIVILEGED_READ=1`.
-- Legacy mutating GET compatibility routes are disabled unless `RAVELINK_ALLOW_LEGACY_MUTATING_GET=1`.
+- Mutating command routes (`/rave/on`, `/rave/off`, `/teach`, `/color`) require `POST`.
 - Hue Entertainment HTTPS path keeps TLS verification enabled.
 - Sensitive runtime logs are redacted by default.
 
@@ -160,14 +160,9 @@ Key behavior:
 ### Twitch color and teach
 
 - `POST /teach`
-- `GET|POST /color`
+- `POST /color`
 - `GET /color/prefixes`
 - `POST /color/prefixes`
-
-Legacy compatibility:
-
-- `GET /rave/on`, `GET /rave/off`, and `GET /teach` only work when
-  `RAVELINK_ALLOW_LEGACY_MUTATING_GET=1`.
 
 Accepted compat text keys:
 - query/body `value1`
