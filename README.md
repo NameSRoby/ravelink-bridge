@@ -20,20 +20,16 @@ This repository state is aligned to `v1.5.0`:
 
 ## Update Log (v1.5.0 Baseline)
 
-- Meta Auto now learns from live song behavior (EMA + peak memory on drive/motion/intensity) so heavy tracks ramp above low 2Hz/4Hz tiers instead of sticking there.
-- High-motion tracks now get sustained-build promotion logic for better high-energy response while calmer sections keep low-rate guardrails.
-- Hotfix for mod debug noise: high-frequency `onTelemetry` debug events are now sanitized and sampled instead of flooding logs every poll tick.
-- `onTelemetry` hook batches with no handlers no longer spam repetitive debug lines.
-- Modder diagnostics remain available through `/mods/debug` with explicit telemetry sampling controls.
-- Core lock workflow upgraded to key-protected unlock with explicit key init/status commands.
-- Security hardening completed across API boundaries, logging redaction, and route guards.
-- Hue entertainment path stabilized with safer fallback/recovery behavior and bounded retries.
-- Audio reactivity map expanded with per-brand source controls and policy-safe compatibility toggles.
-- Hardware-safe rate caps added (default ON) with explicit override path for controlled testing.
-- Scheduler heartbeat safeguards added to prevent long static stalls under low-delta conditions.
-- Hue REST responsiveness tuned (safe transition + adaptive interval behavior) for better practical latency.
-- Linux source startup path added (`.sh` launchers) while keeping Windows as official packaged target.
-- UI storage migration bumped again so stale browser state is wiped on first load of this baseline.
+- New palette-first control flow: build shows by color families (`blue`, `purple`, `red`, `green`, `yellow`) with `1/3/5` colors, `ORDERED` sequencing, or `DISORDER` chaos.
+- Per-brand and per-fixture routing is now first-class: Hue and WiZ can run different palette/metric behavior at the same time, and single fixtures can be overridden independently.
+- Added fixture metric controls for `MANUAL` vs `META AUTO` plus harmony grouping and fixture rotation options.
+- Added per-target max update-rate clamp (`maxHz`) so you can cap aggressive fixtures while preserving proportional motion from the song.
+- Legacy genre/decade/competitive controls were retired from the user control path; v1.5 is BPM interpret + explicit palette/metric routing.
+- App-isolated audio workflow was hardened (priority/fallback app selection, periodic auto-switch checks, and process-aware capture path support).
+- Hue and WiZ output behavior was tuned for closer parity in musical feel (less static stalls, better pulse/brightness expression, stronger palette separation on WiZ).
+- Startup is more reliable on new systems: first launch performs dependency bootstrap automatically and re-checks when dependency manifests change.
+- Onboarding/help text was updated around the current workflow so setup is clearer for first-time users.
+- Security + release hygiene stayed strict: loopback-first API defaults, sensitive-log redaction, and sanitized redistributable defaults.
 
 Detailed release notes:
 - `CHANGELOG.md`
@@ -257,11 +253,15 @@ The routes below are available in the bridge API, but anything beyond the 3 defa
 | Overclock ludicrous | `POST /rave/overclock/ludicrous/on` | `/rave/overclock/ludicrous/on` |
 
 Common values:
-- Genre names: `auto`, `edm`, `hiphop`, `metal`, `ambient`, `house`, `trance`, `dnb`, `pop`, `rock`, `rnb`, `techno`, `media`
-- Decade modes: `auto`, `90s`, `00s`, `10s`, `20s`
+- Mode names: `bpm` (alias: `interpret`)
 - Scene names: `auto`, `idle_soft`, `flow`, `pulse_strobe`
 - Auto profiles: `reactive`, `balanced`, `cinematic`
 - Audio reactivity presets: `balanced`, `aggressive`, `precision`
+- Palette families: `blue`, `purple`, `red`, `green`, `yellow`
+- Colors per family: `1`, `3`, `5`
+- Palette order mode: `ordered`, `disorder`
+- Song metric mode: `manual`, `meta_auto`
+- Manual metric keys: `baseline`, `peaks`, `transients`, `flux`
 - Teach payload format: `<name> <#RRGGBB>` (example `laser_blue #00aaff`, query-string encoded as `laser_blue+%2300aaff`)
 
 Admin-only (do not expose to public chat):
@@ -323,31 +323,21 @@ Notes:
 
 ## Version 1.5.0 Notes
 
-- Runtime and security baseline on top of 1.4.2 behavior:
-  - Startup bootstraps dependency state automatically on first launch on a new system.
-  - Kept local-first route protections with explicit advanced env overrides for compatibility.
-- Telemetry log spam hotfix baseline retained:
-  - Sanitized high-frequency mod `onTelemetry` hook debug payloads.
-  - Added default sampling for `onTelemetry` debug emission to prevent console spam.
-  - Disabled no-handler `onTelemetry` batch spam by default.
-  - Bumped UI storage migration target so stale UI memory is cleared on first load of this baseline.
-- Full security hardening pass:
-  - Loopback-only protection for mutating endpoints by default.
-  - Loopback-only protection for privileged read endpoints by default.
-  - Expanded endpoint rate limiting for abuse/resource control.
-  - Legacy mutating `GET` endpoints disabled by default (use `POST`).
-  - Stronger secret redaction in runtime logging.
-  - Hue transport enforces TLS validation path.
-- SSRF and host-target safety:
-  - Built-in Hue/WiZ fixture host fields normalized to private/local IPv4 only.
-  - Fixture validation rejects unsafe/non-LAN transport targets for built-in brands.
-- UI hardening and cleanup:
-  - DOM rendering tightened in sensitive UI paths.
-  - Safer URL/base-path handling in frontend request helpers.
-  - Fixture/custom routing views stabilized with current catalog state.
-- Code structure improvements:
-  - Added explicit `[TITLE]` functionality indices and section headers across core files to speed future patching.
-- Includes previous reliability/UX improvements from the 1.3.x line (fixture list persistence, custom control improvements, tuning updates).
+- Daily-use workflow changes:
+  - The control model is now centered on palette sequencing + song-metric routing instead of legacy genre/decade buttons.
+  - Brand menus and fixture targeting allow split-task behavior (for example, one fixture follows `peaks` while another follows `flux`).
+  - Meta Auto can still drive assignments automatically, while manual mode gives explicit per-target control.
+- Audio and fixture behavior:
+  - App isolation flow is more practical for stream setups with multiple apps open (priority/fallback + process-aware capture support).
+  - Hue/WiZ behavior tuning focused on reducing indecisive/stale transitions and improving visual contrast/brightness usage.
+  - Per-target `maxHz` clamps let you tame overly fast fixtures without killing musical movement.
+- Startup and setup:
+  - New-system first launch now auto-installs required dependencies before starting.
+  - Onboarding and UI guidance were updated to match the v1.5 control model.
+- Safety and distribution:
+  - Release build sanitization wipes sensitive/local runtime data before packaging.
+  - API remains local-first with protected defaults and explicit opt-in overrides.
+  - Sensitive logs stay redacted by default.
 
 For older major feature lists, see tag history under Releases.
 
