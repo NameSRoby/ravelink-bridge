@@ -443,6 +443,32 @@ button:disabled{
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
 .grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.liveProfileRow{
+  display:grid;
+  grid-template-columns:minmax(140px,1.4fr) repeat(3,minmax(92px,auto));
+  gap:8px;
+  align-items:center;
+  margin:8px 0 4px;
+}
+.liveProfileRow input{
+  min-height:34px;
+  border:1px solid #2a3f6b;
+  border-radius:9px;
+  background:#0b1226;
+  color:var(--text);
+  padding:0 10px;
+  font-size:12px;
+  letter-spacing:.4px;
+}
+.liveProfileRow button{
+  min-height:34px;
+  padding:7px 10px;
+  font-size:11px;
+  letter-spacing:.6px;
+}
+.liveProfileStat{
+  margin-top:2px;
+}
 
 .sceneLockRows{
   display:grid;
@@ -2020,6 +2046,8 @@ tr:last-child td{
   .grid4{grid-template-columns:1fr 1fr}
   .grid5{grid-template-columns:1fr 1fr}
   .grid6{grid-template-columns:1fr 1fr}
+  .liveProfileRow{grid-template-columns:1fr 1fr}
+  .liveProfileRow input{grid-column:1 / -1}
   .telemetry{grid-template-columns:1fr 1fr}
   .controlRow{grid-template-columns:1fr 1fr}
   .fixtureGrid{grid-template-columns:1fr 1fr}
@@ -2253,6 +2281,13 @@ tr:last-child td{
       <button id="offBtn" type="button">RAVE OFF</button>
       <button id="panicBtn" type="button" class="bad">PANIC</button>
     </div>
+    <div class="liveProfileRow">
+      <input id="liveProfileName" type="text" placeholder="profile name (local)" maxlength="32" autocomplete="off" spellcheck="false">
+      <button id="liveProfileSaveBtn" type="button">SAVE PROFILE</button>
+      <button id="liveProfileLoadBtn" type="button">LOAD PROFILE</button>
+      <button id="liveProfileResetBtn" type="button">RESET DEFAULT</button>
+    </div>
+    <p id="liveProfileStat" class="hint liveProfileStat">LIVE PROFILE: default (unsaved)</p>
 
     <h3>MODE <span class="infoTip" title="BPM (INTERPRET) is always active. Old mode switching was removed.">?</span></h3>
     <p class="hint">BPM (INTERPRET) is enforced globally.</p>
@@ -2927,11 +2962,11 @@ tr:last-child td{
                 </div>
                 <div>
                   <label for="colorRaveOffDefault">DEFAULT RAVE OFF COMMAND</label>
-                  <input id="colorRaveOffDefault" type="text" placeholder="e.g. dim blue">
+                  <input id="colorRaveOffDefault" type="text" placeholder="e.g. random">
                 </div>
                 <div class="prefixFullRow">
                   <label for="colorRaveOffGroupMap">GROUP RULES (OPTIONAL) <span class="infoTip" title="One line per group: key=command. key can be hue, wiz, hue:zone, or wiz:zone.">?</span></label>
-                  <textarea id="colorRaveOffGroupMap" placeholder="hue=dim blue&#10;wiz=dim blue&#10;hue:desk=purple"></textarea>
+                  <textarea id="colorRaveOffGroupMap" placeholder="hue=random&#10;wiz=random&#10;hue:desk=purple"></textarea>
                   <p class="prefixSyntax">Syntax: <code>hue=command</code>, <code>wiz=command</code>, or <code>hue:zone=command</code>.</p>
                 </div>
                 <div class="prefixFullRow">
@@ -4234,7 +4269,7 @@ const ui = {
   colorPrefixes: { hue: "hue", wiz: "wiz", other: "" },
   colorFixturePrefixes: {},
   colorRaveOffEnabled: true,
-  colorRaveOffDefaultText: "dim blue",
+  colorRaveOffDefaultText: "random",
   colorRaveOffGroups: {},
   colorRaveOffFixtures: {},
   guidedOnboardingStatus: "",
@@ -4295,6 +4330,8 @@ const AUDIO_REACT_SMART_MATCH_KEY = "ravelink_react_smart_match_v1";
 const AUDIO_REACT_FORCE_LOCK_KEY = "ravelink_react_force_lock_v1";
 const AUDIO_REACT_FORCE_OVERRIDE_KEY = "ravelink_react_force_override_v1";
 const MIDI_TAB_FORCE_KEY = "ravelink_midi_tab_forced_v1";
+const LIVE_PROFILE_STORE_KEY = "ravelink_live_profiles_v1";
+const LIVE_PROFILE_LAST_KEY = "ravelink_live_profile_last_v1";
 const DEV_OVERCLOCK_COMICAL_TEXT = "I AM REALLY REALLY REALLY REALLY REALLY REALLY REALLY SURE";
 const UNSAFE_LOG_ACK_PHRASE = "I_UNDERSTAND_SENSITIVE_LOG_RISK";
 const UI_STORAGE_RESET_KEYS = Object.freeze([
@@ -4316,6 +4353,8 @@ const UI_STORAGE_RESET_KEYS = Object.freeze([
   AUDIO_REACT_FORCE_LOCK_KEY,
   AUDIO_REACT_FORCE_OVERRIDE_KEY,
   MIDI_TAB_FORCE_KEY,
+  LIVE_PROFILE_STORE_KEY,
+  LIVE_PROFILE_LAST_KEY,
   PALETTE_FIXTURE_SELECTION_KEY
 ]);
 const UI_STORAGE_RESET_PREFIXES = Object.freeze([
@@ -4392,6 +4431,11 @@ const el = {
   onBtn: document.getElementById("onBtn"),
   offBtn: document.getElementById("offBtn"),
   panicBtn: document.getElementById("panicBtn"),
+  liveProfileName: document.getElementById("liveProfileName"),
+  liveProfileSaveBtn: document.getElementById("liveProfileSaveBtn"),
+  liveProfileLoadBtn: document.getElementById("liveProfileLoadBtn"),
+  liveProfileResetBtn: document.getElementById("liveProfileResetBtn"),
+  liveProfileStat: document.getElementById("liveProfileStat"),
   reloadBtn: document.getElementById("reloadBtn"),
   dropBtn: document.getElementById("dropBtn"),
   hueEntBtn: document.getElementById("hueEntBtn"),
@@ -5129,6 +5173,11 @@ function applyUiTooltips() {
   setNodeTitle(el.onBtn, "Start reactive rave output.");
   setNodeTitle(el.offBtn, "Stop reactive rave output.");
   setNodeTitle(el.panicBtn, "Emergency blackout command.");
+  setNodeTitle(el.liveProfileName, "Local profile name for quick save/load in LIVE.");
+  setNodeTitle(el.liveProfileSaveBtn, "Save current LIVE controls to local profile storage.");
+  setNodeTitle(el.liveProfileLoadBtn, "Load and apply saved LIVE controls from local profile storage.");
+  setNodeTitle(el.liveProfileResetBtn, "Apply built-in LIVE defaults (balanced profile/reactivity, AUTO scene, 6Hz, flow 1.00x).");
+  setNodeTitle(el.liveProfileStat, "Status of the currently selected local LIVE profile.");
   setNodeTitle(el.themeCogBtn, "Open theme settings.");
   setNodeTitle(el.obsDockCompactBtn, "Toggle compact OBS dock layout.");
   setNodeTitle(
@@ -5400,6 +5449,291 @@ function setBadge(node, state, text) {
   node.classList.remove("ok", "warn", "bad");
   if (nextState) node.classList.add(nextState);
   node.textContent = nextText;
+}
+
+const LIVE_PROFILE_DEFAULT = Object.freeze({
+  autoProfile: "balanced",
+  audioReactivityPreset: "balanced",
+  sceneLock: "auto",
+  flowIntensity: 1,
+  overclockAutoEnabled: false,
+  overclockLevel: 2,
+  metaAutoEnabled: false
+});
+const LIVE_PROFILE_ALLOWED_AUTO = new Set(["reactive", "balanced", "cinematic"]);
+const LIVE_PROFILE_ALLOWED_REACTIVITY = new Set(["balanced", "aggressive", "precision"]);
+const LIVE_PROFILE_ALLOWED_SCENES = new Set(["auto", "idle_soft", "flow", "pulse_strobe"]);
+const LIVE_PROFILE_OVERCLOCK_ROUTE_BY_LEVEL = Object.freeze({
+  0: "/rave/overclock/off",
+  1: "/rave/overclock/on",
+  2: "/rave/overclock/turbo/on",
+  3: "/rave/overclock/ultra/on",
+  4: "/rave/overclock/extreme/on",
+  5: "/rave/overclock/insane/on",
+  6: "/rave/overclock/hyper/on",
+  7: "/rave/overclock/ludicrous/on"
+});
+
+function normalizeLiveProfileName(value, fallback = "default") {
+  const raw = String(value || "").trim().toLowerCase();
+  const compact = raw.replace(/\s+/g, " ");
+  if (/^[a-z0-9][a-z0-9 _-]{0,31}$/.test(compact)) return compact;
+  return String(fallback || "default").trim().toLowerCase() || "default";
+}
+
+function normalizeLiveProfileSnapshot(raw = {}, fallback = LIVE_PROFILE_DEFAULT) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const base = fallback && typeof fallback === "object" ? fallback : LIVE_PROFILE_DEFAULT;
+  const autoProfileRaw = String(source.autoProfile || base.autoProfile || "balanced").trim().toLowerCase();
+  const audioPresetRaw = String(source.audioReactivityPreset || base.audioReactivityPreset || "balanced").trim().toLowerCase();
+  const sceneRaw = String(source.sceneLock || base.sceneLock || "auto").trim().toLowerCase();
+  const overclockLevelRaw = Number(source.overclockLevel);
+  const overclockLevelBase = Number(base.overclockLevel);
+  const overclockLevel = Number.isFinite(overclockLevelRaw)
+    ? Math.max(0, Math.min(7, Math.round(overclockLevelRaw)))
+    : (Number.isFinite(overclockLevelBase) ? Math.max(0, Math.min(7, Math.round(overclockLevelBase))) : 2);
+  let overclockAutoEnabled = parseBooleanUi(
+    source.overclockAutoEnabled,
+    parseBooleanUi(base.overclockAutoEnabled, false)
+  ) === true;
+  const metaAutoEnabled = parseBooleanUi(
+    source.metaAutoEnabled,
+    parseBooleanUi(base.metaAutoEnabled, false)
+  ) === true;
+  if (metaAutoEnabled && overclockAutoEnabled) {
+    overclockAutoEnabled = false;
+  }
+  return {
+    autoProfile: LIVE_PROFILE_ALLOWED_AUTO.has(autoProfileRaw) ? autoProfileRaw : "balanced",
+    audioReactivityPreset: LIVE_PROFILE_ALLOWED_REACTIVITY.has(audioPresetRaw) ? audioPresetRaw : "balanced",
+    sceneLock: LIVE_PROFILE_ALLOWED_SCENES.has(sceneRaw) ? sceneRaw : "auto",
+    flowIntensity: clampFlowIntensity(source.flowIntensity ?? base.flowIntensity ?? 1),
+    overclockAutoEnabled,
+    overclockLevel,
+    metaAutoEnabled
+  };
+}
+
+function readLiveProfileStore() {
+  const empty = { version: 1, profiles: {} };
+  try {
+    const raw = String(localStorage.getItem(LIVE_PROFILE_STORE_KEY) || "").trim();
+    if (!raw) return empty;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return empty;
+    const profilesRaw = parsed.profiles && typeof parsed.profiles === "object" && !Array.isArray(parsed.profiles)
+      ? parsed.profiles
+      : {};
+    const profiles = {};
+    for (const [rawName, payload] of Object.entries(profilesRaw)) {
+      const name = normalizeLiveProfileName(rawName, "");
+      if (!name) continue;
+      const snapshotRaw = payload && typeof payload === "object" && !Array.isArray(payload)
+        ? payload.snapshot
+        : null;
+      const snapshot = normalizeLiveProfileSnapshot(snapshotRaw || payload || {}, LIVE_PROFILE_DEFAULT);
+      const savedAt = Number(payload?.savedAt);
+      profiles[name] = {
+        savedAt: Number.isFinite(savedAt) ? savedAt : Date.now(),
+        snapshot
+      };
+      if (Object.keys(profiles).length >= 24) break;
+    }
+    return { version: 1, profiles };
+  } catch {
+    return empty;
+  }
+}
+
+function writeLiveProfileStore(store) {
+  const safeStore = store && typeof store === "object" ? store : {};
+  const profilesRaw = safeStore.profiles && typeof safeStore.profiles === "object" ? safeStore.profiles : {};
+  const profiles = {};
+  for (const [rawName, payload] of Object.entries(profilesRaw)) {
+    const name = normalizeLiveProfileName(rawName, "");
+    if (!name) continue;
+    const snapshot = normalizeLiveProfileSnapshot(payload?.snapshot || payload || {}, LIVE_PROFILE_DEFAULT);
+    const savedAt = Number(payload?.savedAt);
+    profiles[name] = {
+      savedAt: Number.isFinite(savedAt) ? savedAt : Date.now(),
+      snapshot
+    };
+    if (Object.keys(profiles).length >= 24) break;
+  }
+  const safe = { version: 1, profiles };
+  localStorage.setItem(LIVE_PROFILE_STORE_KEY, JSON.stringify(safe));
+  return safe;
+}
+
+function resolveCurrentLiveProfileName() {
+  return normalizeLiveProfileName(
+    el.liveProfileName?.value ||
+      localStorage.getItem(LIVE_PROFILE_LAST_KEY) ||
+      "default",
+    "default"
+  );
+}
+
+function setCurrentLiveProfileName(name) {
+  const safe = normalizeLiveProfileName(name, "default");
+  if (el.liveProfileName) el.liveProfileName.value = safe;
+  localStorage.setItem(LIVE_PROFILE_LAST_KEY, safe);
+  return safe;
+}
+
+function formatLiveProfileSavedAt(savedAt) {
+  const ms = Number(savedAt);
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  try {
+    return new Date(ms).toLocaleTimeString();
+  } catch {
+    return "";
+  }
+}
+
+function refreshLiveProfileStatus(name = null, overrideText = "") {
+  if (!el.liveProfileStat) return;
+  const custom = String(overrideText || "").trim();
+  if (custom) {
+    el.liveProfileStat.textContent = custom;
+    return;
+  }
+  const profileName = normalizeLiveProfileName(name || resolveCurrentLiveProfileName(), "default");
+  const store = readLiveProfileStore();
+  const entry = store.profiles[profileName];
+  if (!entry) {
+    el.liveProfileStat.textContent = `LIVE PROFILE: ${profileName} (unsaved)`;
+    return;
+  }
+  const timeText = formatLiveProfileSavedAt(entry.savedAt);
+  el.liveProfileStat.textContent = timeText
+    ? `LIVE PROFILE: ${profileName} (saved ${timeText})`
+    : `LIVE PROFILE: ${profileName} (saved)`;
+}
+
+function buildLiveProfileSnapshotFromUi() {
+  return normalizeLiveProfileSnapshot({
+    autoProfile: ui.autoProfile,
+    audioReactivityPreset: ui.audioReactivityPreset,
+    sceneLock: ui.sceneLock,
+    flowIntensity: ui.flowIntensity,
+    overclockAutoEnabled: ui.overclockAutoEnabled,
+    overclockLevel: ui.overclockLevel,
+    metaAutoEnabled: ui.metaAutoEnabled
+  }, LIVE_PROFILE_DEFAULT);
+}
+
+async function applyLiveProfileSnapshot(snapshot = {}, options = {}) {
+  const announce = options.announce !== false;
+  const next = normalizeLiveProfileSnapshot(snapshot, LIVE_PROFILE_DEFAULT);
+  let ok = true;
+
+  const autoHzOk = await setOverclockAutoEnabled(next.overclockAutoEnabled, { announce: false });
+  if (!autoHzOk) ok = false;
+
+  if (!next.overclockAutoEnabled) {
+    const route = LIVE_PROFILE_OVERCLOCK_ROUTE_BY_LEVEL[next.overclockLevel] || LIVE_PROFILE_OVERCLOCK_ROUTE_BY_LEVEL[2];
+    const overclockOk = await setOverclockPreset(next.overclockLevel, route, "");
+    if (!overclockOk) ok = false;
+  }
+
+  const autoProfileOk = await api(`/rave/auto/profile?name=${encodeURIComponent(next.autoProfile)}`);
+  if (autoProfileOk) {
+    ui.autoProfile = next.autoProfile;
+  } else {
+    ok = false;
+  }
+
+  const reactOk = await api(`/rave/audio/reactivity?name=${encodeURIComponent(next.audioReactivityPreset)}`);
+  if (reactOk) {
+    ui.audioReactivityPreset = next.audioReactivityPreset;
+  } else {
+    ok = false;
+  }
+
+  const sceneOk = next.sceneLock === "auto"
+    ? await api("/rave/scene/auto")
+    : await api(`/rave/scene?name=${encodeURIComponent(next.sceneLock)}`);
+  if (sceneOk) {
+    ui.sceneLock = next.sceneLock;
+  } else {
+    ok = false;
+  }
+
+  ui.flowIntensity = next.flowIntensity;
+  ui.flowIntensityInputUntil = Date.now() + 600;
+  applyFlowIntensityUi();
+  const flowOk = await commitFlowIntensity({ silent: true });
+  if (!flowOk) ok = false;
+
+  const metaResponse = await postJson(`/rave/meta/auto?enabled=${next.metaAutoEnabled ? "true" : "false"}`, {});
+  if (metaResponse.ok && metaResponse.data) {
+    ui.metaAutoEnabled = Boolean(metaResponse.data.enabled);
+    ui.metaAutoReason = ui.metaAutoEnabled ? "enabled" : "off";
+  } else {
+    ok = false;
+  }
+
+  maybeApplySmartLiveReactivityPolicy("LIVE PROFILE LOAD");
+  sync();
+  if (announce) {
+    setBadge(el.health, ok ? "ok" : "warn", ok ? "LIVE PROFILE APPLIED" : "LIVE PROFILE APPLIED (PARTIAL)");
+  }
+  return ok;
+}
+
+function initLiveProfileControls() {
+  const initialName = setCurrentLiveProfileName(resolveCurrentLiveProfileName());
+  refreshLiveProfileStatus(initialName);
+
+  if (el.liveProfileName) {
+    el.liveProfileName.addEventListener("change", () => {
+      const name = setCurrentLiveProfileName(el.liveProfileName.value);
+      refreshLiveProfileStatus(name);
+    });
+    el.liveProfileName.addEventListener("blur", () => {
+      const name = setCurrentLiveProfileName(el.liveProfileName.value);
+      refreshLiveProfileStatus(name);
+    });
+  }
+
+  if (el.liveProfileSaveBtn) {
+    el.liveProfileSaveBtn.onclick = () => {
+      const name = setCurrentLiveProfileName(resolveCurrentLiveProfileName());
+      const store = readLiveProfileStore();
+      store.profiles[name] = {
+        savedAt: Date.now(),
+        snapshot: buildLiveProfileSnapshotFromUi()
+      };
+      writeLiveProfileStore(store);
+      refreshLiveProfileStatus(name);
+      setBadge(el.health, "ok", `LIVE PROFILE SAVED (${name.toUpperCase()})`);
+    };
+  }
+
+  if (el.liveProfileLoadBtn) {
+    el.liveProfileLoadBtn.onclick = async () => {
+      const name = setCurrentLiveProfileName(resolveCurrentLiveProfileName());
+      const store = readLiveProfileStore();
+      const entry = store.profiles[name];
+      const snapshot = entry?.snapshot || LIVE_PROFILE_DEFAULT;
+      const ok = await applyLiveProfileSnapshot(snapshot, { announce: false });
+      refreshLiveProfileStatus(name, ok
+        ? `LIVE PROFILE: ${name} loaded`
+        : `LIVE PROFILE: ${name} loaded with partial failures`);
+      setBadge(el.health, ok ? "ok" : "warn", ok ? `LIVE PROFILE LOADED (${name.toUpperCase()})` : `LIVE PROFILE PARTIAL (${name.toUpperCase()})`);
+    };
+  }
+
+  if (el.liveProfileResetBtn) {
+    el.liveProfileResetBtn.onclick = async () => {
+      const ok = await applyLiveProfileSnapshot(LIVE_PROFILE_DEFAULT, { announce: false });
+      refreshLiveProfileStatus(resolveCurrentLiveProfileName(), ok
+        ? "LIVE PROFILE: defaults loaded"
+        : "LIVE PROFILE: defaults loaded with partial failures");
+      setBadge(el.health, ok ? "ok" : "warn", ok ? "LIVE PROFILE DEFAULTS APPLIED" : "LIVE PROFILE DEFAULTS PARTIAL");
+    };
+  }
 }
 
 const PALETTE_FAMILY_ORDER = Object.freeze(["red", "green", "blue"]);
@@ -6393,9 +6727,6 @@ function markPaletteBrandMenusInteraction(holdMs = 1200) {
 }
 
 function isPaletteBrandMenusInteractionActive() {
-  if (!el.paletteBrandMenus) return false;
-  const active = document.activeElement;
-  if (active && el.paletteBrandMenus.contains(active)) return true;
   return Date.now() < Number(paletteBrandMenusInteractionUntil || 0);
 }
 
@@ -6448,8 +6779,9 @@ function renderPaletteBrandMenus(options = {}) {
   el.paletteBrandMenus.innerHTML = cards.join("");
 }
 
-function applyPaletteRuntimeSnapshotToUi(snapshot = {}) {
+function applyPaletteRuntimeSnapshotToUi(snapshot = {}, options = {}) {
   const data = snapshot && typeof snapshot === "object" ? snapshot : {};
+  const opts = options && typeof options === "object" ? options : {};
   if (Array.isArray(data.catalog) && data.catalog.length) {
     renderPaletteFamilyButtons(data.catalog);
   }
@@ -6458,7 +6790,10 @@ function applyPaletteRuntimeSnapshotToUi(snapshot = {}) {
     brandFixtures: data.brandFixtures || {}
   });
   applyFixtureMetricRoutingSnapshotToUi(data.metricRouting || {});
-  renderPaletteBrandMenus({ reason: "palette_runtime_snapshot" });
+  renderPaletteBrandMenus({
+    reason: "palette_runtime_snapshot",
+    force: opts.forceRender === true
+  });
 }
 
 function normalizeHexColor(value, fallback = "#8b001f") {
@@ -8378,7 +8713,7 @@ function applyColorPrefixSnapshot(snapshot = {}) {
     ? config.raveOff
     : {};
   const raveOffEnabled = raveOffRaw.enabled !== false;
-  const raveOffDefaultText = normalizeColorCommandText(raveOffRaw.defaultText, "dim blue");
+  const raveOffDefaultText = normalizeColorCommandText(raveOffRaw.defaultText, "random");
   const raveOffGroups = normalizeColorRaveOffGroupMap(raveOffRaw.groups);
   const raveOffFixtures = normalizeColorRaveOffFixtureMap(raveOffRaw.fixtures);
   const capabilities = snapshot?.capabilities && typeof snapshot.capabilities === "object"
@@ -8457,7 +8792,7 @@ async function saveColorPrefixConfigFromUi(options = {}) {
   let otherPrefix = normalizeColorPrefixToken(el.colorPrefixOther?.value || "");
   let fixturePrefixMap = parseColorFixturePrefixMapText(el.colorPrefixFixtureMap?.value || "");
   let raveOffEnabled = String(el.colorRaveOffEnabled?.value || "1") !== "0";
-  let raveOffDefaultText = normalizeColorCommandText(el.colorRaveOffDefault?.value || "", "dim blue");
+  let raveOffDefaultText = normalizeColorCommandText(el.colorRaveOffDefault?.value || "", "random");
   let raveOffGroupMap = parseColorRaveOffGroupMapText(el.colorRaveOffGroupMap?.value || "");
   let raveOffFixtureMap = parseColorRaveOffFixtureMapText(el.colorRaveOffFixtureMap?.value || "");
 
@@ -8468,7 +8803,7 @@ async function saveColorPrefixConfigFromUi(options = {}) {
     otherPrefix = "";
     fixturePrefixMap = { ok: true, map: {}, errors: [] };
     raveOffEnabled = true;
-    raveOffDefaultText = "dim blue";
+    raveOffDefaultText = "random";
     raveOffGroupMap = { ok: true, map: {}, errors: [] };
     raveOffFixtureMap = { ok: true, map: {}, errors: [] };
   }
@@ -12720,7 +13055,7 @@ async function applyPalettePatch(patch = {}, badgePrefix = "PALETTE") {
     setBadge(el.health, "bad", `${badgePrefix} FAIL${reason}`);
     return false;
   }
-  applyPaletteRuntimeSnapshotToUi(r.data || {});
+  applyPaletteRuntimeSnapshotToUi(r.data || {}, { forceRender: true });
   maybeApplySmartLiveReactivityPolicy(`${badgePrefix} UPDATE`);
   sync();
   return true;
@@ -12752,7 +13087,7 @@ async function applyFixtureRoutingClearPatch(patch = {}, badgePrefix = "OVERRIDE
     setBadge(el.health, "bad", `${badgePrefix} FAIL${reason}`);
     return false;
   }
-  applyPaletteRuntimeSnapshotToUi(r.data || {});
+  applyPaletteRuntimeSnapshotToUi(r.data || {}, { forceRender: true });
   maybeApplySmartLiveReactivityPolicy(`${badgePrefix} UPDATE`);
   sync();
   return true;
@@ -13163,7 +13498,7 @@ function getPaletteBrandScopePatchUi(brandKey) {
 }
 
 if (el.paletteBrandMenus) {
-  const markBrandMenusHot = () => markPaletteBrandMenusInteraction(1400);
+  const markBrandMenusHot = () => markPaletteBrandMenusInteraction(480);
   ["pointerdown", "focusin", "keydown", "input", "change"].forEach(type => {
     el.paletteBrandMenus.addEventListener(type, markBrandMenusHot, { capture: true });
   });
@@ -16526,6 +16861,7 @@ initThemeSettings();
 initObsDockMode();
 initCollapsiblePanels();
 applyUiTooltips();
+initLiveProfileControls();
 el.modActionModId.value = "hello-mod";
 el.modActionName.value = "status";
 resetFixtureForm();

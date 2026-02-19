@@ -6702,9 +6702,13 @@ async function handleRaveOff(_, res) {
       console.warn("[AUTOMATION] stop action failed:", err.message || err);
     });
   }
-  applyStandaloneRaveStopUpdates().catch(err => {
-    console.warn("[STANDALONE] rave-stop update failed:", err.message || err);
-  });
+  if (raveOffColorApplied) {
+    console.log("[STANDALONE] rave-stop updates skipped (rave-off color profile active)");
+  } else {
+    applyStandaloneRaveStopUpdates().catch(err => {
+      console.warn("[STANDALONE] rave-stop update failed:", err.message || err);
+    });
+  }
   res.sendStatus(200);
 }
 
@@ -8257,6 +8261,37 @@ function parseTwitchColorDirective(rawText) {
   };
 }
 
+function normalizeTwitchRaveOffDirective(directive) {
+  const source = directive && typeof directive === "object" ? directive : null;
+  if (!source || source.ok !== true) return source;
+  if (source.type !== "random") return source;
+
+  const hueStateSource = source.hueState && typeof source.hueState === "object"
+    ? source.hueState
+    : {};
+  const wizStateSource = source.wizState && typeof source.wizState === "object"
+    ? source.wizState
+    : {};
+
+  return {
+    ...source,
+    brightness: "bright",
+    hueState: {
+      ...hueStateSource,
+      on: true,
+      bri: TWITCH_COLOR_BRIGHTNESS.hueBriBright,
+      transitiontime: Number.isFinite(Number(hueStateSource.transitiontime))
+        ? hueStateSource.transitiontime
+        : 2
+    },
+    wizState: {
+      ...wizStateSource,
+      on: true,
+      dimming: TWITCH_COLOR_BRIGHTNESS.wizDimmingBright
+    }
+  };
+}
+
 function getColorRequestOptions(req) {
   const query = req.query || {};
   const body = req.body || {};
@@ -8535,7 +8570,11 @@ async function applyTwitchRaveOffColorProfile() {
       });
       continue;
     }
-    assignments.push({ fixture, directive, commandText });
+    assignments.push({
+      fixture,
+      directive: normalizeTwitchRaveOffDirective(directive),
+      commandText
+    });
   }
 
   if (!assignments.length) {
