@@ -13,21 +13,6 @@ if errorlevel 1 (
   exit /b 1
 )
 
-set "NPM_BIN="
-where npm.cmd >nul 2>&1
-if not errorlevel 1 set "NPM_BIN=npm.cmd"
-if not defined NPM_BIN (
-  where npm >nul 2>&1
-  if not errorlevel 1 set "NPM_BIN=npm"
-)
-if not defined NPM_BIN (
-  echo [RaveLink][ERROR] npm is not available in PATH.
-  echo Reinstall Node.js LTS from https://nodejs.org and run this file again.
-  echo.
-  pause
-  exit /b 1
-)
-
 if not exist "package.json" (
   echo [RaveLink][ERROR] package.json not found in this folder.
   echo Open this launcher from the project folder root.
@@ -47,6 +32,20 @@ echo.
 if exist "scripts\start-bridge.js" (
   node scripts\start-bridge.js
 ) else (
+  set "NPM_BIN="
+  where npm.cmd >nul 2>&1
+  if not errorlevel 1 set "NPM_BIN=npm.cmd"
+  if not defined NPM_BIN (
+    where npm >nul 2>&1
+    if not errorlevel 1 set "NPM_BIN=npm"
+  )
+  if not defined NPM_BIN (
+    echo [RaveLink][ERROR] npm is not available in PATH.
+    echo Reinstall Node.js LTS from https://nodejs.org and run this file again.
+    echo.
+    pause
+    exit /b 1
+  )
   call %NPM_BIN% start
 )
 set "EXIT_CODE=%ERRORLEVEL%"

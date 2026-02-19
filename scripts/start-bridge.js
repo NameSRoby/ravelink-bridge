@@ -16,11 +16,29 @@ if (!process.env.RAVELINK_WATCH_PARENT) {
 const bootstrapDepsEnabled = String(process.env.RAVELINK_BOOTSTRAP_DEPS || "1").trim() !== "0";
 
 function runCommand(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const spawnOptions = {
     cwd: rootDir,
     encoding: "utf8",
     stdio: options.stdio || "pipe",
     windowsHide: true
+  };
+
+  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(String(command))) {
+    const quoteArg = (value) => {
+      const text = String(value);
+      if (!text.length) return "\"\"";
+      if (!/[\s\"&|<>^()]/.test(text)) return text;
+      return `"${text.replace(/"/g, "\"\"")}"`;
+    };
+    const commandLine = [command].concat(args || []).map(quoteArg).join(" ");
+    return spawnSync(commandLine, {
+      ...spawnOptions,
+      shell: true
+    });
+  }
+
+  const result = spawnSync(command, args, {
+    ...spawnOptions
   });
   return result;
 }
@@ -30,14 +48,43 @@ function commandExists(command, args = ["--version"]) {
   return result && result.status === 0;
 }
 
-function resolveNpmCommand() {
-  const candidates = process.platform === "win32"
-    ? ["npm.cmd", "npm"]
-    : ["npm"];
-  for (const candidate of candidates) {
-    if (commandExists(candidate)) return candidate;
+function commandReachable(command, args = ["--version"]) {
+  const result = runCommand(command, args, { stdio: "ignore" });
+  return !!(result && !(result.error && result.error.code === "ENOENT"));
+}
+
+function resolveNpmInvocation() {
+  const probes = [];
+  const nodeDir = path.dirname(process.execPath);
+
+  if (process.platform === "win32") {
+    probes.push({ command: "npm.cmd", prefixArgs: [], label: "PATH:npm.cmd" });
+    probes.push({ command: path.join(nodeDir, "npm.cmd"), prefixArgs: [], label: "node-dir:npm.cmd" });
   }
-  return "";
+  probes.push({ command: "npm", prefixArgs: [], label: "PATH:npm" });
+
+  const npmCliCandidates = [
+    path.join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js"),
+    path.join(rootDir, "node_modules", "npm", "bin", "npm-cli.js")
+  ];
+  for (const npmCliPath of npmCliCandidates) {
+    if (fs.existsSync(npmCliPath)) {
+      probes.push({
+        command: process.execPath,
+        prefixArgs: [npmCliPath],
+        label: `node:${npmCliPath}`
+      });
+    }
+  }
+
+  probes.push({ command: "corepack", prefixArgs: ["npm"], label: "PATH:corepack npm" });
+
+  for (const probe of probes) {
+    if (commandReachable(probe.command, probe.prefixArgs.concat(["--version"]))) {
+      return probe;
+    }
+  }
+  return null;
 }
 
 function ensureRuntimeDir() {
@@ -148,17 +195,24 @@ function findMissingNodeDependencies() {
   return missing;
 }
 
-function runNpmInstall(reason) {
-  const npmCommand = resolveNpmCommand();
-  if (!npmCommand) {
-    console.error("[BOOT][ERROR] npm not found in PATH; cannot install Node dependencies.");
+function runNpmInstall(reason, options = {}) {
+  const npm = resolveNpmInvocation();
+  if (!npm) {
+    if (options.allowSkipWhenSatisfied) {
+      const missing = findMissingNodeDependencies();
+      if (!missing.length) {
+        console.warn("[BOOT] npm is unavailable; skipping npm install because dependencies already appear installed.");
+        return true;
+      }
+    }
+    console.error("[BOOT][ERROR] npm not found (PATH/node runtime/corepack); cannot install Node dependencies.");
     return false;
   }
 
-  console.log(`[BOOT] Running full Node dependency sync (${reason})...`);
+  console.log(`[BOOT] Running full Node dependency sync (${reason}) via ${npm.label}...`);
   const installResult = runCommand(
-    npmCommand,
-    ["install", "--include=optional", "--no-audit", "--no-fund"],
+    npm.command,
+    npm.prefixArgs.concat(["install", "--include=optional", "--no-audit", "--no-fund"]),
     { stdio: "inherit" }
   );
   if (installResult.status !== 0) {
@@ -170,7 +224,10 @@ function runNpmInstall(reason) {
 
 function ensureNodeDependencies(plan) {
   if (plan && plan.forceFullInstall) {
-    return runNpmInstall(plan.reason || "full-bootstrap");
+    const allowSkip = plan.reason === "first-launch-on-this-system";
+    return runNpmInstall(plan.reason || "full-bootstrap", {
+      allowSkipWhenSatisfied: allowSkip
+    });
   }
 
   const missing = findMissingNodeDependencies();
