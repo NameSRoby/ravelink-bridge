@@ -1,4 +1,4 @@
-# RaveLink Bridge
+﻿# RaveLink Bridge
 
 Lightweight and powerful streamer-first local lighting engine for Philips Hue + WiZ, with Twitch-ready controls and modular brand extension via local mods.
 
@@ -16,36 +16,29 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 This repository is aligned to `v1.5.1`.
 
-## Beginner Install Guide (Windows)
+## Quick Install (Windows)
 
-1. Download:
-   - `RaveLink-Bridge-Windows-v1.5.1.zip`
-2. Extract it to a normal folder (for example: `Desktop\RaveLink-Bridge`).
-3. Install Node.js LTS:
-   - `https://nodejs.org`
-4. Run:
-   - `RaveLink-Bridge.bat`
-5. On first launch, dependency bootstrap runs automatically.
-6. Open:
-   - `http://127.0.0.1:5050`
-7. Stop safely with:
-   - `RaveLink-Bridge-Stop.bat`
-   - or `Ctrl+C` in the running terminal window
-8. Fallback only if auto-install fails:
-   - run `npm install`, then start again with `RaveLink-Bridge.bat`
+1. Download `RaveLink-Bridge-Windows-v1.5.1.zip` from Releases.
+2. Extract it.
+3. Run `RaveLink-Bridge.bat` (install Node.js LTS first if needed: `https://nodejs.org`).
+4. Open `http://127.0.0.1:5050`.
 
-## What’s New In v1.5.1
+## v1.5.1 (Compared to v1.5.0)
 
-- Smoother brightness behavior:
-  - less nervous flickering
-  - steadier transitions during normal playback
-- Richer color output:
-  - palettes are more vivid by default
-  - better visible separation between tones/colors
-- Better live control stability:
-  - per-brand/per-fixture routing menus are more responsive
-  - fixture selection/editing is less prone to interruption
-- General reliability polish on top of the v1.5 workflow.
+This is a focused polish/hotfix release. No major workflow changes, but better live behavior.
+
+- Reactivity stability:
+  - fixed cases where Hue/WiZ could stall or feel stuck during playback
+  - smoother brightness behavior with less nervous fluctuation
+- Color output quality:
+  - stronger default saturation
+  - clearer distinction between palette colors during live playback
+- Per-fixture routing usability:
+  - custom routing/override UI is more stable while editing
+  - reduced lag/interruption when selecting fixtures and applying per-fixture changes
+- Hardening and safety:
+  - stricter mod import validation
+  - cleaner/safer redistributable packaging behavior
 
 Detailed release notes:
 - `CHANGELOG.md`
@@ -75,6 +68,9 @@ RaveLink Bridge is local-first and now ships with stricter default protections:
 Optional network-access env flags (advanced users only):
 - `RAVELINK_ALLOW_REMOTE_WRITE=1`
 - `RAVELINK_ALLOW_REMOTE_PRIVILEGED_READ=1`
+
+
+> Developer note: this README is intentionally streamer-first. Developer setup and technical workflows are lower in this document under Developer Quick Start.
 
 ## Streamer Quick Start
 
@@ -531,4 +527,5 @@ Output:
 ## License
 
 ISC (`LICENSE`)
+
 
