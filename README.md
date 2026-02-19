@@ -14,32 +14,38 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 - Current Windows release (v1.5.1): https://github.com/NameSRoby/ravelink-bridge/releases/latest
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
-This repository state is aligned to `v1.5.1`:
-- Full security hardening passes applied
-- Code structure/title indexing improved for faster maintenance
+This repository is aligned to `v1.5.1`.
 
-## Update Log (v1.5.1)
+## Beginner Install Guide (Windows)
 
-- Security hardening pass:
-  - stricter mod-import path and payload validation
-  - stricter mod ID validation for `/mods/config`
-  - redistributable export now skips symlink/junction entries
-- Reactivity/color polish:
-  - brightness smoothing is less aggressive
-  - palette output is more saturated by default for stronger visual fidelity
-- Per-fixture routing UI stability improved (less interaction lag while editing custom overrides).
+1. Download:
+   - `RaveLink-Bridge-Windows-v1.5.1.zip`
+2. Extract it to a normal folder (for example: `Desktop\RaveLink-Bridge`).
+3. Install Node.js LTS:
+   - `https://nodejs.org`
+4. Run:
+   - `RaveLink-Bridge.bat`
+5. On first launch, dependency bootstrap runs automatically.
+6. Open:
+   - `http://127.0.0.1:5050`
+7. Stop safely with:
+   - `RaveLink-Bridge-Stop.bat`
+   - or `Ctrl+C` in the running terminal window
+8. Fallback only if auto-install fails:
+   - run `npm install`, then start again with `RaveLink-Bridge.bat`
 
-v1.5 baseline features retained:
-- New palette-first control flow: build shows by spectrum families (`red`, `green`, `blue`) with `1/3/5/8/12` colors, `ORDERED` sequencing, or `DISORDER` chaos.
-- Per-brand and per-fixture routing is now first-class: Hue and WiZ can run different palette/metric behavior at the same time, and single fixtures can be overridden independently.
-- Added fixture metric controls for `MANUAL` vs `META AUTO` plus harmony grouping and fixture rotation options.
-- Added per-target max update-rate clamp (`maxHz`) so you can cap aggressive fixtures while preserving proportional motion from the song.
-- Legacy genre/decade/competitive controls were retired from the user control path; v1.5 is BPM interpret + explicit palette/metric routing.
-- App-isolated audio workflow was hardened (priority/fallback app selection, periodic auto-switch checks, and process-aware capture path support).
-- Hue and WiZ output behavior was tuned for closer parity in musical feel (less static stalls, better pulse/brightness expression, stronger palette separation on WiZ).
-- Startup is more reliable on new systems: first launch performs dependency bootstrap automatically and re-checks when dependency manifests change.
-- Onboarding/help text was updated around the current workflow so setup is clearer for first-time users.
-- Security + release hygiene stayed strict: loopback-first API defaults, sensitive-log redaction, and sanitized redistributable defaults.
+## What’s New In v1.5.1
+
+- Smoother brightness behavior:
+  - less nervous flickering
+  - steadier transitions during normal playback
+- Richer color output:
+  - palettes are more vivid by default
+  - better visible separation between tones/colors
+- Better live control stability:
+  - per-brand/per-fixture routing menus are more responsive
+  - fixture selection/editing is less prone to interruption
+- General reliability polish on top of the v1.5 workflow.
 
 Detailed release notes:
 - `CHANGELOG.md`
@@ -332,16 +338,12 @@ Notes:
 
 ## Version 1.5.1 Notes
 
-- Daily-use workflow changes:
-  - Per-brand/per-fixture routing interactions are more stable during live edits.
-  - Palette output now emphasizes richer saturation for clearer color distinction.
-- Audio and fixture behavior:
-  - Brightness smoothing is slightly calmer to reduce nervous overreaction.
-  - Hue and WiZ maintain the same reactive architecture from v1.5 with tuned output polish.
-- Safety and distribution:
-  - Mod import validation is stricter (path + payload checks).
-  - Mod config writes now keep only valid mod IDs.
-  - Redistributable packaging now excludes symlink/junction traversal.
+- This release is a user-experience polish update.
+- Main focus:
+  - smoother reactivity feel
+  - stronger visual color fidelity
+  - better per-fixture routing UI behavior
+- Core v1.5 control model remains the same.
 
 For older major feature lists, see tag history under Releases.
 
