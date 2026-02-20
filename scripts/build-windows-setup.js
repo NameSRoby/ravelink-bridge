@@ -125,6 +125,8 @@ function writeInstallerScript() {
     "DefaultGroupName=RaveLink Bridge",
     "PrivilegesRequired=lowest",
     "PrivilegesRequiredOverridesAllowed=dialog",
+    "DisableDirPage=no",
+    "UsePreviousAppDir=no",
     "DisableProgramGroupPage=yes",
     "OutputDir={#OutputDir}",
     "OutputBaseFilename={#OutputBaseFilename}",
