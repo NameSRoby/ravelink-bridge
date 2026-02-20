@@ -2,21 +2,22 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-where node >nul 2>&1
-if errorlevel 1 (
-  echo [RaveLink][ERROR] Node.js is not installed or not in PATH.
-  echo Install Node.js LTS from https://nodejs.org and run again.
+set "NODE_BIN="
+set "LOCAL_NODE=%CD%\runtime\node.exe"
+if exist "%LOCAL_NODE%" (
+  set "NODE_BIN=%LOCAL_NODE%"
+) else (
+  where node >nul 2>&1
+  if not errorlevel 1 set "NODE_BIN=node"
+)
+
+if not defined NODE_BIN (
+  echo [RaveLink][ERROR] Node runtime not found.
+  echo Expected bundled runtime: runtime\node.exe
+  echo Or install Node.js LTS from https://nodejs.org
   echo.
   pause
   exit /b 1
-)
-
-set "NPM_BIN="
-where npm.cmd >nul 2>&1
-if not errorlevel 1 set "NPM_BIN=npm.cmd"
-if not defined NPM_BIN (
-  where npm >nul 2>&1
-  if not errorlevel 1 set "NPM_BIN=npm"
 )
 
 if not exist "package.json" (
@@ -27,16 +28,28 @@ if not exist "package.json" (
 )
 
 if exist "scripts\stop-bridge.js" (
-  node scripts\stop-bridge.js
+  "%NODE_BIN%" scripts\stop-bridge.js
 ) else (
-  if not defined NPM_BIN (
-    echo [RaveLink][ERROR] npm is not available in PATH.
-    echo Install Node.js LTS from https://nodejs.org and run again.
-    echo.
-    pause
-    exit /b 1
+  set "LOCAL_NPM_CLI=%CD%\runtime\node_modules\npm\bin\npm-cli.js"
+  if exist "%LOCAL_NPM_CLI%" (
+    "%NODE_BIN%" "%LOCAL_NPM_CLI%" run stop
+  ) else (
+    set "NPM_BIN="
+    where npm.cmd >nul 2>&1
+    if not errorlevel 1 set "NPM_BIN=npm.cmd"
+    if not defined NPM_BIN (
+      where npm >nul 2>&1
+      if not errorlevel 1 set "NPM_BIN=npm"
+    )
+    if not defined NPM_BIN (
+      echo [RaveLink][ERROR] npm is not available in PATH.
+      echo Install Node.js LTS from https://nodejs.org and run again.
+      echo.
+      pause
+      exit /b 1
+    )
+    call %NPM_BIN% run stop
   )
-  call %NPM_BIN% run stop
 )
 echo.
 pause

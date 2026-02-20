@@ -49,6 +49,13 @@ const SKIP_FILES = new Set([
   "AGENTS.md"
 ]);
 
+const SKIP_FILE_PATTERNS = [
+  /^RaveLink-Bridge-Windows-v[\w.\-]+\.zip$/i,
+  /^RaveLink-Bridge-Windows-v[\w.\-]+-self-contained\.zip$/i,
+  /^RaveLink-Bridge-(?:Windows-)?v?[\w.\-]+-setup-installer\.exe$/i,
+  /^RaveLink-Bridge-Setup-v[\w.\-]+\.exe$/i
+];
+
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
@@ -109,6 +116,7 @@ function copyRecursive(srcPath, dstPath, relPath = "") {
 
   const fileName = path.basename(srcPath);
   if (SKIP_FILES.has(fileName)) return;
+  if (SKIP_FILE_PATTERNS.some(pattern => pattern.test(fileName))) return;
   // Exclude common development metadata/config dotfiles from redistributable builds.
   if (fileName.startsWith(".git")) return;
   if (fileName.startsWith(".codex")) return;

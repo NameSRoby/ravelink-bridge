@@ -9,21 +9,20 @@ Primary docs:
 
 ## Beginner Install Guide (Windows)
 
-1. Download the release zip:
-- `RaveLink-Bridge-Windows-v1.5.1.zip`
-2. Extract the zip to a normal folder (for example `Desktop\RaveLink-Bridge`).
-3. Install Node.js LTS from:
-- `https://nodejs.org`
-4. Open the extracted folder and double-click:
-- `RaveLink-Bridge.bat`
-5. First launch on a new system runs a full dependency bootstrap automatically, then starts the bridge.
-6. Wait for the console to show the URL:
+1. Preferred when available, run installer:
+- `RaveLink-Bridge-Windows-v1.5.1-setup-installer.exe`
+2. ZIP fallback:
+- Prefer `RaveLink-Bridge-Windows-v1.5.1-self-contained.zip` (no preinstalled Node required)
+- Legacy/minimal package: `RaveLink-Bridge-Windows-v1.5.1.zip`
+- Extract to a normal folder (for example `Desktop\RaveLink-Bridge`)
+- Double-click `RaveLink-Bridge.bat`
+3. Wait for the console to show the URL:
 - `http://127.0.0.1:5050`
-7. If browser does not open, open that URL manually.
-8. Stop safely when done:
+4. If browser does not open, open that URL manually.
+5. Stop safely when done:
 - `RaveLink-Bridge-Stop.bat`
 - or `Ctrl+C` in the running terminal window
-9. Fallback only if auto-install fails:
+6. ZIP-only fallback if dependencies are missing:
 - open terminal in that folder and run `npm install`, then run `RaveLink-Bridge.bat` again
 
 ## CPU Compatibility Note
@@ -47,6 +46,8 @@ Primary docs:
 - Windows:
   - `RaveLink-Bridge.bat`
   - Stop with `RaveLink-Bridge-Stop.bat`
+- Build Windows installer from source:
+  - `npm run build:setup:windows`
 - Linux/macOS source run (experimental):
   - `bash RaveLink-Bridge.sh`
   - Stop with `bash RaveLink-Bridge-Stop.sh`

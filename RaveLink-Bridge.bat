@@ -4,10 +4,19 @@ cd /d "%~dp0"
 
 echo [RaveLink] Starting launcher in "%CD%"
 
-where node >nul 2>&1
-if errorlevel 1 (
-  echo [RaveLink][ERROR] Node.js is not installed or not in PATH.
-  echo Install Node.js LTS from https://nodejs.org and run this file again.
+set "NODE_BIN="
+set "LOCAL_NODE=%CD%\runtime\node.exe"
+if exist "%LOCAL_NODE%" (
+  set "NODE_BIN=%LOCAL_NODE%"
+) else (
+  where node >nul 2>&1
+  if not errorlevel 1 set "NODE_BIN=node"
+)
+
+if not defined NODE_BIN (
+  echo [RaveLink][ERROR] Node runtime not found.
+  echo Expected bundled runtime: runtime\node.exe
+  echo Or install Node.js LTS from https://nodejs.org
   echo.
   pause
   exit /b 1
@@ -30,23 +39,28 @@ echo [RaveLink] Bridge URL: http://127.0.0.1:5050
 echo [RaveLink] Press Ctrl+C in this window to stop the bridge.
 echo.
 if exist "scripts\start-bridge.js" (
-  node scripts\start-bridge.js
+  "%NODE_BIN%" scripts\start-bridge.js
 ) else (
-  set "NPM_BIN="
-  where npm.cmd >nul 2>&1
-  if not errorlevel 1 set "NPM_BIN=npm.cmd"
-  if not defined NPM_BIN (
-    where npm >nul 2>&1
-    if not errorlevel 1 set "NPM_BIN=npm"
+  set "LOCAL_NPM_CLI=%CD%\runtime\node_modules\npm\bin\npm-cli.js"
+  if exist "%LOCAL_NPM_CLI%" (
+    "%NODE_BIN%" "%LOCAL_NPM_CLI%" start
+  ) else (
+    set "NPM_BIN="
+    where npm.cmd >nul 2>&1
+    if not errorlevel 1 set "NPM_BIN=npm.cmd"
+    if not defined NPM_BIN (
+      where npm >nul 2>&1
+      if not errorlevel 1 set "NPM_BIN=npm"
+    )
+    if not defined NPM_BIN (
+      echo [RaveLink][ERROR] npm is not available in PATH.
+      echo Reinstall Node.js LTS from https://nodejs.org and run this file again.
+      echo.
+      pause
+      exit /b 1
+    )
+    call %NPM_BIN% start
   )
-  if not defined NPM_BIN (
-    echo [RaveLink][ERROR] npm is not available in PATH.
-    echo Reinstall Node.js LTS from https://nodejs.org and run this file again.
-    echo.
-    pause
-    exit /b 1
-  )
-  call %NPM_BIN% start
 )
 set "EXIT_CODE=%ERRORLEVEL%"
 

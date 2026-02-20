@@ -184,6 +184,25 @@ function deleteFile(filePath) {
   } catch {}
 }
 
+function removeRootReleaseArtifacts(root) {
+  if (!fs.existsSync(root)) return;
+  const releaseArtifactPattern = /^RaveLink-Bridge-(?:Windows-)?v?[\w.\-]+(?:-self-contained)?\.zip$/i;
+  const setupArtifactPattern = /^RaveLink-Bridge-(?:Windows-)?v?[\w.\-]+-setup-installer\.exe$/i;
+  const legacySetupPattern = /^RaveLink-Bridge-Setup-v[\w.\-]+\.exe$/i;
+
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const name = entry.name;
+    if (
+      releaseArtifactPattern.test(name) ||
+      setupArtifactPattern.test(name) ||
+      legacySetupPattern.test(name)
+    ) {
+      deleteFile(path.join(root, name));
+    }
+  }
+}
+
 function sanitizeRoot(rootDir = DEFAULT_ROOT) {
   const root = path.resolve(String(rootDir || DEFAULT_ROOT));
   wipeFolder(path.join(root, ".runtime"));
@@ -192,6 +211,7 @@ function sanitizeRoot(rootDir = DEFAULT_ROOT) {
   wipeFolder(path.join(root, "core", "backups"));
   wipeFolder(path.join(root, "release"));
   wipeFolder(path.join(root, ARCHIVE_DIRNAME));
+  removeRootReleaseArtifacts(root);
   deleteFile(path.join(root, "core", ".core-lock.key"));
   deleteFile(path.join(root, "core", "audio.process-locks.json"));
 

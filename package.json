@@ -9,6 +9,7 @@
     "stop": "node scripts/stop-bridge.js",
     "sanitize:release": "node scripts/sanitize-release.js",
     "export:redistributable": "node scripts/export-redistributable.js",
+    "build:setup:windows": "node scripts/build-windows-setup.js",
     "core:lock": "node scripts/core-lock.js lock",
     "core:unlock": "node scripts/core-lock.js unlock",
     "core:lock:status": "node scripts/core-lock.js status",

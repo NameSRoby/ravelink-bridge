@@ -18,9 +18,9 @@ This repository is aligned to `v1.5.1`.
 
 ## Quick Install (Windows)
 
-1. Download `RaveLink-Bridge-Windows-v1.5.1.zip` from Releases.
-2. Extract it.
-3. Run `RaveLink-Bridge.bat` (install Node.js LTS first if needed: `https://nodejs.org`).
+1. Preferred when available: download `RaveLink-Bridge-Windows-v1.5.1-setup-installer.exe` and run it.
+2. ZIP fallback: download `RaveLink-Bridge-Windows-v1.5.1.zip` from Releases and extract it.
+3. Run `RaveLink-Bridge.bat`.
 4. Open `http://127.0.0.1:5050`.
 
 ## v1.5.1 (Compared to v1.5.0)
@@ -504,6 +504,20 @@ Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.1\* -DestinationPa
 
 Output:
 - `release/RaveLink-Bridge-Windows-v1.5.1`
+
+### Setup EXE Build (Windows)
+
+Use this to produce a self-contained installer payload (bundled `node_modules` + local Node runtime) and compile a setup EXE when Inno Setup is installed.
+
+```powershell
+npm run build:setup:windows
+```
+
+Outputs:
+- `release/RaveLink-Bridge-Windows-v1.5.1`
+- `release/RaveLink-Bridge-Windows-v1.5.1-self-contained.zip`
+- `release/installer/RaveLink-Bridge-Windows-v1.5.1-setup-installer.iss`
+- `release/RaveLink-Bridge-Windows-v1.5.1-setup-installer.exe` (when `ISCC.exe` is available)
 
 ## Security And Data Hygiene
 
