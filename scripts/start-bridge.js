@@ -224,8 +224,13 @@ function runNpmInstall(reason, options = {}) {
 
 function ensureNodeDependencies(plan) {
   if (plan && plan.forceFullInstall) {
+    const missing = findMissingNodeDependencies();
+    if (!missing.length) {
+      console.log(`[BOOT] Node dependencies already present; skipping npm install (${plan.reason}).`);
+      return true;
+    }
     const allowSkip = plan.reason === "first-launch-on-this-system";
-    return runNpmInstall(plan.reason || "full-bootstrap", {
+    return runNpmInstall(`${plan.reason || "full-bootstrap"}:missing-${missing.length}`, {
       allowSkipWhenSatisfied: allowSkip
     });
   }
