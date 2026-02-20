@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.5.1 - Twitch Color Routing + Hue Busy Status Fixes (2026-02-20)
+
+### Twitch Command Reliability
+- Restored legacy `GET /color` compatibility so older StreamElements widget templates keep working.
+- Updated bundled Twitch widget templates to send `POST /color` JSON payloads (current preferred path).
+- Added `/color` guard so commands are rejected while RAVE is active (prevents command overlap with live engine output).
+- Added off-rave color routing fallback to `ENGINE`-routed fixtures when no `TWITCH`-enabled fixtures are configured.
+
+### Hue/Engine Status UX
+- Removed noisy transient `ENGINE BUSY` health state caused by in-flight Hue sends.
+- Simplified active Hue Entertainment status text to `ENT ON` for clearer runtime state.
+
 ## v1.5.1 - Security Hardening + Reactivity Polish (2026-02-19)
 
 ### Security + Sanity

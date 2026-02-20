@@ -2116,6 +2116,14 @@ function listTwitchFixtures(brand, zone) {
   return listFixturesByModeScoped("twitch", brand, zone, { requireConfigured: true });
 }
 
+function listColorCommandFixtures(brand, zone) {
+  const twitchFixtures = listTwitchFixtures(brand, zone);
+  if (twitchFixtures.length || state.isLockedBy("rave")) {
+    return twitchFixtures;
+  }
+  return listEngineFixtures(brand, zone);
+}
+
 function listCustomFixtures(brand, zone) {
   return listFixturesByModeScoped("custom", brand, zone, { requireConfigured: true });
 }
@@ -8154,7 +8162,7 @@ function splitPrefixedColorText(rawText, prefixes = {}, fixturePrefixes = {}) {
 function resolveTwitchFixtureById(fixtureId) {
   const targetId = String(fixtureId || "").trim();
   if (!targetId) return null;
-  const fixtures = listTwitchFixtures("", "");
+  const fixtures = listColorCommandFixtures("", "");
   for (const fixture of fixtures) {
     if (String(fixture?.id || "").trim() === targetId) return fixture;
   }
@@ -8384,6 +8392,16 @@ function sendWizStateToFixtures(fixtures = [], wizState = {}) {
 }
 
 async function applyColorText(rawText, options = {}) {
+  if (state.isLockedBy("rave")) {
+    return {
+      ok: false,
+      target: null,
+      usedPrefix: null,
+      fixtureTargetId: null,
+      error: "rave active; /color is disabled while RAVE is on"
+    };
+  }
+
   const commandConfig = getTwitchColorConfigSnapshot();
   const prefixed = splitPrefixedColorText(
     rawText,
@@ -8465,13 +8483,13 @@ async function applyColorText(rawText, options = {}) {
         options.hueZone || options.zone || fixtureRegistry.resolveZone("TWITCH_HUE") || "hue",
         "hue",
         "hue",
-        listTwitchFixtures,
+        listColorCommandFixtures,
         { mode: "twitch" }
       );
     response.hueZones = hueZones;
     const hueFixtures = fixedFixture
       ? (String(fixedFixture.brand || "").trim().toLowerCase() === "hue" ? [fixedFixture] : [])
-      : collectFixturesByZones(listTwitchFixtures, "hue", hueZones);
+      : collectFixturesByZones(listColorCommandFixtures, "hue", hueZones);
     response.hueTargets = hueFixtures.length;
     if (hueFixtures.length) {
       await sendHueStateToFixtures(hueFixtures, directive.hueState);
@@ -8485,13 +8503,13 @@ async function applyColorText(rawText, options = {}) {
         options.wizZone || options.zone || fixtureRegistry.resolveZone("TWITCH_WIZ") || "wiz",
         "wiz",
         "wiz",
-        listTwitchFixtures,
+        listColorCommandFixtures,
         { mode: "twitch" }
       );
     response.wizZones = wizZones;
     const wizFixtures = fixedFixture
       ? (String(fixedFixture.brand || "").trim().toLowerCase() === "wiz" ? [fixedFixture] : [])
-      : collectFixturesByZones(listTwitchFixtures, "wiz", wizZones);
+      : collectFixturesByZones(listColorCommandFixtures, "wiz", wizZones);
     response.wizTargets = wizFixtures.length;
     if (wizFixtures.length) {
       sendWizStateToFixtures(wizFixtures, directive.wizState);
@@ -8779,24 +8797,25 @@ app.post("/color/prefixes", (req, res) => {
   });
 });
 
-app.get("/color", (_, res) => {
-  res.status(405).json({
-    ok: false,
-    error: "method_not_allowed",
-    detail: "Use POST /color."
-  });
-});
-
-app.post("/color", (req, res) => {
+function handleColorRequest(req, res) {
   const text = getCompatText(req);
   applyColorText(text, getColorRequestOptions(req))
     .then(result => {
-      res.json({ ok: result.ok, text, ...result });
+      if (result.ok) {
+        res.json({ ok: true, text, ...result });
+        return;
+      }
+      const message = String(result.error || "").toLowerCase();
+      const status = message.includes("rave active") ? 409 : 200;
+      res.status(status).json({ ok: false, text, ...result });
     })
     .catch(err => {
       res.status(500).json({ ok: false, text, error: err.message || String(err) });
     });
-});
+}
+
+app.get("/color", handleColorRequest);
+app.post("/color", handleColorRequest);
 
 function parsePaletteFamiliesInput(raw) {
   if (Array.isArray(raw)) {

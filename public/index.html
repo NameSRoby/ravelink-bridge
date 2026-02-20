@@ -16733,7 +16733,7 @@ async function poll(options = {}) {
   const activeEnt = h.transportActive === "entertainment" || h?.entertainment?.active === true;
   let hueStateText = "REST";
   if (activeEnt) {
-    hueStateText = h.inflight ? "ENT ON BUSY" : "ENT ON";
+    hueStateText = "ENT ON";
   } else if (desiredEnt) {
     hueStateText = h.transportFallbackReason ? "ENT RETRY" : "ENT WAIT";
   } else if (h.transportFallbackReason) {
@@ -16748,8 +16748,6 @@ async function poll(options = {}) {
 
   if (h.transportDesired === "entertainment" && h.transportActive !== "entertainment") {
     setBadge(el.health, "warn", "HUE ENT FALLBACK");
-  } else if (h.inflight) {
-    setBadge(el.health, "warn", "ENGINE BUSY");
   } else {
     setBadge(el.health, "ok", "ENGINE OK");
   }

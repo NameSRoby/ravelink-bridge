@@ -137,7 +137,7 @@ test("genre routes are fully removed", { concurrency: false }, async () => {
   assert.equal(removed.data, null);
 });
 
-test("mutating command GET routes stay disabled", { concurrency: false }, async () => {
+test("mutating command GET routes stay disabled (except legacy /color compatibility)", { concurrency: false }, async () => {
   const raveOn = await requestJson(`${BASE_URL}/rave/on`, { method: "GET" });
   assert.equal(raveOn.response.status, 405);
   assert.equal(raveOn.data?.error, "method_not_allowed");
@@ -147,8 +147,9 @@ test("mutating command GET routes stay disabled", { concurrency: false }, async 
   assert.equal(teach.data?.error, "method_not_allowed");
 
   const color = await requestJson(`${BASE_URL}/color`, { method: "GET" });
-  assert.equal(color.response.status, 405);
-  assert.equal(color.data?.error, "method_not_allowed");
+  assert.equal(color.response.status, 200);
+  assert.equal(Boolean(color.data?.ok), false);
+  assert.equal(color.data?.error, "missing color text");
 });
 
 test("audio config supports strict app isolation + custom check interval", { concurrency: false }, async () => {

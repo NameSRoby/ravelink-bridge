@@ -82,7 +82,12 @@ window.addEventListener("onEventReceived", obj => {
   if (rewardID !== COLOR_REWARD_ID) return;
 
   fetch(
-    `${BASE_URL}/color?value1=${encodeURIComponent(rawText)}`,
-    { mode: "no-cors" }
+    `${BASE_URL}/color`,
+    {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value1: rawText })
+    }
   ).catch(() => {});
 });
