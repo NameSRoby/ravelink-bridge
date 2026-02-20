@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.1 - Twitch Rave Activation Text Gate Clarification (2026-02-20)
+
+### Twitch Reward Behavior
+- Added configurable `RAVE_ACTIVATE_TEXT` handling in StreamElements templates.
+- `RAVE_ACTIVATE_TEXT = "on"` now acts as a wildcard gate for any non-empty user-entered text.
+- Empty gate (`""`) keeps unconditional activation for the configured RAVE reward ID.
+- Non-empty custom gate values still require exact case-insensitive text match.
+
 ## v1.5.1 - Twitch Color Routing + Hue Busy Status Fixes (2026-02-20)
 
 ### Twitch Command Reliability
