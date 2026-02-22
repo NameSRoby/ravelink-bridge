@@ -28,6 +28,84 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
   const getEngine = typeof deps.getEngine === "function"
     ? deps.getEngine
     : () => deps.engine || null;
+  const hasOwn = (source, key) => Object.prototype.hasOwnProperty.call(source, key);
+  const PALETTE_PATCH_ALLOWED = Object.freeze([
+    "colorsPerFamily",
+    "families",
+    "disorder",
+    "disorderAggression",
+    "cycleMode",
+    "timedIntervalSec",
+    "beatLock",
+    "beatLockGraceSec",
+    "reactiveMargin",
+    "brightnessMode",
+    "brightnessFollowAmount",
+    "vividness",
+    "spectrumMapMode",
+    "spectrumFeatureMap",
+    "brand",
+    "fixtureId",
+    "clearOverride"
+  ]);
+  const METRIC_PATCH_ALLOWED = Object.freeze([
+    "mode",
+    "metric",
+    "metaAutoFlip",
+    "harmonySize",
+    "maxHz",
+    "brand",
+    "fixtureId",
+    "clearOverride"
+  ]);
+
+  function resolveRequestedBrand(patch) {
+    const requestedBrandRaw = hasOwn(patch, "brand")
+      ? String(patch.brand || "").trim().toLowerCase()
+      : "";
+    return {
+      requestedBrandRaw,
+      requestedBrand: normalizePaletteBrandKey(requestedBrandRaw)
+    };
+  }
+
+  function respondInvalidMetricPatch(res, patch) {
+    const invalidFieldSpecs = [
+      {
+        key: "__invalidMode",
+        body: value => ({ ok: false, error: "invalid mode", value, allowed: FIXTURE_METRIC_MODE_ORDER })
+      },
+      {
+        key: "__invalidMetric",
+        body: value => ({ ok: false, error: "invalid metric", value, allowed: FIXTURE_METRIC_KEYS })
+      },
+      {
+        key: "__invalidHarmonySize",
+        body: value => ({
+          ok: false,
+          error: "invalid harmonySize",
+          value,
+          allowedRange: [FIXTURE_METRIC_HARMONY_MIN, FIXTURE_METRIC_HARMONY_MAX]
+        })
+      },
+      {
+        key: "__invalidMaxHz",
+        body: value => ({
+          ok: false,
+          error: "invalid maxHz",
+          value,
+          allowedRange: [FIXTURE_METRIC_MAX_HZ_MIN, FIXTURE_METRIC_MAX_HZ_MAX],
+          allowNull: true
+        })
+      }
+    ];
+    for (const spec of invalidFieldSpecs) {
+      if (!hasOwn(patch, spec.key)) continue;
+      res.status(400).json(spec.body(patch[spec.key]));
+      return true;
+    }
+    return false;
+  }
 
   app.get("/rave/palette", (_, res) => {
     res.json(buildPaletteRuntimeSnapshot());
@@ -36,10 +114,7 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
   app.post("/rave/palette", (req, res) => {
     const patch = collectPalettePatch(req);
     const fixtureId = String(patch.fixtureId || "").trim();
-    const requestedBrandRaw = Object.prototype.hasOwnProperty.call(patch, "brand")
-      ? String(patch.brand || "").trim().toLowerCase()
-      : "";
-    const requestedBrand = normalizePaletteBrandKey(requestedBrandRaw);
+    const { requestedBrandRaw, requestedBrand } = resolveRequestedBrand(patch);
     const clearRequested = parseBooleanLoose(patch.clearOverride, false) === true;
     const hasPaletteFields = hasPalettePatchFields(patch);
 
@@ -56,7 +131,7 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
       res.status(400).json({
         ok: false,
         error: "no valid palette fields",
-        allowed: ["colorsPerFamily", "families", "disorder", "disorderAggression", "brand", "fixtureId", "clearOverride"]
+        allowed: PALETTE_PATCH_ALLOWED
       });
       return;
     }
@@ -90,7 +165,8 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
           : "none";
         console.log(
           `[RAVE] fixture palette override ${result.fixtureId} (${result.brand}) = ${familyLabel || "none"} x${result.config?.colorsPerFamily} ` +
-          `disorder=${result.config?.disorder ? "on" : "off"} ${Math.round(Number(result.config?.disorderAggression || 0) * 100)}%`
+          `disorder=${result.config?.disorder ? "on" : "off"} ${Math.round(Number(result.config?.disorderAggression || 0) * 100)}% ` +
+          `mode=${result.config?.cycleMode || "on_trigger"}`
         );
       }
 
@@ -101,7 +177,7 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
     const enginePatch = {};
     if (requestedBrand) enginePatch.brand = requestedBrand;
     for (const key of PALETTE_PATCH_FIELDS) {
-      if (Object.prototype.hasOwnProperty.call(patch, key)) {
+      if (hasOwn(patch, key)) {
         enginePatch[key] = patch[key];
       }
     }
@@ -131,7 +207,8 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
     } else {
       console.log(
         `[RAVE] palette ${scopeLabel} = ${familyLabel || "none"} x${scoped?.colorsPerFamily} ` +
-        `disorder=${scoped?.disorder ? "on" : "off"} ${Math.round(Number(scoped?.disorderAggression || 0) * 100)}%`
+        `disorder=${scoped?.disorder ? "on" : "off"} ${Math.round(Number(scoped?.disorderAggression || 0) * 100)}% ` +
+        `mode=${scoped?.cycleMode || "on_trigger"}`
       );
     }
     res.json(buildPaletteRuntimeSnapshot(next));
@@ -149,48 +226,11 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
   app.post("/rave/fixture-metrics", (req, res) => {
     const patch = collectFixtureMetricPatch(req);
     const fixtureId = String(patch.fixtureId || "").trim();
-    const requestedBrandRaw = Object.prototype.hasOwnProperty.call(patch, "brand")
-      ? String(patch.brand || "").trim().toLowerCase()
-      : "";
-    const requestedBrand = normalizePaletteBrandKey(requestedBrandRaw);
+    const { requestedBrandRaw, requestedBrand } = resolveRequestedBrand(patch);
     const clearRequested = parseBooleanLoose(patch.clearOverride, false) === true;
     const hasMetricFields = hasFixtureMetricPatchFields(patch);
 
-    if (Object.prototype.hasOwnProperty.call(patch, "__invalidMode")) {
-      res.status(400).json({
-        ok: false,
-        error: "invalid mode",
-        value: patch.__invalidMode,
-        allowed: FIXTURE_METRIC_MODE_ORDER
-      });
-      return;
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "__invalidMetric")) {
-      res.status(400).json({
-        ok: false,
-        error: "invalid metric",
-        value: patch.__invalidMetric,
-        allowed: FIXTURE_METRIC_KEYS
-      });
-      return;
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "__invalidHarmonySize")) {
-      res.status(400).json({
-        ok: false,
-        error: "invalid harmonySize",
-        value: patch.__invalidHarmonySize,
-        allowedRange: [FIXTURE_METRIC_HARMONY_MIN, FIXTURE_METRIC_HARMONY_MAX]
-      });
-      return;
-    }
-    if (Object.prototype.hasOwnProperty.call(patch, "__invalidMaxHz")) {
-      res.status(400).json({
-        ok: false,
-        error: "invalid maxHz",
-        value: patch.__invalidMaxHz,
-        allowedRange: [FIXTURE_METRIC_MAX_HZ_MIN, FIXTURE_METRIC_MAX_HZ_MAX],
-        allowNull: true
-      });
+    if (respondInvalidMetricPatch(res, patch)) {
       return;
     }
 
@@ -207,7 +247,7 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
       res.status(400).json({
         ok: false,
         error: "no valid metric fields",
-        allowed: ["mode", "metric", "metaAutoFlip", "harmonySize", "maxHz", "brand", "fixtureId", "clearOverride"]
+        allowed: METRIC_PATCH_ALLOWED
       });
       return;
     }
@@ -271,10 +311,7 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
   app.post("/rave/fixture-routing/clear", (req, res) => {
     const patch = collectFixtureRoutingClearPatch(req);
     const fixtureId = String(patch.fixtureId || "").trim();
-    const requestedBrandRaw = Object.prototype.hasOwnProperty.call(patch, "brand")
-      ? String(patch.brand || "").trim().toLowerCase()
-      : "";
-    const requestedBrand = normalizePaletteBrandKey(requestedBrandRaw);
+    const { requestedBrandRaw, requestedBrand } = resolveRequestedBrand(patch);
 
     if (requestedBrandRaw && !requestedBrand) {
       res.status(400).json({

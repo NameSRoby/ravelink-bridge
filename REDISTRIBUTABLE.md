@@ -1,7 +1,7 @@
 # RaveLink Bridge Redistributable Notes
 
 This file mirrors high-level usage guidance for packaged/source redistribution.
-Release note: `v1.5.1` continues the v1.5 baseline with additional security hardening and reactivity polish.
+Release note: `v1.5.2` is a hotfix rollup focused on metric-reactive behavior, brightness stability, and safer release packaging.
 
 Primary docs:
 - `README.md` (full setup + runtime usage)
@@ -10,10 +10,10 @@ Primary docs:
 ## Beginner Install Guide (Windows)
 
 1. Preferred when available, run installer:
-- `RaveLink-Bridge-Windows-v1.5.1-setup-installer.exe`
+- `RaveLink-Bridge-Windows-v1.5.2-setup-installer.exe`
 2. ZIP fallback:
-- Prefer `RaveLink-Bridge-Windows-v1.5.1-self-contained.zip` (no preinstalled Node required)
-- Legacy/minimal package: `RaveLink-Bridge-Windows-v1.5.1.zip`
+- Prefer `RaveLink-Bridge-Windows-v1.5.2-self-contained.zip` (no preinstalled Node required)
+- Legacy/minimal package: `RaveLink-Bridge-Windows-v1.5.2.zip`
 - Extract to a normal folder (for example `Desktop\RaveLink-Bridge`)
 - Double-click `RaveLink-Bridge.bat`
 3. Wait for the console to show the URL:
@@ -33,13 +33,12 @@ Primary docs:
 
 ## Startup Dependency Bootstrap
 
-- On first launch on a new system, the launcher preflight runs full dependency bootstrap:
-- Node dependency tree (`npm install`, including optional deps).
-- Windows audio helper dependencies for app/process loopback workflows:
-  - `ffmpeg`
-  - `Python 3.13`
-  - Python packages: `proc-tap`, `psutil`
-- Dependency manifest changes (`package.json` / `package-lock.json`) trigger re-bootstrap automatically.
+- Self-contained installer/ZIP builds now default to verify-only startup:
+  - No automatic `npm`, `winget`, or `pip` downloads on normal launch.
+  - Bundled runtime + bundled `node_modules` are used directly.
+- Source/minimal builds still support full bootstrap when enabled.
+- Optional advanced Windows audio tools can be installed manually via:
+  - `RaveLink-Bridge-Install-Optional-Audio-Tools.bat`
 
 ## Quick Launch
 

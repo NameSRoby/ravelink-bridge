@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 
 const DEFAULT_ROOT = path.join(__dirname, "..");
-const ARCHIVE_DIRNAME = "RaveLink-Bridge-Windows-v1.4.1-EXTRACT-FIRST.BAK-20260214-0139";
+const EXTRACT_ARCHIVE_DIR_RE = /-EXTRACT-FIRST(?:\.BAK-\d{8}-\d{3,6})?$/i;
 
 const FIXTURES_TEMPLATE = {
   intentRoutes: {
@@ -31,12 +31,10 @@ const FIXTURES_TEMPLATE = {
       lightId: 1
     },
     {
-      id: "wiz-background-1",
+      id: "wiz-main-1",
       brand: "wiz",
-      zone: "background",
+      zone: "wiz",
       enabled: true,
-      controlMode: "engine",
-      engineBinding: "wiz",
       engineEnabled: true,
       twitchEnabled: true,
       customEnabled: false,
@@ -45,12 +43,10 @@ const FIXTURES_TEMPLATE = {
     {
       id: "wiz-custom-1",
       brand: "wiz",
-      zone: "desk",
+      zone: "custom",
       enabled: true,
-      controlMode: "standalone",
-      engineBinding: "standalone",
       engineEnabled: false,
-      twitchEnabled: false,
+      twitchEnabled: true,
       customEnabled: true,
       ip: "192.168.x.x"
     }
@@ -60,6 +56,7 @@ const FIXTURES_TEMPLATE = {
 const TWITCH_COLOR_TEMPLATE = {
   version: 1,
   defaultTarget: "hue",
+  autoDefaultTarget: true,
   prefixes: {
     hue: "",
     wiz: "wiz",
@@ -176,6 +173,15 @@ function wipeFolder(folderPath) {
   fs.rmSync(folderPath, { recursive: true, force: true });
 }
 
+function wipeMatchingDirs(rootPath, matcher) {
+  if (!fs.existsSync(rootPath)) return;
+  for (const entry of fs.readdirSync(rootPath, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (!matcher(entry.name)) continue;
+    wipeFolder(path.join(rootPath, entry.name));
+  }
+}
+
 function deleteFile(filePath) {
   try {
     if (fs.existsSync(filePath)) {
@@ -203,22 +209,36 @@ function removeRootReleaseArtifacts(root) {
   }
 }
 
-function sanitizeRoot(rootDir = DEFAULT_ROOT) {
+function sanitizeRoot(rootDir = DEFAULT_ROOT, options = {}) {
   const root = path.resolve(String(rootDir || DEFAULT_ROOT));
-  wipeFolder(path.join(root, ".runtime"));
-  wipeFolder(path.join(root, "backup"));
-  wipeFolder(path.join(root, "backups"));
-  wipeFolder(path.join(root, "core", "backups"));
-  wipeFolder(path.join(root, "release"));
-  wipeFolder(path.join(root, ARCHIVE_DIRNAME));
-  removeRootReleaseArtifacts(root);
+  const opts = {
+    purgeRuntime: options.purgeRuntime !== false,
+    purgeBackups: options.purgeBackups !== false,
+    purgeRelease: options.purgeRelease !== false,
+    pruneRootArtifacts: options.pruneRootArtifacts !== false
+  };
+
+  if (opts.purgeRuntime) {
+    wipeFolder(path.join(root, ".runtime"));
+  }
+  if (opts.purgeBackups) {
+    wipeFolder(path.join(root, "backup"));
+    wipeFolder(path.join(root, "backups"));
+    wipeFolder(path.join(root, "core", "backups"));
+    deleteFile(path.join(root, "core", "fixtures.config.local.backup.json"));
+  }
+  if (opts.purgeRelease) {
+    wipeFolder(path.join(root, "release"));
+  }
+  wipeMatchingDirs(root, name => EXTRACT_ARCHIVE_DIR_RE.test(String(name || "")));
+  if (opts.pruneRootArtifacts) {
+    removeRootReleaseArtifacts(root);
+  }
   deleteFile(path.join(root, "core", ".core-lock.key"));
   deleteFile(path.join(root, "core", "audio.process-locks.json"));
 
   const fixturesPath = path.join(root, "core", "fixtures.config.json");
   writeJson(fixturesPath, FIXTURES_TEMPLATE);
-  const fixturesLocalBackupPath = path.join(root, "core", "fixtures.config.local.backup.json");
-  writeJson(fixturesLocalBackupPath, FIXTURES_TEMPLATE);
   const twitchColorConfigPath = path.join(root, "core", "twitch.color.config.json");
   writeJson(twitchColorConfigPath, TWITCH_COLOR_TEMPLATE);
   const audioRuntimeConfigPath = path.join(root, "core", "audio.config.json");
@@ -237,21 +257,26 @@ function sanitizeRoot(rootDir = DEFAULT_ROOT) {
   console.log(`[sanitize-release] sanitized root: ${root}`);
 }
 
-function sanitizeRelease(rootDir = DEFAULT_ROOT) {
+function sanitizeRelease(rootDir = DEFAULT_ROOT, options = {}) {
   const root = path.resolve(String(rootDir || DEFAULT_ROOT));
-  sanitizeRoot(root);
+  sanitizeRoot(root, options);
 
   // Mirror repo used for publish workflows; sanitize it too if present.
   const pushMirror = path.join(root, ".pushrepo");
   if (fs.existsSync(pushMirror) && fs.statSync(pushMirror).isDirectory()) {
-    sanitizeRoot(pushMirror);
+    sanitizeRoot(pushMirror, options);
   }
 
   console.log("[sanitize-release] done");
 }
 
 if (require.main === module) {
-  sanitizeRelease(DEFAULT_ROOT);
+  const argSet = new Set(process.argv.slice(2).map(arg => String(arg || "").trim().toLowerCase()));
+  const keepBackupsByFlag = argSet.has("--keep-backups");
+  const keepBackupsByEnv = String(process.env.RAVELINK_SANITIZE_KEEP_BACKUPS || "").trim() === "1";
+  sanitizeRelease(DEFAULT_ROOT, {
+    purgeBackups: !(keepBackupsByFlag || keepBackupsByEnv)
+  });
 }
 
 module.exports = sanitizeRelease;

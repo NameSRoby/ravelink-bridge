@@ -20,10 +20,12 @@
 const fs = require("fs");
 const path = require("path");
 const dns = require("dns");
-const net = require("net");
 const tls = require("tls");
 const https = require("https");
 const axios = require("axios");
+const { isPrivateOrLoopbackIpv4 } = require("./utils/private-ipv4");
+const { redactSensitiveLogValue } = require("./utils/log-redaction");
+const { hsvToRgb255: convertHsvToRgb255 } = require("./utils/hsv-rgb");
 
 // [TITLE] Section: Runtime State + Security Flags
 const nativeDnsLookup = dns.lookup.bind(dns);
@@ -36,17 +38,6 @@ const HUE_ENT_ENABLE_ORIGINAL_START_FALLBACK =
   String(process.env.RAVE_HUE_ENT_ORIGINAL_START_FALLBACK || "1").trim() !== "0";
 const HUE_ENT_VERBOSE_LOGS = String(process.env.RAVE_HUE_ENT_VERBOSE_LOGS || "").trim() === "1";
 let hueInsecureTlsWarningLogged = false;
-
-const SENSITIVE_LOG_KEY_RE = /(client[\s_-]*key|clientkey|client_key|app[\s_-]*key|user[\s_-]*name|username|authorization|token|password|api[_-]?key|secret|cookie|set-cookie|bridge[\s_-]*id|bridgeid|entertainment[\s_-]*area(?:[\s_-]*id)?|entertainmentareaid)\s*[=:]\s*([^\s,;|]+)/gi;
-const SENSITIVE_LOG_JSON_KEY_RE = /("(?:clientkey|client_key|app[_-]?key|username|user[_-]?name|authorization|token|password|api[_-]?key|secret|cookie|set-cookie|bridgeid|bridge[_-]?id|entertainmentareaid|entertainment[_-]?area(?:[_-]?id)?)"\s*:\s*")([^"]*)(")/gi;
-const SENSITIVE_LOG_HEX_RE = /\b[a-f0-9]{24,}\b/gi;
-const SENSITIVE_LOG_BRIDGE_HEX_RE = /\b[a-f0-9]{16}\b/gi;
-const SENSITIVE_LOG_UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
-const SENSITIVE_LOG_LONG_TOKEN_RE = /\b[a-z0-9_-]{20,}\b/gi;
-const SENSITIVE_LOG_IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
-const SENSITIVE_LOG_API_SEGMENT_RE = /(\/api\/)([^\/\s?]+)/gi;
-const SENSITIVE_LOG_QUERY_RE = /([?&](?:token|apikey|api_key|clientkey|client_key|username|password|authorization)=)[^&\s]+/gi;
-const SENSITIVE_LOG_BEARER_RE = /(bearer\s+)[a-z0-9._~+/-]+/gi;
 
 // [TITLE] Section: Path/Host + TLS CA Helpers
 function resolveHueSyncModuleDir() {
@@ -80,46 +71,7 @@ function logHueEntVerbose(log = console, ...args) {
   log.log?.(...args);
 }
 
-// [TITLE] Section: IPv4 Private/Loopback Guard
-function parseIpv4Parts(value) {
-  const text = String(value || "").trim();
-  if (net.isIP(text) !== 4) return null;
-  const parts = text.split(".").map(part => Number(part));
-  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) {
-    return null;
-  }
-  return parts;
-}
-
-function isPrivateOrLoopbackIpv4(value) {
-  const parts = parseIpv4Parts(value);
-  if (!parts) return false;
-  const [a, b] = parts;
-  if (a === 10) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 127) return true;
-  return false;
-}
-
 // [TITLE] Section: Log Redaction Helpers
-function redactSensitiveLogValue(value, fallback = "unknown") {
-  let text = String(value || "").trim();
-  if (!text) return fallback;
-  text = text.replace(SENSITIVE_LOG_KEY_RE, (_, key) => `${key}=[redacted]`);
-  text = text.replace(SENSITIVE_LOG_JSON_KEY_RE, (_, lead, __, tail) => `${lead}[redacted]${tail}`);
-  text = text.replace(SENSITIVE_LOG_QUERY_RE, (_, prefix) => `${prefix}[redacted]`);
-  text = text.replace(SENSITIVE_LOG_BEARER_RE, (_, prefix) => `${prefix}[redacted]`);
-  text = text.replace(SENSITIVE_LOG_API_SEGMENT_RE, (_, lead) => `${lead}[redacted]`);
-  text = text.replace(SENSITIVE_LOG_BRIDGE_HEX_RE, "[redacted-id]");
-  text = text.replace(SENSITIVE_LOG_UUID_RE, "[redacted-id]");
-  text = text.replace(SENSITIVE_LOG_HEX_RE, "[redacted]");
-  text = text.replace(SENSITIVE_LOG_LONG_TOKEN_RE, "[redacted]");
-  text = text.replace(SENSITIVE_LOG_IPV4_RE, "[redacted-ip]");
-  if (text.length > 300) text = `${text.slice(0, 297)}...`;
-  return text;
-}
 
 function maybeLogInsecureTlsRequest(log = console) {
   if (!HUE_INSECURE_TLS_ENV_REQUESTED || hueInsecureTlsWarningLogged) return;
@@ -784,33 +736,7 @@ module.exports = function createHueEntertainmentTransport({ fixtureRegistry, log
   }
 
   function hsvToRgb(h, s, v) {
-    const c = v * s;
-    const hp = h / 60;
-    const x = c * (1 - Math.abs((hp % 2) - 1));
-    let r1 = 0;
-    let g1 = 0;
-    let b1 = 0;
-
-    if (hp >= 0 && hp < 1) {
-      r1 = c; g1 = x;
-    } else if (hp < 2) {
-      r1 = x; g1 = c;
-    } else if (hp < 3) {
-      g1 = c; b1 = x;
-    } else if (hp < 4) {
-      g1 = x; b1 = c;
-    } else if (hp < 5) {
-      r1 = x; b1 = c;
-    } else {
-      r1 = c; b1 = x;
-    }
-
-    const m = v - c;
-    return {
-      r: Math.round((r1 + m) * 255),
-      g: Math.round((g1 + m) * 255),
-      b: Math.round((b1 + m) * 255)
-    };
+    return convertHsvToRgb255(h, s, v, { sFallback: 0, vFallback: 0 });
   }
 
   function hueStateToRgb(state = {}) {

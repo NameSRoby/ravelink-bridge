@@ -9,11 +9,33 @@ const { spawnSync } = require("child_process");
 const rootDir = path.resolve(__dirname, "..");
 const runtimeDir = path.join(rootDir, ".runtime");
 const bootstrapStatePath = path.join(runtimeDir, "bootstrap-state.json");
+const distributionManifestPath = path.join(rootDir, "distribution.manifest.json");
 const bootstrapSchemaVersion = 1;
+
+function readDistributionManifest() {
+  try {
+    if (!fs.existsSync(distributionManifestPath)) return null;
+    const parsed = JSON.parse(fs.readFileSync(distributionManifestPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+const distributionManifest = readDistributionManifest();
+const isSelfContainedDistro = distributionManifest?.selfContained === true;
+const bootstrapDepsDefault = isSelfContainedDistro ? "0" : "1";
+const bootstrapSystemDepsDefault = isSelfContainedDistro ? "0" : "1";
+
 if (!process.env.RAVELINK_WATCH_PARENT) {
   process.env.RAVELINK_WATCH_PARENT = "1";
 }
-const bootstrapDepsEnabled = String(process.env.RAVELINK_BOOTSTRAP_DEPS || "1").trim() !== "0";
+const bootstrapDepsEnabled = String(process.env.RAVELINK_BOOTSTRAP_DEPS || bootstrapDepsDefault).trim() !== "0";
+const bootstrapSystemDepsEnabled = String(
+  process.env.RAVELINK_BOOTSTRAP_SYSTEM_DEPS || bootstrapSystemDepsDefault
+).trim() !== "0";
+const bootstrapOnlyMode = String(process.env.RAVELINK_BOOTSTRAP_ONLY || "").trim() === "1";
 
 function runCommand(command, args, options = {}) {
   const spawnOptions = {
@@ -24,16 +46,15 @@ function runCommand(command, args, options = {}) {
   };
 
   if (process.platform === "win32" && /\.(cmd|bat)$/i.test(String(command))) {
-    const quoteArg = (value) => {
-      const text = String(value);
-      if (!text.length) return "\"\"";
-      if (!/[\s\"&|<>^()]/.test(text)) return text;
-      return `"${text.replace(/"/g, "\"\"")}"`;
-    };
-    const commandLine = [command].concat(args || []).map(quoteArg).join(" ");
-    return spawnSync(commandLine, {
-      ...spawnOptions,
-      shell: true
+    const commandShell = process.env.ComSpec || "cmd.exe";
+    return spawnSync(commandShell, [
+      "/d",
+      "/s",
+      "/c",
+      String(command),
+      ...((Array.isArray(args) ? args : []).map(value => String(value)))
+    ], {
+      ...spawnOptions
     });
   }
 
@@ -209,17 +230,34 @@ function runNpmInstall(reason, options = {}) {
     return false;
   }
 
-  console.log(`[BOOT] Running full Node dependency sync (${reason}) via ${npm.label}...`);
-  const installResult = runCommand(
-    npm.command,
-    npm.prefixArgs.concat(["install", "--include=optional", "--no-audit", "--no-fund"]),
-    { stdio: "inherit" }
-  );
-  if (installResult.status !== 0) {
-    console.error("[BOOT][ERROR] npm install failed.");
-    return false;
+  const hasLockfile = fs.existsSync(path.join(rootDir, "package-lock.json"));
+  const attempts = [];
+  if (hasLockfile) {
+    attempts.push({
+      label: "npm ci",
+      args: ["ci", "--include=optional", "--no-audit", "--no-fund"]
+    });
   }
-  return true;
+  attempts.push({
+    label: "npm install",
+    args: ["install", "--include=optional", "--no-audit", "--no-fund"]
+  });
+
+  console.log(`[BOOT] Running full Node dependency sync (${reason}) via ${npm.label}...`);
+  for (const attempt of attempts) {
+    const result = runCommand(
+      npm.command,
+      npm.prefixArgs.concat(attempt.args),
+      { stdio: "inherit" }
+    );
+    if (result.status === 0) {
+      return true;
+    }
+    console.warn(`[BOOT] ${attempt.label} failed; ${attempt === attempts[attempts.length - 1] ? "no more fallbacks" : "trying fallback"}...`);
+  }
+
+  console.error("[BOOT][ERROR] npm dependency sync failed.");
+  return false;
 }
 
 function ensureNodeDependencies(plan) {
@@ -240,10 +278,16 @@ function ensureNodeDependencies(plan) {
   return runNpmInstall(`missing-node-dependencies:${missing.length}`);
 }
 
-function ensurePython313OnWindows() {
+function ensurePython313OnWindows(options = {}) {
   if (process.platform !== "win32") return false;
+  const allowInstall = options.allowInstall !== false;
   const check = runCommand("py", ["-3.13", "-c", "import sys; print(sys.version)"]);
   if (check.status === 0) return true;
+
+  if (!allowInstall) {
+    console.warn("[BOOT] Python 3.13 not found; auto-install is disabled in this launch mode.");
+    return false;
+  }
 
   if (!commandExists("winget")) {
     console.warn("[BOOT] Python 3.13 not found and winget is unavailable; process-loopback bootstrap skipped.");
@@ -275,12 +319,18 @@ function ensurePython313OnWindows() {
   return true;
 }
 
-function ensureProcessLoopbackPythonDeps() {
+function ensureProcessLoopbackPythonDeps(options = {}) {
   if (process.platform !== "win32") return true;
-  if (!ensurePython313OnWindows()) return false;
+  const allowInstall = options.allowInstall !== false;
+  if (!ensurePython313OnWindows({ allowInstall })) return false;
 
   const check = runCommand("py", ["-3.13", "-c", "import proctap, psutil"]);
   if (check.status === 0) return true;
+
+  if (!allowInstall) {
+    console.warn("[BOOT] Python deps (proc-tap, psutil) not found; auto-install is disabled in this launch mode.");
+    return false;
+  }
 
   console.log("[BOOT] Installing process-loopback Python deps (proc-tap, psutil)...");
   const install = runCommand(
@@ -301,11 +351,19 @@ function ensureProcessLoopbackPythonDeps() {
   return true;
 }
 
-function ensureFfmpegBinary() {
+function ensureFfmpegBinary(options = {}) {
+  const configuredPath = String(process.env.RAVE_AUDIO_FFMPEG_PATH || "").trim();
+  if (configuredPath && commandExists(configuredPath, ["-version"])) return true;
   if (commandExists("ffmpeg", ["-version"])) return true;
+  const allowInstall = options.allowInstall !== false;
 
   if (process.platform !== "win32") {
     console.warn("[BOOT] ffmpeg is not available in PATH; install ffmpeg for app isolation capture support.");
+    return false;
+  }
+
+  if (!allowInstall) {
+    console.warn("[BOOT] ffmpeg not found; auto-install is disabled in this launch mode.");
     return false;
   }
 
@@ -339,12 +397,39 @@ function ensureFfmpegBinary() {
 }
 
 function runBootstrapPreflight() {
+  const plan = resolveBootstrapPlan();
+  const allowSystemDepInstall = bootstrapSystemDepsEnabled;
+
   if (!bootstrapDepsEnabled) {
-    console.log("[BOOT] Dependency bootstrap disabled via RAVELINK_BOOTSTRAP_DEPS=0");
+    const missingNodeDeps = findMissingNodeDependencies();
+    if (missingNodeDeps.length) {
+      console.error(
+        `[BOOT][ERROR] Missing Node dependencies (${missingNodeDeps.length}) while bootstrap is disabled. ` +
+        "Use a self-contained package or set RAVELINK_BOOTSTRAP_DEPS=1."
+      );
+      return false;
+    }
+
+    const modeText = allowSystemDepInstall ? "system-tools-install-enabled" : "verify-only";
+    console.log(`[BOOT] Dependency bootstrap disabled via RAVELINK_BOOTSTRAP_DEPS=0 (${modeText}).`);
+
+    const ffmpegReady = ensureFfmpegBinary({ allowInstall: allowSystemDepInstall });
+    const processLoopbackReady = ensureProcessLoopbackPythonDeps({ allowInstall: allowSystemDepInstall });
+    writeBootstrapState({
+      schema: bootstrapSchemaVersion,
+      depFingerprint: plan.depFingerprint,
+      nodeInstallReason: "verify-only",
+      ffmpegReady: ffmpegReady === true,
+      processLoopbackReady: processLoopbackReady === true,
+      updatedAt: new Date().toISOString()
+    });
+
+    if (process.platform === "win32" && (!ffmpegReady || !processLoopbackReady)) {
+      console.warn("[BOOT] Optional Windows audio tools are unavailable; app isolation features may be limited.");
+    }
     return true;
   }
 
-  const plan = resolveBootstrapPlan();
   if (plan.forceFullInstall) {
     console.log(`[BOOT] Full dependency bootstrap required (${plan.reason}).`);
   }
@@ -353,8 +438,8 @@ function runBootstrapPreflight() {
     return false;
   }
 
-  const ffmpegReady = ensureFfmpegBinary();
-  const processLoopbackReady = ensureProcessLoopbackPythonDeps();
+  const ffmpegReady = ensureFfmpegBinary({ allowInstall: allowSystemDepInstall });
+  const processLoopbackReady = ensureProcessLoopbackPythonDeps({ allowInstall: allowSystemDepInstall });
   writeBootstrapState({
     schema: bootstrapSchemaVersion,
     depFingerprint: plan.depFingerprint,
@@ -388,6 +473,11 @@ function resolveHueCaPath() {
 if (!runBootstrapPreflight()) {
   process.exitCode = 1;
   throw new Error("Startup bootstrap preflight failed.");
+}
+
+if (bootstrapOnlyMode) {
+  console.log("[BOOT] Bootstrap-only mode complete.");
+  process.exit(0);
 }
 
 const certPath = resolveHueCaPath();

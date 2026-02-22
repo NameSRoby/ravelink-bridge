@@ -30,6 +30,17 @@ if not exist "package.json" (
   exit /b 1
 )
 
+if exist "distribution.manifest.json" (
+  if not defined RAVELINK_BOOTSTRAP_DEPS set "RAVELINK_BOOTSTRAP_DEPS=0"
+  if not defined RAVELINK_BOOTSTRAP_SYSTEM_DEPS set "RAVELINK_BOOTSTRAP_SYSTEM_DEPS=0"
+  echo [RaveLink] Self-contained distro mode enabled.
+)
+
+set "BUNDLED_FFMPEG=%CD%\runtime\tools\ffmpeg\ffmpeg.exe"
+if not defined RAVE_AUDIO_FFMPEG_PATH if exist "%BUNDLED_FFMPEG%" (
+  set "RAVE_AUDIO_FFMPEG_PATH=%BUNDLED_FFMPEG%"
+)
+
 set "HUE_CERT=%CD%\node_modules\hue-sync\signify.pem"
 if not defined NODE_EXTRA_CA_CERTS if exist "%HUE_CERT%" (
   set "NODE_EXTRA_CA_CERTS=%HUE_CERT%"

@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
+const { hsvToRgb255: convertHsvToRgb255 } = require("../../core/utils/hsv-rgb");
 
 const CONFIG_PATH = path.join(__dirname, "config.json");
 const SUPPORTED_INTENTS = new Set(["HUE_STATE", "WIZ_PULSE", "TWITCH_HUE", "TWITCH_WIZ"]);
@@ -151,30 +152,7 @@ function readConfigFile() {
 }
 
 function hsvToRgb(h, s, v) {
-  const hh = ((Number(h) % 360) + 360) % 360;
-  const ss = clamp(s, 0, 1, 0);
-  const vv = clamp(v, 0, 1, 0);
-
-  const c = vv * ss;
-  const x = c * (1 - Math.abs((hh / 60) % 2 - 1));
-  const m = vv - c;
-
-  let rp = 0;
-  let gp = 0;
-  let bp = 0;
-
-  if (hh < 60) [rp, gp, bp] = [c, x, 0];
-  else if (hh < 120) [rp, gp, bp] = [x, c, 0];
-  else if (hh < 180) [rp, gp, bp] = [0, c, x];
-  else if (hh < 240) [rp, gp, bp] = [0, x, c];
-  else if (hh < 300) [rp, gp, bp] = [x, 0, c];
-  else [rp, gp, bp] = [c, 0, x];
-
-  return {
-    r: Math.round((rp + m) * 255),
-    g: Math.round((gp + m) * 255),
-    b: Math.round((bp + m) * 255)
-  };
+  return convertHsvToRgb255(h, s, v, { sFallback: 0, vFallback: 0 });
 }
 
 function buildRgbFromHueIntent(intent, fallback) {
@@ -211,15 +189,17 @@ function buildRgbFromWizIntent(intent, fallback) {
   };
 }
 
+const INTENT_RGB_RESOLVERS = Object.freeze({
+  HUE_STATE: buildRgbFromHueIntent,
+  TWITCH_HUE: buildRgbFromHueIntent,
+  WIZ_PULSE: buildRgbFromWizIntent,
+  TWITCH_WIZ: buildRgbFromWizIntent
+});
+
 function mapIntentToRgb(intent, fallback) {
   if (!intent || typeof intent !== "object") return null;
-  if (intent.type === "HUE_STATE" || intent.type === "TWITCH_HUE") {
-    return buildRgbFromHueIntent(intent, fallback);
-  }
-  if (intent.type === "WIZ_PULSE" || intent.type === "TWITCH_WIZ") {
-    return buildRgbFromWizIntent(intent, fallback);
-  }
-  return null;
+  const resolve = INTENT_RGB_RESOLVERS[intent.type];
+  return typeof resolve === "function" ? resolve(intent, fallback) : null;
 }
 
 function routeModeForIntent(intentType) {

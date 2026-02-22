@@ -18,6 +18,8 @@
 const fs = require("fs");
 const net = require("net");
 const path = require("path");
+const { normalizePrivateOrLoopbackIpv4 } = require("./utils/private-ipv4");
+const { parseBooleanLoose } = require("./utils/booleans");
 
 // [TITLE] Section: Core Constants + Route Bindings
 const CONFIG_PATH = path.join(__dirname, "fixtures.config.json");
@@ -62,6 +64,14 @@ const FIXTURE_CORE_FIELDS = new Set([
   "lightId",
   "ip"
 ]);
+const CANONICAL_ZONE_BY_BRAND = Object.freeze({
+  hue: "hue",
+  wiz: "wiz"
+});
+const DERIVED_ZONE_BY_BRAND_MODE = Object.freeze({
+  hue: Object.freeze({ engine: "hue", twitch: "hue", custom: "hue" }),
+  wiz: Object.freeze({ engine: "wiz", twitch: "wiz", custom: "custom" })
+});
 
 // [TITLE] Section: Utility Helpers
 function cloneJsonSafe(value, fallback = null) {
@@ -97,15 +107,7 @@ function extractFixtureExtras(source = {}) {
 }
 
 function normalizeBoolean(value, fallback = false) {
-  if (value === true || value === false) return value;
-  if (value === 1 || value === "1") return true;
-  if (value === 0 || value === "0") return false;
-  if (typeof value === "string") {
-    const raw = value.trim().toLowerCase();
-    if (raw === "true" || raw === "on" || raw === "yes") return true;
-    if (raw === "false" || raw === "off" || raw === "no") return false;
-  }
-  return fallback;
+  return parseBooleanLoose(value, fallback);
 }
 
 // [TITLE] Section: Default Config Seed
@@ -194,9 +196,8 @@ function normalizeZone(value, fallback = "custom") {
 
 function getCanonicalZoneForBrand(brand, fallback = "custom") {
   const key = normalizeBrand(brand);
-  if (key === "hue") return "hue";
-  if (key === "wiz") return "wiz";
-  return normalizeZone(fallback, "custom");
+  const canonical = CANONICAL_ZONE_BY_BRAND[key];
+  return canonical || normalizeZone(fallback, "custom");
 }
 
 // [TITLE] Section: Host + Placeholder Validation
@@ -250,32 +251,8 @@ function isLikelyNetworkHost(value) {
 }
 
 // [TITLE] Section: Private LAN IP Guards
-function parseIpv4Parts(value) {
-  const text = String(value || "").trim();
-  if (net.isIP(text) !== 4) return null;
-  const parts = text.split(".").map(part => Number(part));
-  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) {
-    return null;
-  }
-  return parts;
-}
-
-function isPrivateOrLoopbackIpv4(value) {
-  const parts = parseIpv4Parts(value);
-  if (!parts) return false;
-  const [a, b] = parts;
-  if (a === 10) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 127) return true;
-  return false;
-}
-
 function normalizePrivateLanIpv4(value) {
-  const text = String(value || "").trim();
-  if (!text) return "";
-  return isPrivateOrLoopbackIpv4(text) ? text : "";
+  return normalizePrivateOrLoopbackIpv4(value);
 }
 
 // [TITLE] Section: Transport Readiness (Hue/WiZ)
@@ -309,10 +286,15 @@ function isWizFixtureConfigured(fixture = {}) {
   return Boolean(normalizePrivateLanIpv4(ip));
 }
 
+const TRANSPORT_CONFIG_BY_BRAND = Object.freeze({
+  hue: isHueFixtureConfigured,
+  wiz: isWizFixtureConfigured
+});
+
 function isFixtureConfiguredForTransport(fixture = {}) {
   const brand = normalizeBrand(fixture.brand);
-  if (brand === "hue") return isHueFixtureConfigured(fixture);
-  if (brand === "wiz") return isWizFixtureConfigured(fixture);
+  const check = TRANSPORT_CONFIG_BY_BRAND[brand];
+  if (check) return check(fixture);
   return isValidBrand(brand);
 }
 
@@ -343,9 +325,8 @@ function normalizeRequestedEngineBinding(value) {
 }
 
 function deriveEngineBinding({ brand, engineEnabled, requestedBinding }) {
-  if (!engineEnabled) return "standalone";
-  if (requestedBinding === brand) return brand;
-  return brand;
+  void requestedBinding;
+  return engineEnabled ? brand : "standalone";
 }
 
 function validateFixtureCoupling({
@@ -371,10 +352,8 @@ function validateFixtureCoupling({
     return "custom mode cannot be enabled while engine mode is enabled";
   }
 
-  if (engineEnabled) {
-    if (requestedBinding && requestedBinding !== brand) {
-      return `${brand.toUpperCase()} fixtures cannot bind to ${requestedBinding.toUpperCase()} engine path`;
-    }
+  if (engineEnabled && requestedBinding && requestedBinding !== brand) {
+    return `${brand.toUpperCase()} fixtures cannot bind to ${requestedBinding.toUpperCase()} engine path`;
   }
 
   return null;
@@ -470,16 +449,9 @@ function getDerivedIntentZones(fixtures, binding) {
         : modeFlags.engineEnabled;
     if (!modeEnabled) continue;
     const brand = normalizeBrand(fixture.brand);
-    if (brand === "hue") {
-      zones.push("hue");
-      continue;
-    }
-    if (brand === "wiz") {
-      if (mode === "custom") {
-        zones.push("custom");
-      } else {
-        zones.push("wiz");
-      }
+    const brandModeMap = DERIVED_ZONE_BY_BRAND_MODE[brand];
+    if (brandModeMap) {
+      zones.push(brandModeMap[mode] || brandModeMap.engine);
       continue;
     }
     zones.push(normalizeZone(fixture.zone, getCanonicalZoneForBrand(brand, "custom")));
@@ -597,47 +569,42 @@ function getVersion() {
 }
 
 function listBy(brand, zone, options = {}) {
-  const requireConfigured = Boolean(options.requireConfigured);
-  return registry.fixtures.filter(f => {
-    if (!f.enabled) return false;
-    if (brand && f.brand !== brand) return false;
-    if (zone && f.zone !== zone) return false;
-    if (requireConfigured && !isFixtureConfiguredForTransport(f)) return false;
-    return true;
-  });
+  return listFixturesWithMode(brand, zone, options, fixture => fixture.enabled !== false);
 }
 
 function listEngineBy(brand, zone, options = {}) {
-  const requireConfigured = Boolean(options.requireConfigured);
-  return registry.fixtures.filter(f => {
-    if (!f.enabled) return false;
-    if (brand && f.brand !== brand) return false;
-    if (zone && f.zone !== zone) return false;
-    if (requireConfigured && !isFixtureConfiguredForTransport(f)) return false;
-    return isEngineCoupledFixture(f);
-  });
+  return listFixturesWithMode(brand, zone, options, fixture => isEngineCoupledFixture(fixture));
 }
 
 function listTwitchBy(brand, zone, options = {}) {
-  const requireConfigured = Boolean(options.requireConfigured);
-  return registry.fixtures.filter(f => {
-    if (!f.enabled) return false;
-    if (brand && f.brand !== brand) return false;
-    if (zone && f.zone !== zone) return false;
-    if (requireConfigured && !isFixtureConfiguredForTransport(f)) return false;
-    return normalizeBoolean(f.twitchEnabled, false);
-  });
+  return listFixturesWithMode(
+    brand,
+    zone,
+    options,
+    fixture => normalizeBoolean(fixture.twitchEnabled, false)
+  );
 }
 
 function listCustomBy(brand, zone, options = {}) {
+  return listFixturesWithMode(
+    brand,
+    zone,
+    options,
+    fixture => normalizeBoolean(fixture.customEnabled, false)
+  );
+}
+
+function listFixturesWithMode(brand, zone, options = {}, modePredicate = null) {
   const requireConfigured = Boolean(options.requireConfigured);
-  return registry.fixtures.filter(f => {
-    if (!f.enabled) return false;
-    if (brand && f.brand !== brand) return false;
-    if (zone && f.zone !== zone) return false;
-    if (requireConfigured && !isFixtureConfiguredForTransport(f)) return false;
-    return normalizeBoolean(f.customEnabled, false);
-  });
+  const filters = [
+    fixture => Boolean(fixture && fixture.enabled)
+  ];
+  if (brand) filters.push(fixture => fixture.brand === brand);
+  if (zone) filters.push(fixture => fixture.zone === zone);
+  if (requireConfigured) filters.push(isFixtureConfiguredForTransport);
+  if (typeof modePredicate === "function") filters.push(modePredicate);
+
+  return registry.fixtures.filter(fixture => filters.every(filter => filter(fixture)));
 }
 
 // [TITLE] Section: Summary + Mutation APIs

@@ -1,4 +1,4 @@
-﻿# RaveLink Bridge
+# RaveLink Bridge
 
 Lightweight and powerful streamer-first local lighting engine for Philips Hue + WiZ, with Twitch-ready controls and modular brand extension via local mods.
 
@@ -11,34 +11,32 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.5.1): https://github.com/NameSRoby/ravelink-bridge/releases/latest
+- Current Windows release (v1.5.2): https://github.com/NameSRoby/ravelink-bridge/releases/latest
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
-This repository is aligned to `v1.5.1`.
+This repository is aligned to `v1.5.2`.
 
 ## Quick Install (Windows)
 
-1. Preferred when available: download `RaveLink-Bridge-Windows-v1.5.1-setup-installer.exe` and run it.
-2. ZIP fallback: download `RaveLink-Bridge-Windows-v1.5.1.zip` from Releases and extract it.
+1. Preferred when available: download `RaveLink-Bridge-Windows-v1.5.2-setup-installer.exe` and run it.
+2. ZIP fallback: download `RaveLink-Bridge-Windows-v1.5.2.zip` from Releases and extract it.
 3. Run `RaveLink-Bridge.bat`.
 4. Open `http://127.0.0.1:5050`.
 
-## v1.5.1 (Compared to v1.5.0)
+## v1.5.2 (Hotfix Rollup)
 
-This is a focused polish/hotfix release. No major workflow changes, but better live behavior.
+This is a safety + stability hotfix release with better music response and cleaner packaging defaults.
 
 - Reactivity stability:
-  - fixed cases where Hue/WiZ could stall or feel stuck during playback
-  - smoother brightness behavior with less nervous fluctuation
+  - color movement now follows selected metrics more directly (`baseline+drums`, `peaks`, `transients`, `flux`)
+  - tuned behavior for less “stuck/static” feel during playback
 - Color output quality:
-  - stronger default saturation
-  - clearer distinction between palette colors during live playback
+  - improved per-metric color cadence tuning for clearer motion contrast
 - Per-fixture routing usability:
-  - custom routing/override UI is more stable while editing
-  - reduced lag/interruption when selecting fixtures and applying per-fixture changes
-- Hardening and safety:
-  - stricter mod import validation
-  - cleaner/safer redistributable packaging behavior
+  - existing fixture routing workflows remain intact after hotfix restructure
+- Reliability + setup:
+  - cleaner update/install behavior for packaged builds
+  - safer default release baseline for new installs
 
 Detailed release notes:
 - `CHANGELOG.md`
@@ -54,7 +52,7 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 - MIDI controller mapping tab (learn + bindings + trigger tests)
 - Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
 
-## Security Defaults (v1.5.1)
+## Security Defaults (v1.5.2)
 
 RaveLink Bridge is local-first and now ships with stricter default protections:
 
@@ -76,9 +74,10 @@ Optional network-access env flags (advanced users only):
 
 If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
 
-1. Install Node.js LTS from `https://nodejs.org`.
+1. If you used the Windows installer or self-contained ZIP, you do not need a separate Node install.
+   - Source/minimal ZIP users: install Node.js LTS from `https://nodejs.org`.
 2. Double-click `RaveLink-Bridge.bat`.
-   - First launch on a new system runs a full dependency bootstrap automatically (Node dependencies + Windows audio helper dependencies).
+   - Self-contained distro builds default to offline-safe verify mode (no automatic dependency downloads).
 3. Wait for the launcher window to show:
    - `Bridge URL: http://127.0.0.1:5050`
 4. The browser should open automatically.
@@ -94,6 +93,8 @@ If your stream setup gremlin appears at 2AM, this checklist is built for that ex
    - `TWITCH` = chat/reward `/color` control
    - `CUSTOM` = manual/custom fixture behavior
 9. Click `APPLY ROUTING` for each fixture you changed.
+10. Optional advanced audio app/process isolation tools:
+   - Run `RaveLink-Bridge-Install-Optional-Audio-Tools.bat`
 10. Click `TEST CONNECTIVITY` and confirm fixture target status is ready.
 11. Start the show with `RAVE ON`.
 12. Optional: open `MIDI` tab and map your controller buttons/knobs.
@@ -149,9 +150,6 @@ If "where does this code go?" is ever the question, the answer is: inside the St
 Use this exact template file:
 - `INTEGRATIONS_TWITCH/START-HERE-STREAMELEMENTS-WIDGET-TEMPLATE/PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
 
-Equivalent legacy copy:
-- `INTEGRATIONS_TWITCH/streamelements/reward-listener.template.js`
-
 Step-by-step:
 1. Start `RaveLink-Bridge.bat` first, so the local bridge is already live.
 2. Make sure your integration bot is in your Twitch chat before testing rewards.
@@ -189,7 +187,7 @@ If rewards trigger in StreamElements but lights do not move, re-check:
 Use reward triggers or chat command actions to call bridge endpoints, for example:
 - `POST http://127.0.0.1:5050/rave/on`
 - `POST http://127.0.0.1:5050/rave/off`
-- `GET http://127.0.0.1:5050/color?value1=purple`
+- `POST http://127.0.0.1:5050/color?value1=purple`
 - `POST http://127.0.0.1:5050/teach` with JSON body `{ "value1": "toxic_green #39ff14" }`
 
 ### Overlay/Chat Bot Compatibility
@@ -209,18 +207,18 @@ Plain-English flow:
 
 What the included StreamElements widget supports out of the box:
 - `RAVE_REWARD_ID` -> calls `/rave/on` (then auto `/rave/off` after timeout).
-- `COLOR_REWARD_ID` -> sends reward text to `/color?value1=...`.
-- `TEACH_REWARD_ID` -> sends reward text to `POST /teach` (`{ value1: "<name> <#RRGGBB>" }`).
+- `COLOR_REWARD_ID` -> sends reward text to `POST /color?value1=...`.
+- `TEACH_REWARD_ID` -> sends reward text to `POST /teach?value1=...`.
 
 Concrete channel point examples (default widget behavior):
 
 | Viewer input or reward text | Bot HTTP request | What happens |
 |---|---|---|
 | Reward title `RAVE` | `POST http://127.0.0.1:5050/rave/on` | Starts rave engine (default widget then auto-calls `/rave/off` after timeout). |
-| Reward text `blue` | `GET http://127.0.0.1:5050/color?value1=blue` | Applies blue using current Twitch color config (default target is `hue`). |
-| Reward text `wiz blue` | `GET http://127.0.0.1:5050/color?value1=wiz+blue` | Applies blue to WiZ-routed fixtures only. |
-| Reward text `hue blue` | `GET http://127.0.0.1:5050/color?value1=hue+blue` | Applies blue to Hue-routed fixtures only. |
-| Reward text `toxic_green #39ff14` (Teach reward) | `POST http://127.0.0.1:5050/teach` with body `{ "value1": "toxic_green #39ff14" }` | Learns a new color alias named `toxic_green`. |
+| Reward text `blue` | `POST http://127.0.0.1:5050/color?value1=blue` | Applies blue using current Twitch color config (default unprefixed target is `hue`, auto-falls back to `wiz` if no Hue fixtures are routed). |
+| Reward text `wiz blue` | `POST http://127.0.0.1:5050/color?value1=wiz+blue` | Applies blue to WiZ-routed fixtures only. |
+| Reward text `hue blue` | `POST http://127.0.0.1:5050/color?value1=hue+blue` | Applies blue to Hue-routed fixtures only. |
+| Reward text `toxic_green #39ff14` (Teach reward) | `POST http://127.0.0.1:5050/teach?value1=toxic_green+%2339ff14` | Learns a new color alias named `toxic_green`. |
 
 How much can you customize:
 - You can name rewards anything (`Blue`, `Wiz Blue`, `Rave Start`, etc.).
@@ -332,14 +330,14 @@ Notes:
 - The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
 - Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
 
-## Version 1.5.1 Notes
+## Version 1.5.2 Notes
 
-- This release is a user-experience polish update.
+- This release is a hotfix rollup with safer packaging defaults.
 - Main focus:
-  - smoother reactivity feel
-  - stronger visual color fidelity
-  - better per-fixture routing UI behavior
-- Core v1.5 control model remains the same.
+  - metric-following color motion improvements across `baseline+drums`, `peaks`, `transients`, and `flux`
+  - improved loud/quiet brightness response, especially for WiZ
+  - stronger sanitize checks before publishing redistributables/installers
+- Core control model remains the same (no workflow reset required).
 
 For older major feature lists, see tag history under Releases.
 
@@ -499,31 +497,32 @@ npm run export:redistributable
 3. Zip:
 
 ```powershell
-Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.1\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.5.1.zip -Force
+Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.2\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.5.2.zip -Force
 ```
 
 Output:
-- `release/RaveLink-Bridge-Windows-v1.5.1`
+- `release/RaveLink-Bridge-Windows-v1.5.2`
 
 ### Setup EXE Build (Windows)
 
-Use this to produce a self-contained installer payload (bundled `node_modules` + local Node runtime) and compile a setup EXE when Inno Setup is installed.
+Use this to produce a self-contained installer payload (bundled `node_modules` + local Node runtime, optional bundled `ffmpeg` when available on the build machine) and compile a setup EXE when Inno Setup is installed.
 
 ```powershell
 npm run build:setup:windows
 ```
 
 Outputs:
-- `release/RaveLink-Bridge-Windows-v1.5.1`
-- `release/RaveLink-Bridge-Windows-v1.5.1-self-contained.zip`
-- `release/installer/RaveLink-Bridge-Windows-v1.5.1-setup-installer.iss`
-- `release/RaveLink-Bridge-Windows-v1.5.1-setup-installer.exe` (when `ISCC.exe` is available)
+- `release/RaveLink-Bridge-Windows-v1.5.2`
+- `release/RaveLink-Bridge-Windows-v1.5.2-self-contained.zip`
+- `release/installer/RaveLink-Bridge-Windows-v1.5.2-setup-installer.iss`
+- `release/RaveLink-Bridge-Windows-v1.5.2-setup-installer.exe` (when `ISCC.exe` is available)
 
 ## Security And Data Hygiene
 
 - Keep local backups private (`backups/`, `core/backups/`).
 - Do not publish real fixture credentials/tokens/IPs.
 - Use `sanitize-release` before publishing redistributables.
+- `sanitize-release` now purges repo/release backup artifacts by default; use `--keep-backups` (or `RAVELINK_SANITIZE_KEEP_BACKUPS=1`) only for local-only workflows.
 
 ## Related Docs
 

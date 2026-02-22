@@ -28,23 +28,14 @@ try {
 const fs = require("fs");
 const path = require("path");
 const { spawn, execFile } = require("child_process");
+const { parseBooleanLoose } = require("./utils/booleans");
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const toNum = (v, fallback) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
-const toBool = (value, fallback = false) => {
-  if (value === true || value === false) return value;
-  if (value === 1 || value === "1") return true;
-  if (value === 0 || value === "0") return false;
-  if (typeof value === "string") {
-    const raw = value.trim().toLowerCase();
-    if (raw === "true" || raw === "yes" || raw === "on") return true;
-    if (raw === "false" || raw === "no" || raw === "off") return false;
-  }
-  return fallback;
-};
+const toBool = (value, fallback = false) => parseBooleanLoose(value, fallback);
 const AUDIO_VERBOSE_LOGS = String(process.env.RAVE_AUDIO_VERBOSE_LOGS || "").trim() === "1";
 const PROCESS_LOOPBACK_LOCKS_PATH = path.join(__dirname, "audio.process-locks.json");
 const PROCESS_LOOPBACK_SILENCE_PROBE_MS = 2200;
@@ -282,192 +273,97 @@ module.exports = function createAudio(onLevel) {
 
   function normalizeCfgPatch(patch = {}) {
     const next = {};
+    const assignWhenDefined = (key, transformer) => {
+      const raw = patch[key];
+      if (raw === undefined) return;
+      next[key] = transformer(raw);
+    };
 
-    if (patch.inputBackend !== undefined) {
-      const raw = String(patch.inputBackend || "").trim().toLowerCase();
-      next.inputBackend = raw === "ffmpeg" || raw === "portaudio" ? raw : "auto";
+    assignWhenDefined("inputBackend", raw => {
+      const normalized = String(raw || "").trim().toLowerCase();
+      return normalized === "ffmpeg" || normalized === "portaudio" ? normalized : "auto";
+    });
+
+    const scalarPatchTransformers = [
+      ["sampleRate", raw => clamp(Math.round(toNum(raw, cfg.sampleRate)), 22050, 192000)],
+      ["framesPerBuffer", raw => clamp(Math.round(toNum(raw, cfg.framesPerBuffer)), 64, 2048)],
+      ["channels", raw => clamp(Math.round(toNum(raw, cfg.channels)), 1, 8)],
+      ["noiseFloorMin", raw => clamp(toNum(raw, cfg.noiseFloorMin), 0, 0.02)],
+      ["peakDecay", raw => clamp(toNum(raw, cfg.peakDecay), 0.5, 0.9995)],
+      ["outputGain", raw => clamp(toNum(raw, cfg.outputGain), 0.2, 3)],
+      ["autoLevelEnabled", raw => toBool(raw, cfg.autoLevelEnabled)],
+      ["autoLevelTargetRms", raw => clamp(toNum(raw, cfg.autoLevelTargetRms), 0.005, 0.2)],
+      ["autoLevelMinGain", raw => clamp(toNum(raw, cfg.autoLevelMinGain), 0.2, 3)],
+      ["autoLevelMaxGain", raw => clamp(toNum(raw, cfg.autoLevelMaxGain), 0.2, 4)],
+      ["autoLevelResponse", raw => clamp(toNum(raw, cfg.autoLevelResponse), 0.001, 0.2)],
+      ["autoLevelGate", raw => clamp(toNum(raw, cfg.autoLevelGate), 0, 0.03)],
+      ["limiterThreshold", raw => clamp(toNum(raw, cfg.limiterThreshold), 0.4, 0.99)],
+      ["limiterKnee", raw => clamp(toNum(raw, cfg.limiterKnee), 0.02, 0.8)],
+      ["restartMs", raw => clamp(Math.round(toNum(raw, cfg.restartMs)), 250, 20000)],
+      ["watchdogMs", raw => clamp(Math.round(toNum(raw, cfg.watchdogMs)), 800, 30000)],
+      ["logEveryTicks", raw => clamp(Math.round(toNum(raw, cfg.logEveryTicks)), 10, 2000)],
+      ["bandLowHz", raw => clamp(Math.round(toNum(raw, cfg.bandLowHz)), 60, 500)],
+      ["bandMidHz", raw => clamp(Math.round(toNum(raw, cfg.bandMidHz)), 700, 8000)],
+      ["deviceMatch", raw => String(raw || "").toLowerCase()],
+      ["ffmpegPath", raw => String(raw || "").trim() || "ffmpeg"],
+      ["ffmpegInputDevice", raw => String(raw || "").trim()],
+      ["ffmpegUseWallclock", raw => toBool(raw, cfg.ffmpegUseWallclock)],
+      ["ffmpegAppIsolationEnabled", raw => toBool(raw, cfg.ffmpegAppIsolationEnabled)],
+      ["ffmpegAppIsolationStrict", raw => toBool(raw, cfg.ffmpegAppIsolationStrict)],
+      ["ffmpegAppIsolationMultiSource", raw => toBool(raw, cfg.ffmpegAppIsolationMultiSource)],
+      [
+        "ffmpegAppIsolationCheckMs",
+        raw => clamp(Math.round(toNum(raw, cfg.ffmpegAppIsolationCheckMs)), 60000, 1800000)
+      ]
+    ];
+    for (const [key, transformer] of scalarPatchTransformers) {
+      assignWhenDefined(key, transformer);
     }
 
-    if (patch.sampleRate !== undefined) {
-      next.sampleRate = clamp(Math.round(toNum(patch.sampleRate, cfg.sampleRate)), 22050, 192000);
-    }
+    assignWhenDefined("deviceId", raw => {
+      if (raw === null || raw === "" || String(raw).toLowerCase() === "auto") return null;
+      return Math.round(toNum(raw, cfg.deviceId ?? 0));
+    });
 
-    if (patch.framesPerBuffer !== undefined) {
-      next.framesPerBuffer = clamp(Math.round(toNum(patch.framesPerBuffer, cfg.framesPerBuffer)), 64, 2048);
-    }
+    assignWhenDefined("ffmpegInputFormat", raw => {
+      const normalized = String(raw || "").trim().toLowerCase();
+      return normalized || "dshow";
+    });
 
-    if (patch.channels !== undefined) {
-      next.channels = clamp(Math.round(toNum(patch.channels, cfg.channels)), 1, 8);
-    }
+    assignWhenDefined("ffmpegInputDevices", raw => (
+      Array.isArray(raw)
+        ? normalizeFfmpegDeviceList(raw, [])
+        : normalizeFfmpegDeviceList(raw, cfg.ffmpegInputDevices)
+    ));
 
-    if (patch.noiseFloorMin !== undefined) {
-      next.noiseFloorMin = clamp(toNum(patch.noiseFloorMin, cfg.noiseFloorMin), 0, 0.02);
-    }
+    assignWhenDefined("ffmpegLogLevel", raw => {
+      const normalized = String(raw || "").trim().toLowerCase();
+      return normalized || "error";
+    });
 
-    if (patch.peakDecay !== undefined) {
-      next.peakDecay = clamp(toNum(patch.peakDecay, cfg.peakDecay), 0.5, 0.9995);
-    }
+    assignWhenDefined("ffmpegAppIsolationPrimaryApp", raw => {
+      const normalized = String(raw || "").trim();
+      return normalized ? normalizeConfiguredApp(normalized, cfg.ffmpegAppIsolationPrimaryApp) : "";
+    });
 
-    if (patch.outputGain !== undefined) {
-      next.outputGain = clamp(toNum(patch.outputGain, cfg.outputGain), 0.2, 3);
-    }
+    assignWhenDefined("ffmpegAppIsolationFallbackApp", raw => {
+      const normalized = String(raw || "").trim();
+      return normalized ? normalizeConfiguredApp(normalized, cfg.ffmpegAppIsolationFallbackApp) : "";
+    });
 
-    if (patch.autoLevelEnabled !== undefined) {
-      next.autoLevelEnabled = toBool(patch.autoLevelEnabled, cfg.autoLevelEnabled);
-    }
+    assignWhenDefined("ffmpegAppIsolationPrimaryDevices", raw => (
+      Array.isArray(raw)
+        ? normalizeFfmpegDeviceList(raw, [])
+        : normalizeFfmpegDeviceList(raw, cfg.ffmpegAppIsolationPrimaryDevices)
+    ));
 
-    if (patch.autoLevelTargetRms !== undefined) {
-      next.autoLevelTargetRms = clamp(toNum(patch.autoLevelTargetRms, cfg.autoLevelTargetRms), 0.005, 0.2);
-    }
+    assignWhenDefined("ffmpegAppIsolationFallbackDevices", raw => (
+      Array.isArray(raw)
+        ? normalizeFfmpegDeviceList(raw, [])
+        : normalizeFfmpegDeviceList(raw, cfg.ffmpegAppIsolationFallbackDevices)
+    ));
 
-    if (patch.autoLevelMinGain !== undefined) {
-      next.autoLevelMinGain = clamp(toNum(patch.autoLevelMinGain, cfg.autoLevelMinGain), 0.2, 3);
-    }
-
-    if (patch.autoLevelMaxGain !== undefined) {
-      next.autoLevelMaxGain = clamp(toNum(patch.autoLevelMaxGain, cfg.autoLevelMaxGain), 0.2, 4);
-    }
-
-    if (patch.autoLevelResponse !== undefined) {
-      next.autoLevelResponse = clamp(toNum(patch.autoLevelResponse, cfg.autoLevelResponse), 0.001, 0.2);
-    }
-
-    if (patch.autoLevelGate !== undefined) {
-      next.autoLevelGate = clamp(toNum(patch.autoLevelGate, cfg.autoLevelGate), 0, 0.03);
-    }
-
-    if (patch.limiterThreshold !== undefined) {
-      next.limiterThreshold = clamp(toNum(patch.limiterThreshold, cfg.limiterThreshold), 0.4, 0.99);
-    }
-
-    if (patch.limiterKnee !== undefined) {
-      next.limiterKnee = clamp(toNum(patch.limiterKnee, cfg.limiterKnee), 0.02, 0.8);
-    }
-
-    if (patch.restartMs !== undefined) {
-      next.restartMs = clamp(Math.round(toNum(patch.restartMs, cfg.restartMs)), 250, 20000);
-    }
-
-    if (patch.watchdogMs !== undefined) {
-      next.watchdogMs = clamp(Math.round(toNum(patch.watchdogMs, cfg.watchdogMs)), 800, 30000);
-    }
-
-    if (patch.logEveryTicks !== undefined) {
-      next.logEveryTicks = clamp(Math.round(toNum(patch.logEveryTicks, cfg.logEveryTicks)), 10, 2000);
-    }
-
-    if (patch.bandLowHz !== undefined) {
-      next.bandLowHz = clamp(Math.round(toNum(patch.bandLowHz, cfg.bandLowHz)), 60, 500);
-    }
-
-    if (patch.bandMidHz !== undefined) {
-      next.bandMidHz = clamp(Math.round(toNum(patch.bandMidHz, cfg.bandMidHz)), 700, 8000);
-    }
-
-    if (patch.deviceMatch !== undefined) {
-      next.deviceMatch = String(patch.deviceMatch || "").toLowerCase();
-    }
-
-    if (patch.deviceId !== undefined) {
-      if (patch.deviceId === null || patch.deviceId === "" || String(patch.deviceId).toLowerCase() === "auto") {
-        next.deviceId = null;
-      } else {
-        next.deviceId = Math.round(toNum(patch.deviceId, cfg.deviceId ?? 0));
-      }
-    }
-
-    if (patch.ffmpegPath !== undefined) {
-      next.ffmpegPath = String(patch.ffmpegPath || "").trim() || "ffmpeg";
-    }
-
-    if (patch.ffmpegInputFormat !== undefined) {
-      const raw = String(patch.ffmpegInputFormat || "").trim().toLowerCase();
-      next.ffmpegInputFormat = raw || "dshow";
-    }
-
-    if (patch.ffmpegInputDevice !== undefined) {
-      next.ffmpegInputDevice = String(patch.ffmpegInputDevice || "").trim();
-    }
-
-    if (patch.ffmpegInputDevices !== undefined) {
-      next.ffmpegInputDevices = Array.isArray(patch.ffmpegInputDevices)
-        ? normalizeFfmpegDeviceList(patch.ffmpegInputDevices, [])
-        : normalizeFfmpegDeviceList(patch.ffmpegInputDevices, cfg.ffmpegInputDevices);
-    }
-
-    if (patch.ffmpegLogLevel !== undefined) {
-      const raw = String(patch.ffmpegLogLevel || "").trim().toLowerCase();
-      next.ffmpegLogLevel = raw || "error";
-    }
-
-    if (patch.ffmpegUseWallclock !== undefined) {
-      next.ffmpegUseWallclock = toBool(patch.ffmpegUseWallclock, cfg.ffmpegUseWallclock);
-    }
-
-    if (patch.ffmpegAppIsolationEnabled !== undefined) {
-      next.ffmpegAppIsolationEnabled = toBool(
-        patch.ffmpegAppIsolationEnabled,
-        cfg.ffmpegAppIsolationEnabled
-      );
-    }
-
-    if (patch.ffmpegAppIsolationStrict !== undefined) {
-      next.ffmpegAppIsolationStrict = toBool(
-        patch.ffmpegAppIsolationStrict,
-        cfg.ffmpegAppIsolationStrict
-      );
-    }
-
-    if (patch.ffmpegAppIsolationPrimaryApp !== undefined) {
-      const raw = String(patch.ffmpegAppIsolationPrimaryApp || "").trim();
-      next.ffmpegAppIsolationPrimaryApp = raw
-        ? normalizeConfiguredApp(raw, cfg.ffmpegAppIsolationPrimaryApp)
-        : "";
-    }
-
-    if (patch.ffmpegAppIsolationFallbackApp !== undefined) {
-      const raw = String(patch.ffmpegAppIsolationFallbackApp || "").trim();
-      next.ffmpegAppIsolationFallbackApp = raw
-        ? normalizeConfiguredApp(raw, cfg.ffmpegAppIsolationFallbackApp)
-        : "";
-    }
-
-    if (patch.ffmpegAppIsolationPrimaryDevices !== undefined) {
-      next.ffmpegAppIsolationPrimaryDevices = Array.isArray(patch.ffmpegAppIsolationPrimaryDevices)
-        ? normalizeFfmpegDeviceList(patch.ffmpegAppIsolationPrimaryDevices, [])
-        : normalizeFfmpegDeviceList(
-          patch.ffmpegAppIsolationPrimaryDevices,
-          cfg.ffmpegAppIsolationPrimaryDevices
-        );
-    }
-
-    if (patch.ffmpegAppIsolationFallbackDevices !== undefined) {
-      next.ffmpegAppIsolationFallbackDevices = Array.isArray(patch.ffmpegAppIsolationFallbackDevices)
-        ? normalizeFfmpegDeviceList(patch.ffmpegAppIsolationFallbackDevices, [])
-        : normalizeFfmpegDeviceList(
-          patch.ffmpegAppIsolationFallbackDevices,
-          cfg.ffmpegAppIsolationFallbackDevices
-        );
-    }
-
-    if (patch.ffmpegAppIsolationMultiSource !== undefined) {
-      next.ffmpegAppIsolationMultiSource = toBool(
-        patch.ffmpegAppIsolationMultiSource,
-        cfg.ffmpegAppIsolationMultiSource
-      );
-    }
-
-    if (patch.ffmpegAppIsolationCheckMs !== undefined) {
-      next.ffmpegAppIsolationCheckMs = clamp(
-        Math.round(toNum(patch.ffmpegAppIsolationCheckMs, cfg.ffmpegAppIsolationCheckMs)),
-        60000,
-        1800000
-      );
-    }
-
-    if (patch.procTapCaptureLocks !== undefined) {
-      next.procTapCaptureLocks = sanitizeProcessLoopbackLockMap(patch.procTapCaptureLocks);
-    }
+    assignWhenDefined("procTapCaptureLocks", raw => sanitizeProcessLoopbackLockMap(raw));
 
     const resolvedMinGain = next.autoLevelMinGain !== undefined
       ? next.autoLevelMinGain
@@ -539,7 +435,7 @@ module.exports = function createAudio(onLevel) {
     }
   }
 
-function summarizeRunningApps(rawList = []) {
+  function summarizeRunningApps(rawList = []) {
     const grouped = new Map();
     for (const item of Array.isArray(rawList) ? rawList : []) {
       const processName = sanitizeAppName(item?.ProcessName || item?.processName || "", "");
@@ -551,6 +447,8 @@ function summarizeRunningApps(rawList = []) {
       if (!key) continue;
       const title = String(item?.MainWindowTitle || item?.mainWindowTitle || "").trim();
       const pid = Number(item?.Id || item?.id);
+      const windowHandle = Number(item?.MainWindowHandle || item?.mainWindowHandle || 0);
+      const hasWindow = windowHandle > 0 || Boolean(title);
       if (!grouped.has(key)) {
         grouped.set(key, {
           app: appName.toLowerCase(),
@@ -558,7 +456,9 @@ function summarizeRunningApps(rawList = []) {
           displayName: appName,
           instances: 0,
           pids: [],
-          windowTitles: []
+          windowTitles: [],
+          hasWindow: false,
+          windowHandle: 0
         });
       }
       const entry = grouped.get(key);
@@ -569,28 +469,57 @@ function summarizeRunningApps(rawList = []) {
       if (title && !entry.windowTitles.includes(title)) {
         entry.windowTitles.push(title);
       }
+      if (hasWindow) {
+        entry.hasWindow = true;
+      }
+      if (windowHandle > entry.windowHandle) {
+        entry.windowHandle = windowHandle;
+      }
     }
-  return [...grouped.values()]
-    .sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
-}
-
-function summarizeRunningProcessTokens(rawList = []) {
-  const tokens = new Set();
-  for (const item of Array.isArray(rawList) ? rawList : []) {
-    const processName = sanitizeAppName(item?.ProcessName || item?.processName || "", "");
-    const token = normalizeAppToken(processName);
-    if (!token) continue;
-    tokens.add(token);
+    return [...grouped.values()]
+      .sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
   }
-  return [...tokens.values()];
-}
+
+  function summarizeRunningProcessTokens(rawList = []) {
+    const tokens = new Set();
+    for (const item of Array.isArray(rawList) ? rawList : []) {
+      const processName = sanitizeAppName(item?.ProcessName || item?.processName || "", "");
+      const token = normalizeAppToken(processName);
+      if (!token) continue;
+      tokens.add(token);
+    }
+    return [...tokens.values()];
+  }
+
+  function buildAudioHintedAppList(apps = [], audioTokenList = []) {
+    const audioTokens = new Set(
+      (Array.isArray(audioTokenList) ? audioTokenList : [])
+        .map(token => normalizeAppToken(token))
+        .filter(Boolean)
+    );
+    return (Array.isArray(apps) ? apps : []).map(app => {
+      const token = normalizeAppToken(app?.app || app?.displayName || app?.processName || "");
+      const hasWindow = app?.hasWindow === true || (Array.isArray(app?.windowTitles) && app.windowTitles.length > 0);
+      const audioCapable = Boolean(token && audioTokens.has(token));
+      return {
+        ...app,
+        audioCapable,
+        likelyAudio: audioCapable || hasWindow
+      };
+    });
+  }
 
   function listRunningApps(options = {}) {
     const timeoutMs = clamp(Math.round(toNum(options.timeoutMs, 2500)), 600, 10000);
+    const includeAudioHints = toBool(options.includeAudioHints, false) || toBool(options.audioOnly, false);
+    const audioOnly = toBool(options.audioOnly, false);
+    const audioProbeTimeoutMs = clamp(Math.round(toNum(options.audioProbeTimeoutMs, 2200)), 700, 8000);
     if (process.platform !== "win32") {
       return Promise.resolve({
         ok: false,
         apps: [],
+        processTokens: [],
+        audioHints: null,
         scannedAt: Date.now(),
         error: "running app scan is currently supported on Windows only"
       });
@@ -613,6 +542,7 @@ function summarizeRunningProcessTokens(rawList = []) {
               ok: false,
               apps: [],
               processTokens: [],
+              audioHints: null,
               scannedAt: Date.now(),
               error: String(stderr || stdout || error.message || "app scan failed").trim()
             });
@@ -621,12 +551,81 @@ function summarizeRunningProcessTokens(rawList = []) {
           const parsed = parsePowershellJson(stdout);
           const apps = summarizeRunningApps(parsed);
           const processTokens = summarizeRunningProcessTokens(parsed);
-          resolve({
-            ok: true,
-            apps,
-            processTokens,
-            scannedAt: Date.now()
-          });
+          if (!includeAudioHints) {
+            resolve({
+              ok: true,
+              apps,
+              processTokens,
+              audioHints: null,
+              scannedAt: Date.now()
+            });
+            return;
+          }
+
+          listProcTapAudioProcesses({ timeoutMs: audioProbeTimeoutMs })
+            .then(probe => {
+              const probeOk = Boolean(probe?.ok);
+              const probeProcesses = Array.isArray(probe?.processes) ? probe.processes : [];
+              const audioTokens = probeOk
+                ? [...new Set(probeProcesses.map(item => normalizeAppToken(item?.token)).filter(Boolean))]
+                : [];
+              const hintedApps = buildAudioHintedAppList(apps, audioTokens);
+              let filteredApps = hintedApps.slice();
+              let filterMode = "all";
+              if (audioOnly) {
+                if (audioTokens.length > 0) {
+                  filteredApps = hintedApps.filter(app => app.audioCapable === true);
+                  filterMode = "audio_capable";
+                } else {
+                  filteredApps = hintedApps.filter(app => app.likelyAudio === true);
+                  filterMode = "likely_audio";
+                }
+                if (!filteredApps.length && hintedApps.length) {
+                  filteredApps = hintedApps.slice();
+                  filterMode = "fallback_all";
+                }
+              }
+              resolve({
+                ok: true,
+                apps: filteredApps,
+                processTokens,
+                scannedAt: Date.now(),
+                audioHints: {
+                  includeAudioHints: true,
+                  audioOnly,
+                  mode: filterMode,
+                  source: audioTokens.length > 0 ? "proctap_audio_processes" : "window_activity",
+                  probeOk,
+                  probeError: String(probe?.error || "").trim(),
+                  audioTokens,
+                  totalApps: hintedApps.length,
+                  visibleApps: filteredApps.length
+                }
+              });
+            })
+            .catch(err => {
+              const hintedApps = buildAudioHintedAppList(apps, []);
+              const filteredApps = audioOnly
+                ? hintedApps.filter(app => app.likelyAudio === true)
+                : hintedApps.slice();
+              resolve({
+                ok: true,
+                apps: filteredApps.length ? filteredApps : hintedApps,
+                processTokens,
+                scannedAt: Date.now(),
+                audioHints: {
+                  includeAudioHints: true,
+                  audioOnly,
+                  mode: audioOnly ? "likely_audio" : "all",
+                  source: "window_activity",
+                  probeOk: false,
+                  probeError: String(err?.message || "audio probe failed").trim(),
+                  audioTokens: [],
+                  totalApps: hintedApps.length,
+                  visibleApps: filteredApps.length || hintedApps.length
+                }
+              });
+            });
         }
       );
     });
@@ -870,11 +869,29 @@ function summarizeRunningProcessTokens(rawList = []) {
     let devices = defaultDevices.slice();
 
     if (cfg.ffmpegAppIsolationEnabled) {
-      if (primaryApp && running.has(primaryApp)) {
-        selectedAppToken = primaryApp;
-        selectedApp = primaryAppRaw || `${primaryApp}.exe`;
-        captureToken = resolveCaptureTokenForApp(primaryApp, running) || primaryApp;
-        mode = "primary";
+      const appSelectionCandidates = [
+        {
+          token: primaryApp,
+          appRaw: primaryAppRaw,
+          mode: "primary",
+          preferredDevices: primaryDevices.length ? primaryDevices : defaultDevices.slice()
+        },
+        {
+          token: fallbackApp,
+          appRaw: fallbackAppRaw,
+          mode: "fallback_app",
+          preferredDevices: fallbackDevices.length ? fallbackDevices : defaultDevices.slice()
+        }
+      ];
+      const activeSelection = appSelectionCandidates.find(
+        candidate => candidate.token && running.has(candidate.token)
+      );
+
+      if (activeSelection) {
+        selectedAppToken = activeSelection.token;
+        selectedApp = activeSelection.appRaw || `${activeSelection.token}.exe`;
+        captureToken = resolveCaptureTokenForApp(activeSelection.token, running) || activeSelection.token;
+        mode = activeSelection.mode;
         activeApp = `${captureToken}.exe`;
         const capturePidCount = Number(runningPidCountByToken.get(captureToken) || 0);
         // For multi-process apps (e.g. Firefox/Chrome), capture by name so proctap can follow the
@@ -882,20 +899,7 @@ function summarizeRunningProcessTokens(rawList = []) {
         activePid = capturePidCount === 1
           ? Number(runningPidByToken.get(captureToken) || 0)
           : 0;
-        devices = primaryDevices.length ? primaryDevices : defaultDevices.slice();
-      } else if (fallbackApp && running.has(fallbackApp)) {
-        selectedAppToken = fallbackApp;
-        selectedApp = fallbackAppRaw || `${fallbackApp}.exe`;
-        captureToken = resolveCaptureTokenForApp(fallbackApp, running) || fallbackApp;
-        mode = "fallback_app";
-        activeApp = `${captureToken}.exe`;
-        const capturePidCount = Number(runningPidCountByToken.get(captureToken) || 0);
-        // For multi-process apps (e.g. Firefox/Chrome), capture by name so proctap can follow the
-        // active audio process instead of pinning to a possibly silent helper/UI PID.
-        activePid = capturePidCount === 1
-          ? Number(runningPidByToken.get(captureToken) || 0)
-          : 0;
-        devices = fallbackDevices.length ? fallbackDevices : defaultDevices.slice();
+        devices = activeSelection.preferredDevices.slice();
       } else if (strictIsolation) {
         mode = hasConfiguredTargets ? "awaiting_app" : "strict_missing_target";
         devices = [];

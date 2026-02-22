@@ -28,6 +28,7 @@ const SKIP_DIRS = new Set([
 const SKIP_RELATIVE_DIRS = new Set([
   ".runtime",
   "debug",
+  "core/backups",
   "core/test-versions",
   "core/unstable"
 ]);
@@ -162,6 +163,28 @@ function writePlatformMarker(outDir) {
   fs.writeFileSync(path.join(outDir, "PLATFORM-WINDOWS-ONLY.txt"), `${content}\n`, "utf8");
 }
 
+function writeDistributionManifest(outDir, options = {}) {
+  const selfContained = options.selfContained === true;
+  const manifest = {
+    schema: 1,
+    appName: APP_NAME,
+    version: String(pkg.version || ""),
+    targetPlatform: "windows",
+    packaged: true,
+    selfContained,
+    bootstrapDefaults: {
+      deps: selfContained ? "off" : "on",
+      systemDeps: selfContained ? "off" : "on"
+    },
+    generatedAt: new Date().toISOString()
+  };
+  fs.writeFileSync(
+    path.join(outDir, "distribution.manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8"
+  );
+}
+
 function createReleaseZip(outDir, options = {}) {
   const zipBaseName = String(options.zipBaseName || path.basename(outDir)).trim() || path.basename(outDir);
   const zipPath = path.join(RELEASE_ROOT, `${zipBaseName}.zip`);
@@ -209,12 +232,15 @@ function main() {
   if (fs.existsSync(sanitizeScript)) {
     const sanitizeRelease = require(sanitizeScript);
     if (typeof sanitizeRelease === "function") {
-      sanitizeRelease(finalOutDir);
+      sanitizeRelease(finalOutDir, {
+        purgeBackups: true
+      });
     }
   }
 
   writeReleaseReadme(finalOutDir);
   writePlatformMarker(finalOutDir);
+  writeDistributionManifest(finalOutDir, { selfContained: false });
 
   const zipPath = createReleaseZip(finalOutDir, {
     zipBaseName: path.basename(finalOutDir),

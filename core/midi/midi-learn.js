@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { normalizeMidiActionAlias } = require("./action-normalizer");
 
 const MAP_PATH = path.join(__dirname, "..", "midi-map.json");
 const ACTIONS = Object.freeze([
@@ -86,16 +87,7 @@ function toInt(value, min, max, fallback) {
 }
 
 function normalizeAction(action) {
-  let key = String(action || "").trim().toLowerCase();
-  if (key === "overclock" || key === "oc") key = "overclock_toggle";
-  if (key === "behavior_auto" || key === "behavior_clamp") key = "behavior_interpret";
-  if (key === "flow_up") key = "flow_intensity_up";
-  if (key === "flow_down") key = "flow_intensity_down";
-  if (key === "flow_reset") key = "flow_intensity_reset";
-  if (key === "palette_all_1") key = "palette_preset_all_1";
-  if (key === "palette_all_3") key = "palette_preset_all_3";
-  if (key === "palette_duo_cool") key = "palette_preset_duo_cool";
-  if (key === "palette_duo_warm") key = "palette_preset_duo_warm";
+  const key = normalizeMidiActionAlias(action);
   return ACTION_SET.has(key) ? key : "";
 }
 

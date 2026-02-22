@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { parseBooleanLoose } = require("../utils/booleans");
 
 const DEFAULT_CONFIG = {
   enabled: [],
@@ -37,6 +38,49 @@ const DEFAULT_MOD_DEBUG_MAX_DEPTH = 5;
 const DEFAULT_MOD_TELEMETRY_DEBUG_SAMPLE_MS = 4000;
 const DEFAULT_MOD_TELEMETRY_NO_HANDLER_DEBUG_MS = 0;
 const DEBUG_REDACT_KEY_RE = /(secret|token|password|passwd|clientkey|api[_-]?key|authorization|cookie|session|bearer)/i;
+const FIXTURE_MODE_FILTERS = {
+  engine: fixture => fixture.engineEnabled === true,
+  twitch: fixture => fixture.twitchEnabled === true,
+  custom: fixture => fixture.customEnabled === true
+};
+const FIXTURE_CONFIGURED_BY_BRAND = {
+  hue: fixture => Boolean(fixture.bridgeIp) && Boolean(fixture.username) && Number(fixture.lightId) > 0,
+  wiz: fixture => Boolean(fixture.ip)
+};
+const DEBUG_EXPLANATION_FACTORIES = {
+  "mods.hook.call": ({ hook, modId }) =>
+    `Calling hook${hook ? ` '${hook}'` : ""}${modId ? ` on mod '${modId}'` : ""}.`,
+  "mods.hook.ok": ({ hook, modId }) =>
+    `Hook${hook ? ` '${hook}'` : ""}${modId ? ` for mod '${modId}'` : ""} completed successfully.`,
+  "mods.hook.error": ({ hook, modId }) =>
+    `Hook${hook ? ` '${hook}'` : ""}${modId ? ` for mod '${modId}'` : ""} failed and returned an error.`,
+  "mods.hook.batch.start": ({ hook }) => `Starting hook batch${hook ? ` for '${hook}'` : ""}.`,
+  "mods.hook.batch.done": ({ hook }) => `Finished hook batch${hook ? ` for '${hook}'` : ""}.`,
+  "mods.hook.batch.skipped": ({ hook }) =>
+    `Skipped hook batch${hook ? ` for '${hook}'` : ""} because no loaded handlers are registered.`,
+  "mods.instantiate.start": ({ modId }) =>
+    `Loading mod module${modId ? ` '${modId}'` : ""} and preparing exported hooks.`,
+  "mods.instantiate.ok": ({ modId }) =>
+    `Mod${modId ? ` '${modId}'` : ""} loaded and registered its available hooks.`,
+  "mods.instantiate.failed": ({ modId }) =>
+    `Mod${modId ? ` '${modId}'` : ""} failed during load/initialization.`,
+  "mods.load.start": () => "Starting full mod loader cycle (config read, discover, instantiate).",
+  "mods.load.done": () => "Completed mod loader cycle and refreshed loaded mod snapshot.",
+  "mods.config.loaded": () => "Read and normalized mods.config.json from disk.",
+  "mods.config.invalid": () => "mods.config.json could not be parsed and defaults were applied.",
+  "mods.http.call": () => "Forwarding incoming mod HTTP request to target mod onHttp handler.",
+  "mods.http.ok": () => "Mod HTTP handler returned a valid response.",
+  "mods.http.error": () => "Mod HTTP handler threw an exception while processing request."
+};
+const DEBUG_SECTION_PREFIX_RULES = [
+  { prefix: "mods.config.", title: "CONFIG" },
+  { prefix: "mods.discover.", title: "DISCOVERY" },
+  { prefixes: ["mods.instantiate.", "mods.load.", "mods.teardown."], title: "LIFECYCLE" },
+  { prefix: "mods.hook.", title: "HOOKS" },
+  { prefix: "mods.http.", title: "HTTP" },
+  { prefix: "debug.", title: "DEBUG" },
+  { prefix: "mod.user.", title: "MOD USER" }
+];
 
 function cloneJsonSafe(value, fallback = null) {
   try {
@@ -47,11 +91,7 @@ function cloneJsonSafe(value, fallback = null) {
 }
 
 function parseBool(value, fallback = false) {
-  if (value === undefined || value === null || String(value).trim() === "") return fallback;
-  const raw = String(value).trim().toLowerCase();
-  if (raw === "1" || raw === "true" || raw === "yes" || raw === "on") return true;
-  if (raw === "0" || raw === "false" || raw === "no" || raw === "off") return false;
-  return fallback;
+  return parseBooleanLoose(value, fallback);
 }
 
 function parseIntRange(value, min, max, fallback) {
@@ -159,16 +199,6 @@ function summarizeDebugValue(
   const maxString = parseIntRange(options.maxString, 24, 2048, 260);
 
   if (value === null || value === undefined) return value ?? null;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
-  if (typeof value === "bigint") return String(value);
-  if (typeof value === "string") {
-    if (value.length <= maxString) return value;
-    return `${value.slice(0, Math.max(0, maxString - 3))}...`;
-  }
-  if (typeof value === "function") {
-    return `[function ${value.name || "anonymous"}]`;
-  }
   if (value instanceof Date) {
     const ts = Number(value.getTime());
     return Number.isFinite(ts) ? value.toISOString() : String(value);
@@ -181,8 +211,23 @@ function summarizeDebugValue(
       stack: stack || ""
     };
   }
-  if (typeof value !== "object") {
-    return String(value);
+
+  switch (typeof value) {
+    case "boolean":
+      return value;
+    case "number":
+      return Number.isFinite(value) ? value : String(value);
+    case "bigint":
+      return String(value);
+    case "string":
+      if (value.length <= maxString) return value;
+      return `${value.slice(0, Math.max(0, maxString - 3))}...`;
+    case "function":
+      return `[function ${value.name || "anonymous"}]`;
+    case "object":
+      break;
+    default:
+      return String(value);
   }
 
   if (seen.has(value)) return "[circular]";
@@ -440,17 +485,13 @@ function buildFixtureFilter(filters = {}) {
     if (brand && String(fixture.brand || "").trim().toLowerCase() !== brand) return false;
     if (zone && String(fixture.zone || "").trim().toLowerCase() !== zone) return false;
 
-    if (mode === "engine" && fixture.engineEnabled !== true) return false;
-    if (mode === "twitch" && fixture.twitchEnabled !== true) return false;
-    if (mode === "custom" && fixture.customEnabled !== true) return false;
+    const modeFilter = FIXTURE_MODE_FILTERS[mode];
+    if (modeFilter && !modeFilter(fixture)) return false;
 
     if (!configuredOnly) return true;
-    if (fixture.brand === "hue") {
-      return Boolean(fixture.bridgeIp) && Boolean(fixture.username) && Number(fixture.lightId) > 0;
-    }
-    if (fixture.brand === "wiz") {
-      return Boolean(fixture.ip);
-    }
+    const brandKey = String(fixture.brand || "").trim().toLowerCase();
+    const configuredFilter = FIXTURE_CONFIGURED_BY_BRAND[brandKey];
+    if (configuredFilter) return configuredFilter(fixture);
     return true;
   };
 }
@@ -609,70 +650,26 @@ module.exports = function createModLoader(options = {}) {
   }
 
   function getDefaultDebugExplanation(kind, detail = {}) {
-    const hook = String(detail?.hook || "").trim();
-    const modId = String(detail?.modId || detail?.id || "").trim();
-    if (kind === "mods.hook.call") {
-      return `Calling hook${hook ? ` '${hook}'` : ""}${modId ? ` on mod '${modId}'` : ""}.`;
-    }
-    if (kind === "mods.hook.ok") {
-      return `Hook${hook ? ` '${hook}'` : ""}${modId ? ` for mod '${modId}'` : ""} completed successfully.`;
-    }
-    if (kind === "mods.hook.error") {
-      return `Hook${hook ? ` '${hook}'` : ""}${modId ? ` for mod '${modId}'` : ""} failed and returned an error.`;
-    }
-    if (kind === "mods.hook.batch.start") {
-      return `Starting hook batch${hook ? ` for '${hook}'` : ""}.`;
-    }
-    if (kind === "mods.hook.batch.done") {
-      return `Finished hook batch${hook ? ` for '${hook}'` : ""}.`;
-    }
-    if (kind === "mods.hook.batch.skipped") {
-      return `Skipped hook batch${hook ? ` for '${hook}'` : ""} because no loaded handlers are registered.`;
-    }
-    if (kind === "mods.instantiate.start") {
-      return `Loading mod module${modId ? ` '${modId}'` : ""} and preparing exported hooks.`;
-    }
-    if (kind === "mods.instantiate.ok") {
-      return `Mod${modId ? ` '${modId}'` : ""} loaded and registered its available hooks.`;
-    }
-    if (kind === "mods.instantiate.failed") {
-      return `Mod${modId ? ` '${modId}'` : ""} failed during load/initialization.`;
-    }
-    if (kind === "mods.load.start") {
-      return "Starting full mod loader cycle (config read, discover, instantiate).";
-    }
-    if (kind === "mods.load.done") {
-      return "Completed mod loader cycle and refreshed loaded mod snapshot.";
-    }
-    if (kind === "mods.config.loaded") {
-      return "Read and normalized mods.config.json from disk.";
-    }
-    if (kind === "mods.config.invalid") {
-      return "mods.config.json could not be parsed and defaults were applied.";
-    }
-    if (kind === "mods.http.call") {
-      return "Forwarding incoming mod HTTP request to target mod onHttp handler.";
-    }
-    if (kind === "mods.http.ok") {
-      return "Mod HTTP handler returned a valid response.";
-    }
-    if (kind === "mods.http.error") {
-      return "Mod HTTP handler threw an exception while processing request.";
+    const eventKey = String(kind || "").trim();
+    const factory = DEBUG_EXPLANATION_FACTORIES[eventKey];
+    if (factory) {
+      const ctx = {
+        hook: String(detail?.hook || "").trim(),
+        modId: String(detail?.modId || detail?.id || "").trim()
+      };
+      return factory(ctx);
     }
     return "Detailed mod loader diagnostic event.";
   }
 
   function getDebugSectionTitle(kind = "") {
     const key = String(kind || "").trim().toLowerCase();
-    if (key.startsWith("mods.config.")) return "CONFIG";
-    if (key.startsWith("mods.discover.")) return "DISCOVERY";
-    if (key.startsWith("mods.instantiate.") || key.startsWith("mods.load.") || key.startsWith("mods.teardown.")) {
-      return "LIFECYCLE";
+    for (const rule of DEBUG_SECTION_PREFIX_RULES) {
+      if (rule.prefix && key.startsWith(rule.prefix)) return rule.title;
+      if (Array.isArray(rule.prefixes) && rule.prefixes.some(prefix => key.startsWith(prefix))) {
+        return rule.title;
+      }
     }
-    if (key.startsWith("mods.hook.")) return "HOOKS";
-    if (key.startsWith("mods.http.")) return "HTTP";
-    if (key.startsWith("debug.")) return "DEBUG";
-    if (key.startsWith("mod.user.")) return "MOD USER";
     return "GENERAL";
   }
 
@@ -812,36 +809,49 @@ module.exports = function createModLoader(options = {}) {
 
   function setDebugConfig(patch = {}) {
     const next = patch && typeof patch === "object" ? patch : {};
-    if (Object.prototype.hasOwnProperty.call(next, "enabled")) {
-      debugEnabled = parseBool(next.enabled, debugEnabled);
+    const hasOwn = key => Object.prototype.hasOwnProperty.call(next, key);
+    const scalarTransforms = [
+      {
+        key: "enabled",
+        apply: raw => {
+          debugEnabled = parseBool(raw, debugEnabled);
+        }
+      },
+      {
+        key: "maxPayloadChars",
+        apply: raw => {
+          debugPayloadChars = parseIntRange(raw, 300, 20000, debugPayloadChars);
+        }
+      },
+      {
+        key: "maxDepth",
+        apply: raw => {
+          debugMaxDepth = parseIntRange(raw, 2, 8, debugMaxDepth);
+        }
+      },
+      {
+        key: "telemetryDebugSampleMs",
+        apply: raw => {
+          telemetryDebugSampleMs = parseIntRange(raw, 250, 60000, telemetryDebugSampleMs);
+        }
+      },
+      {
+        key: "telemetryNoHandlerDebugMs",
+        apply: raw => {
+          telemetryNoHandlerDebugMs = parseIntRange(raw, 0, 300000, telemetryNoHandlerDebugMs);
+        }
+      }
+    ];
+    for (const spec of scalarTransforms) {
+      if (!hasOwn(spec.key)) continue;
+      spec.apply(next[spec.key]);
     }
-    if (Object.prototype.hasOwnProperty.call(next, "maxEvents")) {
+
+    if (hasOwn("maxEvents")) {
       debugMaxEvents = parseIntRange(next.maxEvents, 100, 5000, debugMaxEvents);
       while (debugEvents.length > debugMaxEvents) {
         debugEvents.shift();
       }
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "maxPayloadChars")) {
-      debugPayloadChars = parseIntRange(next.maxPayloadChars, 300, 20000, debugPayloadChars);
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "maxDepth")) {
-      debugMaxDepth = parseIntRange(next.maxDepth, 2, 8, debugMaxDepth);
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "telemetryDebugSampleMs")) {
-      telemetryDebugSampleMs = parseIntRange(
-        next.telemetryDebugSampleMs,
-        250,
-        60000,
-        telemetryDebugSampleMs
-      );
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "telemetryNoHandlerDebugMs")) {
-      telemetryNoHandlerDebugMs = parseIntRange(
-        next.telemetryNoHandlerDebugMs,
-        0,
-        300000,
-        telemetryNoHandlerDebugMs
-      );
     }
     if (next.clear === true) {
       clearDebugEvents();

@@ -10,16 +10,33 @@ try {
 }
 
 const midiLearn = require("./midi-learn");
-const PALETTE_FAMILIES = Object.freeze(["blue", "purple", "red", "green", "yellow"]);
+const { normalizeMidiActionAlias } = require("./action-normalizer");
+const PALETTE_FAMILIES = Object.freeze(["red", "green", "blue"]);
+const PALETTE_FAMILY_ALIASES = Object.freeze({
+  purple: "red",
+  magenta: "red",
+  pink: "red",
+  yellow: "green",
+  amber: "green",
+  lime: "green",
+  cyan: "blue",
+  aqua: "blue",
+  teal: "blue"
+});
 const PALETTE_PRESETS = Object.freeze({
-  palette_preset_all_1: Object.freeze({ families: Object.freeze(["blue", "purple", "red", "green", "yellow"]), colorsPerFamily: 1 }),
-  palette_preset_all_3: Object.freeze({ families: Object.freeze(["blue", "purple", "red", "green", "yellow"]), colorsPerFamily: 3 }),
-  palette_preset_duo_cool: Object.freeze({ families: Object.freeze(["blue", "purple"]) }),
-  palette_preset_duo_warm: Object.freeze({ families: Object.freeze(["red", "yellow"]) })
+  palette_preset_all_1: Object.freeze({ families: Object.freeze(["red", "green", "blue"]), colorsPerFamily: 1 }),
+  palette_preset_all_3: Object.freeze({ families: Object.freeze(["red", "green", "blue"]), colorsPerFamily: 3 }),
+  palette_preset_duo_cool: Object.freeze({ families: Object.freeze(["green", "blue"]) }),
+  palette_preset_duo_warm: Object.freeze({ families: Object.freeze(["red", "green"]) })
 });
 const FLOW_INTENSITY_STEP = 0.1;
 const FLOW_INTENSITY_DEFAULT = 1;
 const MIDI_CC_REPEAT_MIN_MS = 90;
+const MIDI_COMMAND_TYPE_MAP = Object.freeze({
+  0xb0: "cc",
+  0x90: "note",
+  0x80: "note"
+});
 
 function safePortName(input, index) {
   try {
@@ -30,17 +47,7 @@ function safePortName(input, index) {
 }
 
 function normalizeAction(action) {
-  let key = String(action || "").trim().toLowerCase();
-  if (key === "overclock" || key === "oc") key = "overclock_toggle";
-  if (key === "behavior_auto" || key === "behavior_clamp") key = "behavior_interpret";
-  if (key === "flow_up") key = "flow_intensity_up";
-  if (key === "flow_down") key = "flow_intensity_down";
-  if (key === "flow_reset") key = "flow_intensity_reset";
-  if (key === "palette_all_1") key = "palette_preset_all_1";
-  if (key === "palette_all_3") key = "palette_preset_all_3";
-  if (key === "palette_duo_cool") key = "palette_preset_duo_cool";
-  if (key === "palette_duo_warm") key = "palette_preset_duo_warm";
-  return key;
+  return normalizeMidiActionAlias(action);
 }
 
 function actionLabel(action) {
@@ -56,14 +63,8 @@ function parseMidiMessage(payload) {
   if (!Number.isFinite(status) || !Number.isFinite(number) || !Number.isFinite(rawValue)) return null;
 
   const command = status & 0xf0;
-  let type = "";
-  if (command === 0xb0) {
-    type = "cc";
-  } else if (command === 0x90 || command === 0x80) {
-    type = "note";
-  } else {
-    return null;
-  }
+  const type = MIDI_COMMAND_TYPE_MAP[command] || "";
+  if (!type) return null;
 
   return {
     type,
@@ -191,23 +192,33 @@ module.exports = function createMidiManager(engine) {
     };
     const setPaletteFamilies = families => {
       if (!Array.isArray(families) || !families.length) return false;
-      const normalized = Array.from(
+      const normalizedRaw = Array.from(
         new Set(
           families
-            .map(item => String(item || "").trim().toLowerCase())
+            .map(item => {
+              const key = String(item || "").trim().toLowerCase();
+              return PALETTE_FAMILY_ALIASES[key] || key;
+            })
             .filter(item => PALETTE_FAMILIES.includes(item))
         )
       );
+      const normalized = PALETTE_FAMILIES.filter(family => normalizedRaw.includes(family));
       if (!normalized.length) return false;
       return setPaletteConfig({ families: normalized });
     };
     const togglePaletteFamily = familyId => {
-      const family = String(familyId || "").trim().toLowerCase();
+      const familyRaw = String(familyId || "").trim().toLowerCase();
+      const family = PALETTE_FAMILY_ALIASES[familyRaw] || familyRaw;
       if (!PALETTE_FAMILIES.includes(family)) return false;
       const current = getPaletteConfig();
       const currentFamilies = Array.isArray(current?.families)
-        ? current.families.map(name => String(name || "").trim().toLowerCase()).filter(Boolean)
-        : ["blue", "purple"];
+        ? current.families
+            .map(name => {
+              const key = String(name || "").trim().toLowerCase();
+              return PALETTE_FAMILY_ALIASES[key] || key;
+            })
+            .filter(Boolean)
+        : ["red", "green", "blue"];
       const next = currentFamilies.includes(family)
         ? currentFamilies.filter(item => item !== family)
         : [...currentFamilies, family];
@@ -364,6 +375,12 @@ module.exports = function createMidiManager(engine) {
 
       case "palette_colors_5":
         return setPaletteConfig({ colorsPerFamily: 5 });
+
+      case "palette_colors_8":
+        return setPaletteConfig({ colorsPerFamily: 8 });
+
+      case "palette_colors_12":
+        return setPaletteConfig({ colorsPerFamily: 12 });
 
       case "palette_family_blue":
       case "palette_family_purple":

@@ -1,24 +1,16 @@
 # Changelog
 
-## v1.5.1 - Twitch Rave Activation Text Gate Clarification (2026-02-20)
+## v1.5.2 - Hotfix Rollup + Release Safety (2026-02-22)
 
-### Twitch Reward Behavior
-- Added configurable `RAVE_ACTIVATE_TEXT` handling in StreamElements templates.
-- `RAVE_ACTIVATE_TEXT = "on"` now acts as a wildcard gate for any non-empty user-entered text.
-- Empty gate (`""`) keeps unconditional activation for the configured RAVE reward ID.
-- Non-empty custom gate values still require exact case-insensitive text match.
+### What Users Will Notice
+- Music-reactive color behavior was re-tuned so palette movement follows audio metrics more directly in `baseline+drums`, `peaks`, `transients`, and `flux`.
+- Legacy brightness now has better loud/quiet contrast, with cleaner low-end behavior and less “always bright” output.
+- WiZ brightness handling is more usable during quiet passages and transitions.
 
-## v1.5.1 - Twitch Color Routing + Hue Busy Status Fixes (2026-02-20)
-
-### Twitch Command Reliability
-- Restored legacy `GET /color` compatibility so older StreamElements widget templates keep working.
-- Updated bundled Twitch widget templates to send `POST /color` JSON payloads (current preferred path).
-- Added `/color` guard so commands are rejected while RAVE is active (prevents command overlap with live engine output).
-- Added off-rave color routing fallback to `ENGINE`-routed fixtures when no `TWITCH`-enabled fixtures are configured.
-
-### Hue/Engine Status UX
-- Removed noisy transient `ENGINE BUSY` health state caused by in-flight Hue sends.
-- Simplified active Hue Entertainment status text to `ENT ON` for clearer runtime state.
+### Reliability + Setup
+- Packaging/install flow was tightened so updates are more predictable and safer to install.
+- Runtime behavior remains compatible with existing profiles and routing choices.
+- This release is the recommended baseline for all users.
 
 ## v1.5.1 - Security Hardening + Reactivity Polish (2026-02-19)
 
@@ -132,7 +124,7 @@
 
 1. Open releases:
    - `https://github.com/NameSRoby/ravelink-bridge/releases`
-2. Download the latest `RaveLink-Bridge-Windows-v1.5.1.zip`.
+2. Download the latest `RaveLink-Bridge-Windows-v1.5.2.zip`.
 3. Extract the zip.
 4. Install dependencies if needed:
    - `npm install`

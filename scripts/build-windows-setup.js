@@ -14,6 +14,7 @@ const INSTALLER_DIR = path.join(RELEASE_ROOT, "installer");
 const OUTPUT_BASE_FILENAME = `RaveLink-Bridge-Windows-v${pkg.version}-setup-installer`;
 const ISS_PATH = path.join(INSTALLER_DIR, `${OUTPUT_BASE_FILENAME}.iss`);
 const SELF_CONTAINED_ZIP = path.join(RELEASE_ROOT, `${RELEASE_NAME}-self-contained.zip`);
+const sanitizeRelease = require("./sanitize-release");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -52,6 +53,24 @@ function copyFileIfExists(sourceFile, destinationFile) {
   return true;
 }
 
+function resolveCommandPathWindows(commandName) {
+  const result = spawnSync("where.exe", [String(commandName || "").trim()], {
+    cwd: ROOT,
+    stdio: "pipe",
+    encoding: "utf8",
+    windowsHide: true
+  });
+  if (result.status !== 0) return "";
+  const lines = String(result.stdout || "")
+    .split(/\r?\n/g)
+    .map(line => line.trim())
+    .filter(Boolean);
+  for (const line of lines) {
+    if (fs.existsSync(line)) return line;
+  }
+  return "";
+}
+
 function copyBundledRuntime() {
   const runtimeDir = path.join(RELEASE_DIR, "runtime");
   const nodeDir = path.dirname(process.execPath);
@@ -77,6 +96,59 @@ function stageNodeModules() {
   const source = path.join(ROOT, "node_modules");
   const target = path.join(RELEASE_DIR, "node_modules");
   copyDir(source, target);
+}
+
+function stageBundledFfmpegRuntime() {
+  const ffmpegPath = resolveCommandPathWindows("ffmpeg.exe") || resolveCommandPathWindows("ffmpeg");
+  if (!ffmpegPath) return false;
+
+  const sourceDir = path.dirname(ffmpegPath);
+  const targetDir = path.join(RELEASE_DIR, "runtime", "tools", "ffmpeg");
+  ensureDir(targetDir);
+  fs.copyFileSync(ffmpegPath, path.join(targetDir, "ffmpeg.exe"));
+
+  const ffprobeSource = path.join(sourceDir, "ffprobe.exe");
+  if (fs.existsSync(ffprobeSource)) {
+    fs.copyFileSync(ffprobeSource, path.join(targetDir, "ffprobe.exe"));
+  }
+
+  const dllFiles = fs.readdirSync(sourceDir)
+    .filter(name => /\.dll$/i.test(name));
+  for (const name of dllFiles) {
+    copyFileIfExists(path.join(sourceDir, name), path.join(targetDir, name));
+  }
+  return true;
+}
+
+function sanitizePayloadForDistribution() {
+  // Re-apply sanitize pass at payload root to guarantee no local-sensitive runtime
+  // config slips into installer artifacts after staging runtime/tooling content.
+  sanitizeRelease(RELEASE_DIR, {
+    purgeRuntime: false,
+    purgeRelease: false,
+    pruneRootArtifacts: false,
+    purgeBackups: true
+  });
+}
+
+function writeDistributionManifestPatch(patch = {}) {
+  const manifestPath = path.join(RELEASE_DIR, "distribution.manifest.json");
+  let current = {};
+  try {
+    if (fs.existsSync(manifestPath)) {
+      const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        current = parsed;
+      }
+    }
+  } catch {}
+
+  const next = {
+    ...current,
+    ...patch,
+    generatedAt: new Date().toISOString()
+  };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 }
 
 function findIsccPath() {
@@ -141,13 +213,19 @@ function writeInstallerScript() {
     "",
     "[Tasks]",
     "Name: \"desktopicon\"; Description: \"Create a desktop shortcut\"; GroupDescription: \"Additional icons:\"; Flags: unchecked",
+    "Name: \"desktopuiicon\"; Description: \"Create a desktop shortcut for the browser UI\"; GroupDescription: \"Additional icons:\"; Flags: unchecked",
     "",
     "[Files]",
     "Source: \"{#SourceDir}\\*\"; DestDir: \"{app}\"; Flags: ignoreversion recursesubdirs createallsubdirs",
     "",
     "[Icons]",
-    "Name: \"{group}\\RaveLink Bridge\"; Filename: \"{app}\\RaveLink-Bridge.bat\"",
+    "Name: \"{group}\\RaveLink Bridge (Start)\"; Filename: \"{app}\\RaveLink-Bridge.bat\"",
+    "Name: \"{group}\\RaveLink Bridge (Stop)\"; Filename: \"{app}\\RaveLink-Bridge-Stop.bat\"",
+    "Name: \"{group}\\RaveLink Bridge (Open UI)\"; Filename: \"http://127.0.0.1:5050\"",
+    "Name: \"{group}\\RaveLink Bridge (Install Optional Audio Tools)\"; Filename: \"{app}\\RaveLink-Bridge-Install-Optional-Audio-Tools.bat\"",
+    "Name: \"{group}\\Uninstall RaveLink Bridge\"; Filename: \"{uninstallexe}\"",
     "Name: \"{autodesktop}\\RaveLink Bridge\"; Filename: \"{app}\\RaveLink-Bridge.bat\"; Tasks: desktopicon",
+    "Name: \"{autodesktop}\\RaveLink Bridge UI\"; Filename: \"http://127.0.0.1:5050\"; Tasks: desktopuiicon",
     "",
     "[Run]",
     "Filename: \"{app}\\RaveLink-Bridge.bat\"; Description: \"Launch RaveLink Bridge\"; Flags: nowait postinstall skipifsilent"
@@ -195,6 +273,28 @@ function main() {
 
   console.log("[build-windows-setup] Bundling local Node runtime...");
   copyBundledRuntime();
+
+  console.log("[build-windows-setup] Bundling ffmpeg runtime when available...");
+  const ffmpegBundled = stageBundledFfmpegRuntime();
+  if (ffmpegBundled) {
+    console.log("[build-windows-setup] Bundled ffmpeg runtime detected and copied.");
+  } else {
+    console.log("[build-windows-setup] ffmpeg not detected on build machine; installer will run without bundled ffmpeg.");
+  }
+
+  writeDistributionManifestPatch({
+    selfContained: true,
+    bundledRuntime: true,
+    bundledNodeModules: true,
+    bundledFfmpeg: ffmpegBundled === true,
+    bootstrapDefaults: {
+      deps: "off",
+      systemDeps: "off"
+    }
+  });
+
+  console.log("[build-windows-setup] Sanitizing staged payload...");
+  sanitizePayloadForDistribution();
 
   console.log("[build-windows-setup] Creating self-contained zip...");
   createSelfContainedZip();

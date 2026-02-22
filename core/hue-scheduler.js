@@ -22,12 +22,12 @@ module.exports = function createHueScheduler() {
     forcedHeartbeat: 0
   };
 
-  const MIN_INTERVAL = 260; // ms
-  const MAX_SILENCE_MS = 1200; // force a refresh when delta stays tiny too long
+  const MIN_INTERVAL = 220; // ms
+  const MAX_SILENCE_MS = 900; // force a refresh when delta stays tiny too long
   const DELTA = {
-    hue: 420,
-    bri: 6,
-    sat: 6
+    hue: 300,
+    bri: 4,
+    sat: 4
   };
 
   function remember(state, now) {

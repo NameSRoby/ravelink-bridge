@@ -1,6 +1,7 @@
 node_modules/
 release/
 .runtime/
+.pushrepo/
 core/fixtures.config.local.backup.json
 core/.core-lock.key
 ravelink-bridge/

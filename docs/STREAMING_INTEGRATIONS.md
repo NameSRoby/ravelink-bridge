@@ -30,8 +30,8 @@ You can use Streamer.bot, Mix It Up, SAMMI, or any bot that can send HTTP reques
 Common mappings:
 - `POST /rave/on`
 - `POST /rave/off`
-- `GET /teach?value1=<phrase>`
-- `GET /color?value1=<color>`
+- `POST /teach?value1=<phrase>`
+- `POST /color?value1=<color>`
 
 More control:
 - `POST /rave/palette` (example: `{"families":["blue","purple"],"colorsPerFamily":3}`)

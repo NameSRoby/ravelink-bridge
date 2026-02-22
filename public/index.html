@@ -445,12 +445,22 @@ button:disabled{
 .grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
 .liveProfileRow{
   display:grid;
-  grid-template-columns:minmax(140px,1.4fr) repeat(3,minmax(92px,auto));
+  grid-template-columns:minmax(140px,1.2fr) minmax(140px,1fr) repeat(4,minmax(92px,auto));
   gap:8px;
   align-items:center;
   margin:8px 0 4px;
 }
 .liveProfileRow input{
+  min-height:34px;
+  border:1px solid #2a3f6b;
+  border-radius:9px;
+  background:#0b1226;
+  color:var(--text);
+  padding:0 10px;
+  font-size:12px;
+  letter-spacing:.4px;
+}
+.liveProfileRow select{
   min-height:34px;
   border:1px solid #2a3f6b;
   border-radius:9px;
@@ -468,6 +478,14 @@ button:disabled{
 }
 .liveProfileStat{
   margin-top:2px;
+}
+.profileAppliedPulse{
+  animation:profileAppliedPulseAnim 900ms ease-out 1;
+}
+@keyframes profileAppliedPulseAnim{
+  0%{box-shadow:0 0 0 rgba(0,0,0,0)}
+  30%{box-shadow:0 0 18px var(--accentGlow)}
+  100%{box-shadow:0 0 0 rgba(0,0,0,0)}
 }
 
 .sceneLockRows{
@@ -1280,6 +1298,14 @@ canvas{width:100%;height:160px}
   color:#9eb0db;
 }
 
+.paletteScopeHint{
+  margin:6px 0 0;
+}
+
+.paletteScopeHintWarn{
+  color:#ffc485;
+}
+
 .paletteBrandMiniGrid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
@@ -1653,6 +1679,74 @@ canvas{width:100%;height:160px}
 
 .audioQuickActionRow{
   margin-top:10px;
+}
+
+.audioRouteModeRow{
+  margin-top:8px;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+
+.audioRouteModeRow label{
+  margin:0;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:11px;
+}
+
+.audioAppsFilterHint{
+  margin-top:6px;
+}
+
+.audioIsoAdvanced{
+  display:grid;
+  gap:6px;
+}
+
+.audioIsoAdvanced label{
+  margin-bottom:0;
+}
+
+.audioOptionalToolsBanner{
+  margin-top:10px;
+  border:1px solid #264377;
+  border-radius:10px;
+  background:linear-gradient(180deg,#0f1a34,#091226);
+  padding:10px;
+}
+
+.audioOptionalToolsBanner.warn{
+  border-color:#7a5f27;
+  background:linear-gradient(180deg,#2a200c,#171105);
+}
+
+.audioOptionalToolsBanner.ok{
+  border-color:#2b6a44;
+  background:linear-gradient(180deg,#11281d,#0b1a12);
+}
+
+.audioOptionalToolsHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.audioOptionalToolsBody{
+  margin-top:6px;
+}
+
+.audioOptionalToolsActions{
+  margin-top:8px;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+
+.audioOptionalToolsActions button{
+  min-height:34px;
 }
 
 .audioQuickActionRow button{
@@ -2047,7 +2141,8 @@ tr:last-child td{
   .grid5{grid-template-columns:1fr 1fr}
   .grid6{grid-template-columns:1fr 1fr}
   .liveProfileRow{grid-template-columns:1fr 1fr}
-  .liveProfileRow input{grid-column:1 / -1}
+  .liveProfileRow input,
+  .liveProfileRow select{grid-column:1 / -1}
   .telemetry{grid-template-columns:1fr 1fr}
   .controlRow{grid-template-columns:1fr 1fr}
   .fixtureGrid{grid-template-columns:1fr 1fr}
@@ -2061,6 +2156,8 @@ tr:last-child td{
   .apiBaseRow{grid-template-columns:1fr}
   .routeGuideGrid{grid-template-columns:1fr}
   .audioGuideGrid{grid-template-columns:1fr}
+  .audioRouteModeRow{grid-template-columns:1fr}
+  .audioOptionalToolsActions{grid-template-columns:1fr}
   .audioQuickSecondaryRow{grid-template-columns:1fr}
   .audioQuickTuneGrid{grid-template-columns:1fr}
   .audioQuickTuneMeta{grid-template-columns:1fr}
@@ -2283,8 +2380,12 @@ tr:last-child td{
     </div>
     <div class="liveProfileRow">
       <input id="liveProfileName" type="text" placeholder="profile name (local)" maxlength="32" autocomplete="off" spellcheck="false">
+      <select id="liveProfileSelect" title="Select a saved local LIVE profile.">
+        <option value="__custom__">CUSTOM / TYPE NAME</option>
+      </select>
       <button id="liveProfileSaveBtn" type="button">SAVE PROFILE</button>
       <button id="liveProfileLoadBtn" type="button">LOAD PROFILE</button>
+      <button id="liveProfileDeleteBtn" type="button" class="warn">DELETE PROFILE</button>
       <button id="liveProfileResetBtn" type="button">RESET DEFAULT</button>
     </div>
     <p id="liveProfileStat" class="hint liveProfileStat">LIVE PROFILE: default (unsaved)</p>
@@ -2420,6 +2521,15 @@ tr:last-child td{
           <button type="button" data-palette-count="8">8 COLORS/FAMILY</button>
           <button type="button" data-palette-count="12">12 COLORS/FAMILY</button>
         </div>
+        <p class="advancedSubTitle">VIVIDNESS</p>
+        <div class="grid5">
+          <button type="button" data-palette-vividness="0">SOFT</button>
+          <button type="button" data-palette-vividness="1">BALANCED</button>
+          <button type="button" data-palette-vividness="2">HIGH</button>
+          <button type="button" data-palette-vividness="3">ULTRA</button>
+          <button type="button" data-palette-vividness="4">MAX</button>
+        </div>
+        <p class="hint">Higher vividness increases saturation/contrast while keeping family identity.</p>
 
         <p class="advancedSubTitle">QUICK PRESETS</p>
         <div class="grid4">
@@ -2493,6 +2603,20 @@ tr:last-child td{
             <input id="paletteReactiveMargin" type="range" min="5" max="100" step="1" value="28">
           </div>
         </div>
+
+        <p class="advancedSubTitle">BRIGHTNESS ENGINE (RAVE TEST)</p>
+        <div class="grid2">
+          <button type="button" data-palette-brightness-mode="legacy">LEGACY</button>
+          <button type="button" data-palette-brightness-mode="test">TEST FOLLOW</button>
+        </div>
+        <div id="paletteBrightnessFollowWrap" class="slider hidden">
+          <label>
+            <span>FOLLOW AMOUNT</span>
+            <span id="paletteBrightnessFollowAmountVal" class="sliderValue">1.00x</span>
+          </label>
+          <input id="paletteBrightnessFollowAmount" type="range" min="0" max="200" step="1" value="100">
+        </div>
+        <p class="hint">LEGACY keeps current brightness behavior. TEST links brightness to palette color motion + audio dynamics.</p>
 
         <div id="paletteSpectrumControls" class="paletteControlWrap hidden">
           <p class="hint">Spectrum Mapper picks the active palette group from audio features. Color motion inside that group still follows ORDER/DISORDER.</p>
@@ -2583,7 +2707,7 @@ tr:last-child td{
         <p class="hint">Force a rescan for FFmpeg app-isolation priority/fallback now (without waiting for the 5-minute auto check).</p>
         <div class="grid2 audioQuickActionRow">
           <button id="liveAudioAppSearchBtn" type="button">FORCE APP SEARCH</button>
-          <input id="liveAudioAppSearchStat" class="audioAppSearchStatus" type="text" value="App isolation scan idle." readonly>
+          <input id="liveAudioAppSearchStat" class="audioAppSearchStatus" type="text" value="App source scan idle." readonly>
         </div>
         <p class="hint">Use this after opening your priority app to force immediate capture-source handoff.</p>
       </div>
@@ -3005,6 +3129,19 @@ tr:last-child td{
         </div>
       </div>
     </div>
+    <div id="aOptionalToolsBanner" class="audioOptionalToolsBanner hidden">
+      <div class="audioOptionalToolsHead">
+        <strong>OPTIONAL AUDIO TOOLS</strong>
+        <span id="aOptionalToolsBadge" class="statusPill warn">CHECKING</span>
+      </div>
+      <p id="aOptionalToolsText" class="hint audioOptionalToolsBody">
+        Checking optional app-isolation tools...
+      </p>
+      <div class="audioOptionalToolsActions">
+        <button id="aOptionalToolsInfoBtn" type="button">HOW TO INSTALL</button>
+        <button id="aOptionalToolsDismissBtn" type="button">DISMISS</button>
+      </div>
+    </div>
     <div class="subcluster">
       <h3>QUICK SETUP</h3>
       <p class="hint">For most users: pick a device, choose sample rate + frames, then apply.</p>
@@ -3054,17 +3191,22 @@ tr:last-child td{
           <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide source routing and app isolation setup.">COLLAPSE</button>
         </div>
         <div class="clusterBody">
-          <p class="hint">Easy setup: 1) pick backend + input source, 2) add isolated cable sources, 3) select priority/fallback app, 4) apply audio config.</p>
+          <p class="hint">Quick setup: choose main app + backup app, verify source devices, then apply audio config. Advanced controls remain available.</p>
+          <div class="audioRouteModeRow">
+            <label><input id="aIsoSimpleMode" type="checkbox" checked> SIMPLE MODE (RECOMMENDED)</label>
+            <label><input id="aAppsShowAll" type="checkbox"> SHOW ALL PROCESSES (ADVANCED)</label>
+          </div>
+          <p id="aAppsFilterHint" class="hint audioAppsFilterHint">APP LIST MODE: likely audio apps.</p>
           <div class="controlRow">
             <div>
-              <label for="aInputBackend">INPUT BACKEND <span class="infoTip" title="AUTO uses PortAudio unless an FFmpeg input device is configured. Use FFMPEG for app-isolated virtual-device capture.">?</span></label>
+              <label for="aInputBackend">CAPTURE BACKEND <span class="infoTip" title="AUTO uses PortAudio unless an FFmpeg input device is configured. Use FFMPEG for app-isolated virtual-device capture.">?</span></label>
               <select id="aInputBackend">
                 <option value="auto">auto</option>
                 <option value="portaudio">portaudio</option>
                 <option value="ffmpeg">ffmpeg</option>
               </select>
             </div>
-            <div>
+            <div class="audioIsoAdvanced">
               <label for="aFfmpegFormat">FFMPEG INPUT FORMAT <span class="infoTip" title="Windows usually uses dshow for virtual cables.">?</span></label>
               <select id="aFfmpegFormat">
                 <option value="dshow">dshow</option>
@@ -3072,49 +3214,51 @@ tr:last-child td{
               </select>
             </div>
             <div>
-              <label for="aFfmpegDevice">FFMPEG INPUT DEVICE <span class="infoTip" title="For dshow, use device display name (example: CABLE Output (VB-Audio Virtual Cable)).">?</span></label>
+              <label for="aFfmpegDevice">PRIMARY INPUT DEVICE (FFMPEG) <span class="infoTip" title="For dshow, use device display name (example: CABLE Output (VB-Audio Virtual Cable)).">?</span></label>
               <input id="aFfmpegDevice" type="text" value="" placeholder="CABLE Output (VB-Audio Virtual Cable)">
             </div>
             <div>
-              <label for="aFfmpegSources">DEFAULT ISOLATED SOURCES <span class="infoTip" title="One source per line (or comma-separated). First source is used by default.">?</span></label>
+              <label for="aFfmpegSources">DEFAULT SOURCE DEVICE(S) <span class="infoTip" title="One source per line (or comma-separated). First source is used by default.">?</span></label>
               <textarea id="aFfmpegSources" rows="3" placeholder="CABLE Output (VB-Audio Virtual Cable)"></textarea>
             </div>
           </div>
           <div class="controlRow">
             <div>
-              <label><input id="aAppIsolationEnabled" type="checkbox"> APP ISOLATION AUTO SWITCH (RECOMMENDED)</label>
-              <label><input id="aAppIsolationMultiSource" type="checkbox"> MIX MULTIPLE SOURCES (AMIX)</label>
-              <label><input id="aAppIsolationStrict" type="checkbox"> STRICT APP ISOLATION (NO FALLBACK)</label>
-              <label for="aAppIsolationCheckMs">APP ISO CHECK INTERVAL</label>
-              <select id="aAppIsolationCheckMs">
-                <option value="60000">1 MIN</option>
-                <option value="120000">2 MIN</option>
-                <option value="300000" selected>5 MIN</option>
-                <option value="600000">10 MIN</option>
-                <option value="900000">15 MIN</option>
-              </select>
-              <p class="hint">When MIX is OFF, only the first source is used. When ON, all listed sources are mixed.</p>
+              <label><input id="aAppIsolationEnabled" type="checkbox"> AUTO SWITCH TO MAIN/BACKUP APP (RECOMMENDED)</label>
+              <div class="audioIsoAdvanced">
+                <label><input id="aAppIsolationMultiSource" type="checkbox"> MIX MULTIPLE SOURCES (AMIX)</label>
+                <label><input id="aAppIsolationStrict" type="checkbox"> STRICT APP ISOLATION (NO FALLBACK)</label>
+                <label for="aAppIsolationCheckMs">APP ISO CHECK INTERVAL</label>
+                <select id="aAppIsolationCheckMs">
+                  <option value="60000">1 MIN</option>
+                  <option value="120000">2 MIN</option>
+                  <option value="300000" selected>5 MIN</option>
+                  <option value="600000">10 MIN</option>
+                  <option value="900000">15 MIN</option>
+                </select>
+                <p class="hint">When MIX is OFF, only the first source is used. When ON, all listed sources are mixed.</p>
+              </div>
             </div>
             <div>
-              <label for="aAppPrimary">PRIORITY APP (RUNNING APPS)</label>
+              <label for="aAppPrimary">MAIN APP (AUTO SWITCH)</label>
               <select id="aAppPrimary"></select>
             </div>
             <div>
-              <label for="aAppFallback">FALLBACK APP (RUNNING APPS)</label>
+              <label for="aAppFallback">BACKUP APP (IF MAIN IS CLOSED)</label>
               <select id="aAppFallback"></select>
             </div>
-            <div>
+            <div class="audioIsoAdvanced">
               <label for="aAppPrimarySources">PRIORITY APP SOURCES <span class="infoTip" title="Optional override source list for the priority app. Leave blank to use DEFAULT ISOLATED SOURCES.">?</span></label>
               <textarea id="aAppPrimarySources" rows="3" placeholder="optional override"></textarea>
             </div>
-            <div>
+            <div class="audioIsoAdvanced">
               <label for="aAppFallbackSources">FALLBACK APP SOURCES <span class="infoTip" title="Optional override source list for fallback app or fallback mode when priority app is missing.">?</span></label>
               <textarea id="aAppFallbackSources" rows="3" placeholder="optional fallback override"></textarea>
             </div>
           </div>
           <div class="grid2 audioQuickActionRow">
-            <button id="aAppsRefreshBtn" type="button" title="Refresh running app list for app-isolation selectors.">REFRESH RUNNING APPS</button>
-            <input id="aAppIsolationStatus" class="audioAppSearchStatus" type="text" value="App isolation scan idle." readonly>
+            <button id="aAppsRefreshBtn" type="button" title="Refresh running app list for app-isolation selectors.">REFRESH APP LIST</button>
+            <input id="aAppIsolationStatus" class="audioAppSearchStatus" type="text" value="App source scan idle." readonly>
           </div>
           <p class="hint">Windows workflow: route each target app to a virtual cable in App Volume & Device Preferences, then map those cable device names here.</p>
         </div>
@@ -4190,6 +4334,9 @@ const ui = {
   paletteBeatLock: false,
   paletteBeatLockGraceSec: 2,
   paletteReactiveMargin: 28,
+  paletteBrightnessMode: "legacy",
+  paletteBrightnessFollowAmount: 1,
+  paletteVividness: 2,
   paletteSpectrumMapMode: "auto",
   paletteSpectrumFeatureMap: ["lows", "mids", "highs", "rms", "flux"],
   paletteBrandOverrides: { hue: null, wiz: null },
@@ -4223,6 +4370,13 @@ const ui = {
   audioConfigLoaded: false,
   audioAppsLoaded: false,
   audioRunningApps: [],
+  audioRunningAppsHinted: [],
+  audioAppHintMeta: null,
+  audioAudioCapableTokens: [],
+  audioAppsShowAll: localStorage.getItem("ravelink_audio_apps_show_all_v1") === "1",
+  audioSimpleRoutingMode: localStorage.getItem("ravelink_audio_simple_mode_v1") !== "0",
+  audioOptionalToolsStatus: null,
+  audioOptionalToolsDismissed: localStorage.getItem("ravelink_audio_optional_tools_dismissed_v1") === "1",
   midiConfigLoaded: false,
   midiDetected: false,
   midiActions: [],
@@ -4330,6 +4484,9 @@ const AUDIO_REACT_SMART_MATCH_KEY = "ravelink_react_smart_match_v1";
 const AUDIO_REACT_FORCE_LOCK_KEY = "ravelink_react_force_lock_v1";
 const AUDIO_REACT_FORCE_OVERRIDE_KEY = "ravelink_react_force_override_v1";
 const MIDI_TAB_FORCE_KEY = "ravelink_midi_tab_forced_v1";
+const AUDIO_APPS_SHOW_ALL_KEY = "ravelink_audio_apps_show_all_v1";
+const AUDIO_SIMPLE_MODE_KEY = "ravelink_audio_simple_mode_v1";
+const AUDIO_OPTIONAL_TOOLS_DISMISS_KEY = "ravelink_audio_optional_tools_dismissed_v1";
 const LIVE_PROFILE_STORE_KEY = "ravelink_live_profiles_v1";
 const LIVE_PROFILE_LAST_KEY = "ravelink_live_profile_last_v1";
 const DEV_OVERCLOCK_COMICAL_TEXT = "I AM REALLY REALLY REALLY REALLY REALLY REALLY REALLY SURE";
@@ -4353,6 +4510,9 @@ const UI_STORAGE_RESET_KEYS = Object.freeze([
   AUDIO_REACT_FORCE_LOCK_KEY,
   AUDIO_REACT_FORCE_OVERRIDE_KEY,
   MIDI_TAB_FORCE_KEY,
+  AUDIO_APPS_SHOW_ALL_KEY,
+  AUDIO_SIMPLE_MODE_KEY,
+  AUDIO_OPTIONAL_TOOLS_DISMISS_KEY,
   LIVE_PROFILE_STORE_KEY,
   LIVE_PROFILE_LAST_KEY,
   PALETTE_FIXTURE_SELECTION_KEY
@@ -4432,8 +4592,10 @@ const el = {
   offBtn: document.getElementById("offBtn"),
   panicBtn: document.getElementById("panicBtn"),
   liveProfileName: document.getElementById("liveProfileName"),
+  liveProfileSelect: document.getElementById("liveProfileSelect"),
   liveProfileSaveBtn: document.getElementById("liveProfileSaveBtn"),
   liveProfileLoadBtn: document.getElementById("liveProfileLoadBtn"),
+  liveProfileDeleteBtn: document.getElementById("liveProfileDeleteBtn"),
   liveProfileResetBtn: document.getElementById("liveProfileResetBtn"),
   liveProfileStat: document.getElementById("liveProfileStat"),
   reloadBtn: document.getElementById("reloadBtn"),
@@ -4481,6 +4643,11 @@ const el = {
   aApplyBtn: document.getElementById("aApplyBtn"),
   aRestartBtn: document.getElementById("aRestartBtn"),
   aResetDefaultsBtn: document.getElementById("aResetDefaultsBtn"),
+  aOptionalToolsBanner: document.getElementById("aOptionalToolsBanner"),
+  aOptionalToolsBadge: document.getElementById("aOptionalToolsBadge"),
+  aOptionalToolsText: document.getElementById("aOptionalToolsText"),
+  aOptionalToolsInfoBtn: document.getElementById("aOptionalToolsInfoBtn"),
+  aOptionalToolsDismissBtn: document.getElementById("aOptionalToolsDismissBtn"),
   metaAutoOnBtn: document.getElementById("metaAutoOnBtn"),
   metaAutoOffBtn: document.getElementById("metaAutoOffBtn"),
   metaAutoTrackerAutoBtn: document.getElementById("metaAutoTrackerAutoBtn"),
@@ -4566,6 +4733,9 @@ const el = {
   aAppIsolationMultiSource: document.getElementById("aAppIsolationMultiSource"),
   aAppIsolationStrict: document.getElementById("aAppIsolationStrict"),
   aAppIsolationCheckMs: document.getElementById("aAppIsolationCheckMs"),
+  aIsoSimpleMode: document.getElementById("aIsoSimpleMode"),
+  aAppsShowAll: document.getElementById("aAppsShowAll"),
+  aAppsFilterHint: document.getElementById("aAppsFilterHint"),
   aAppPrimary: document.getElementById("aAppPrimary"),
   aAppFallback: document.getElementById("aAppFallback"),
   aAppPrimarySources: document.getElementById("aAppPrimarySources"),
@@ -4892,6 +5062,9 @@ const el = {
   paletteReactiveControls: document.getElementById("paletteReactiveControls"),
   paletteReactiveMargin: document.getElementById("paletteReactiveMargin"),
   paletteReactiveMarginVal: document.getElementById("paletteReactiveMarginVal"),
+  paletteBrightnessFollowWrap: document.getElementById("paletteBrightnessFollowWrap"),
+  paletteBrightnessFollowAmount: document.getElementById("paletteBrightnessFollowAmount"),
+  paletteBrightnessFollowAmountVal: document.getElementById("paletteBrightnessFollowAmountVal"),
   paletteSpectrumControls: document.getElementById("paletteSpectrumControls")
 };
 
@@ -4902,10 +5075,12 @@ const autoProfileButtons = Array.from(document.querySelectorAll("[data-auto-prof
 const audioReactivityButtons = Array.from(document.querySelectorAll("[data-audio-reactivity]"));
 const audioQuickPresetButtons = Array.from(document.querySelectorAll("[data-audio-quick]"));
 const paletteCountButtons = Array.from(document.querySelectorAll("[data-palette-count]"));
+const paletteVividnessButtons = Array.from(document.querySelectorAll("[data-palette-vividness]"));
 const palettePresetButtons = Array.from(document.querySelectorAll("[data-palette-preset]"));
 const paletteDisorderButtons = Array.from(document.querySelectorAll("[data-palette-disorder]"));
 const paletteCycleModeButtons = Array.from(document.querySelectorAll("[data-palette-cycle-mode]"));
 const paletteBeatLockButtons = Array.from(document.querySelectorAll("[data-palette-beat-lock]"));
+const paletteBrightnessModeButtons = Array.from(document.querySelectorAll("[data-palette-brightness-mode]"));
 const paletteSpectrumModeButtons = Array.from(document.querySelectorAll("[data-palette-spectrum-mode]"));
 const paletteCustomBrandButtons = Array.from(document.querySelectorAll("[data-palette-custom-brand]"));
 const getPaletteSpectrumFeatureSelectors = () =>
@@ -5174,8 +5349,10 @@ function applyUiTooltips() {
   setNodeTitle(el.offBtn, "Stop reactive rave output.");
   setNodeTitle(el.panicBtn, "Emergency blackout command.");
   setNodeTitle(el.liveProfileName, "Local profile name for quick save/load in LIVE.");
+  setNodeTitle(el.liveProfileSelect, "Browse and select saved local LIVE profiles.");
   setNodeTitle(el.liveProfileSaveBtn, "Save current LIVE controls to local profile storage.");
   setNodeTitle(el.liveProfileLoadBtn, "Load and apply saved LIVE controls from local profile storage.");
+  setNodeTitle(el.liveProfileDeleteBtn, "Delete selected local LIVE profile.");
   setNodeTitle(el.liveProfileResetBtn, "Apply built-in LIVE defaults (balanced profile/reactivity, AUTO scene, 6Hz, flow 1.00x).");
   setNodeTitle(el.liveProfileStat, "Status of the currently selected local LIVE profile.");
   setNodeTitle(el.themeCogBtn, "Open theme settings.");
@@ -5240,6 +5417,12 @@ function applyUiTooltips() {
     "Auto-tune overclock Hz from live audio only. This does not change Meta profile/reactivity."
   );
   setNodeTitle(el.aResetDefaultsBtn, "Restore audio controls to defaults and apply immediately.");
+  setNodeTitle(el.aOptionalToolsBanner, "Optional app-isolation tool status and install guidance.");
+  setNodeTitle(el.aOptionalToolsInfoBtn, "Show simple install instructions for optional audio tools.");
+  setNodeTitle(el.aOptionalToolsDismissBtn, "Hide this optional-tools banner.");
+  setNodeTitle(el.aIsoSimpleMode, "Hide advanced app-isolation controls for easier setup.");
+  setNodeTitle(el.aAppsShowAll, "Show every running process, not just likely audio-capable apps.");
+  setNodeTitle(el.aAppsFilterHint, "Current app list filtering mode and count.");
   setNodeTitle(el.reactDropEnabled, "Enable/disable drop-trigger behavior (off by default).");
   setNodeTitle(
     el.reactHardwareRateLimitsEnabled,
@@ -5392,6 +5575,10 @@ function applyUiTooltips() {
     const count = Number(btn.dataset.paletteCount || 3);
     setNodeTitle(btn, `Use ${count} color${count === 1 ? "" : "s"} per selected family.`);
   });
+  paletteVividnessButtons.forEach(btn => {
+    const level = Number(btn.dataset.paletteVividness || 2);
+    setNodeTitle(btn, `Set palette vividness level to ${level}. Higher levels increase saturation and separation.`);
+  });
   palettePresetButtons.forEach(btn => {
     const key = String(btn.dataset.palettePreset || "").trim().toLowerCase();
     const preset = PALETTE_PRESETS[key];
@@ -5418,8 +5605,18 @@ function applyUiTooltips() {
         : "Ordered mode: play selected families in fixed sequence."
     );
   });
+  paletteBrightnessModeButtons.forEach(btn => {
+    const mode = String(btn.dataset.paletteBrightnessMode || "").trim().toLowerCase();
+    setNodeTitle(
+      btn,
+      mode === "test"
+        ? "TEST mode: brightness follows palette color movement + audio activity."
+        : "LEGACY mode: keep current brightness behavior."
+    );
+  });
   setNodeTitle(el.paletteDisorderAggression, "How aggressively disorder jumps between colors/families.");
   setNodeTitle(el.paletteDisorderAggressionResetBtn, "Reset disorder aggression to default.");
+  setNodeTitle(el.paletteBrightnessFollowAmount, "Strength of TEST brightness-follow behavior (0.00x to 2.00x).");
 }
 
 function detectLimiterPreset(config = {}) {
@@ -5473,6 +5670,8 @@ const LIVE_PROFILE_OVERCLOCK_ROUTE_BY_LEVEL = Object.freeze({
   6: "/rave/overclock/hyper/on",
   7: "/rave/overclock/ludicrous/on"
 });
+const LIVE_PROFILE_SELECT_CUSTOM_VALUE = "__custom__";
+let liveProfileStatusResetTimer = null;
 
 function normalizeLiveProfileName(value, fallback = "default") {
   const raw = String(value || "").trim().toLowerCase();
@@ -5565,6 +5764,148 @@ function writeLiveProfileStore(store) {
   return safe;
 }
 
+function getLiveProfileStoreEntriesSorted(store = null) {
+  const source = store && typeof store === "object" ? store : readLiveProfileStore();
+  const profiles = source.profiles && typeof source.profiles === "object" ? source.profiles : {};
+  return Object.entries(profiles)
+    .map(([name, entry]) => {
+      const safeName = normalizeLiveProfileName(name, "");
+      const savedAt = Number(entry?.savedAt);
+      return {
+        name: safeName,
+        savedAt: Number.isFinite(savedAt) ? savedAt : 0
+      };
+    })
+    .filter(entry => Boolean(entry.name))
+    .sort((a, b) => {
+      const byTime = b.savedAt - a.savedAt;
+      if (byTime !== 0) return byTime;
+      return String(a.name).localeCompare(String(b.name));
+    });
+}
+
+function syncLiveProfileSelectOptions(nameHint = null) {
+  if (!el.liveProfileSelect) return;
+  const currentName = normalizeLiveProfileName(nameHint || resolveCurrentLiveProfileName(), "default");
+  const store = readLiveProfileStore();
+  const entries = getLiveProfileStoreEntriesSorted(store);
+
+  const options = [
+    { value: LIVE_PROFILE_SELECT_CUSTOM_VALUE, label: "CUSTOM / TYPE NAME" },
+    ...entries.map(entry => {
+      const timeText = formatLiveProfileSavedAt(entry.savedAt);
+      const suffix = timeText ? ` (${timeText})` : "";
+      return {
+        value: entry.name,
+        label: `${entry.name}${suffix}`
+      };
+    })
+  ];
+
+  el.liveProfileSelect.innerHTML = options
+    .map(opt => `<option value="${escapeHtmlUi(opt.value)}">${escapeHtmlUi(opt.label)}</option>`)
+    .join("");
+
+  const hasCurrent = entries.some(entry => entry.name === currentName);
+  el.liveProfileSelect.value = hasCurrent ? currentName : LIVE_PROFILE_SELECT_CUSTOM_VALUE;
+  if (el.liveProfileDeleteBtn) {
+    const selectedName = normalizeLiveProfileName(el.liveProfileSelect.value, "");
+    const canDeleteSelected = entries.some(entry => entry.name === selectedName);
+    el.liveProfileDeleteBtn.disabled = !(canDeleteSelected || hasCurrent);
+  }
+}
+
+function resolveLiveProfileSelectedName() {
+  if (!el.liveProfileSelect) return "";
+  return normalizeLiveProfileName(el.liveProfileSelect.value, "");
+}
+
+function resolveLiveProfileActionName() {
+  const selected = resolveLiveProfileSelectedName();
+  if (selected) return selected;
+  return resolveCurrentLiveProfileName();
+}
+
+function clearLiveProfileStatusResetTimer() {
+  if (!liveProfileStatusResetTimer) return;
+  clearTimeout(liveProfileStatusResetTimer);
+  liveProfileStatusResetTimer = null;
+}
+
+function scheduleLiveProfileStatusReset(name, delayMs = 3600) {
+  clearLiveProfileStatusResetTimer();
+  const waitMs = Math.max(1200, Number(delayMs) || 3600);
+  liveProfileStatusResetTimer = setTimeout(() => {
+    refreshLiveProfileStatus(name);
+  }, waitMs);
+}
+
+function formatLiveProfileSnapshotSummary(snapshot = {}) {
+  const safe = normalizeLiveProfileSnapshot(snapshot, LIVE_PROFILE_DEFAULT);
+  const scene = safe.sceneLock === "auto" ? "SCENE AUTO" : `SCENE ${String(safe.sceneLock || "").toUpperCase()}`;
+  const hz = safe.overclockAutoEnabled
+    ? "AUTO HZ"
+    : `${Math.max(0, Math.min(7, Math.round(Number(safe.overclockLevel) || 0)))} STEP HZ`;
+  return [
+    `AUTO ${String(safe.autoProfile || "balanced").toUpperCase()}`,
+    `A-REACT ${String(safe.audioReactivityPreset || "balanced").toUpperCase()}`,
+    scene,
+    hz,
+    `META ${safe.metaAutoEnabled ? "ON" : "OFF"}`
+  ].join(" | ");
+}
+
+function pulseLiveProfileAppliedControls(snapshot = {}) {
+  const safe = normalizeLiveProfileSnapshot(snapshot, LIVE_PROFILE_DEFAULT);
+  const targets = [];
+  const autoBtn = autoProfileButtons.find(btn => btn.dataset.autoProfile === safe.autoProfile);
+  if (autoBtn) targets.push(autoBtn);
+  const reactBtn = audioReactivityButtons.find(btn => btn.dataset.audioReactivity === safe.audioReactivityPreset);
+  if (reactBtn) targets.push(reactBtn);
+  const sceneBtn = sceneButtons.find(btn => btn.dataset.scene === safe.sceneLock);
+  if (sceneBtn) targets.push(sceneBtn);
+
+  if (safe.overclockAutoEnabled && el.ocAutoBtn) {
+    targets.push(el.ocAutoBtn);
+  } else {
+    const overclockButtonsByLevel = {
+      0: el.ocOffBtn,
+      1: el.ocOnBtn,
+      2: el.ocTurboBtn,
+      3: el.ocUltraBtn,
+      4: el.ocExtremeBtn,
+      5: el.ocInsaneBtn,
+      6: el.ocHyperBtn,
+      7: el.ocLudicrousBtn
+    };
+    const level = Math.max(0, Math.min(7, Math.round(Number(safe.overclockLevel) || 0)));
+    const targetBtn = overclockButtonsByLevel[level];
+    if (targetBtn) targets.push(targetBtn);
+  }
+
+  if (safe.metaAutoEnabled && el.metaAutoOnBtn) {
+    targets.push(el.metaAutoOnBtn);
+  }
+  if (!safe.metaAutoEnabled && el.metaAutoOffBtn) {
+    targets.push(el.metaAutoOffBtn);
+  }
+
+  const uniqueTargets = [...new Set(targets.filter(Boolean))];
+  for (const node of uniqueTargets) {
+    node.classList.remove("profileAppliedPulse");
+  }
+  requestAnimationFrame(() => {
+    for (const node of uniqueTargets) {
+      node.classList.add("profileAppliedPulse");
+    }
+    setTimeout(() => {
+      for (const node of uniqueTargets) {
+        node.classList.remove("profileAppliedPulse");
+      }
+    }, 1000);
+  });
+}
+
 function resolveCurrentLiveProfileName() {
   return normalizeLiveProfileName(
     el.liveProfileName?.value ||
@@ -5625,6 +5966,8 @@ function buildLiveProfileSnapshotFromUi() {
 
 async function applyLiveProfileSnapshot(snapshot = {}, options = {}) {
   const announce = options.announce !== false;
+  const forcePoll = options.forcePoll === true;
+  const pulse = options.pulse !== false;
   const next = normalizeLiveProfileSnapshot(snapshot, LIVE_PROFILE_DEFAULT);
   let ok = true;
 
@@ -5675,7 +6018,19 @@ async function applyLiveProfileSnapshot(snapshot = {}, options = {}) {
   }
 
   maybeApplySmartLiveReactivityPolicy("LIVE PROFILE LOAD");
-  sync();
+  if (forcePoll) {
+    try {
+      await poll({ force: true });
+    } catch {
+      ok = false;
+      sync();
+    }
+  } else {
+    sync();
+  }
+  if (pulse) {
+    pulseLiveProfileAppliedControls(buildLiveProfileSnapshotFromUi());
+  }
   if (announce) {
     setBadge(el.health, ok ? "ok" : "warn", ok ? "LIVE PROFILE APPLIED" : "LIVE PROFILE APPLIED (PARTIAL)");
   }
@@ -5684,15 +6039,36 @@ async function applyLiveProfileSnapshot(snapshot = {}, options = {}) {
 
 function initLiveProfileControls() {
   const initialName = setCurrentLiveProfileName(resolveCurrentLiveProfileName());
+  syncLiveProfileSelectOptions(initialName);
   refreshLiveProfileStatus(initialName);
 
   if (el.liveProfileName) {
     el.liveProfileName.addEventListener("change", () => {
       const name = setCurrentLiveProfileName(el.liveProfileName.value);
+      syncLiveProfileSelectOptions(name);
       refreshLiveProfileStatus(name);
     });
     el.liveProfileName.addEventListener("blur", () => {
       const name = setCurrentLiveProfileName(el.liveProfileName.value);
+      syncLiveProfileSelectOptions(name);
+      refreshLiveProfileStatus(name);
+    });
+  }
+
+  if (el.liveProfileSelect) {
+    el.liveProfileSelect.addEventListener("change", () => {
+      const selectedName = resolveLiveProfileSelectedName();
+      if (!selectedName) {
+        const typed = normalizeLiveProfileName(el.liveProfileName?.value, "");
+        const store = readLiveProfileStore();
+        if (el.liveProfileDeleteBtn) {
+          el.liveProfileDeleteBtn.disabled = !typed || !store.profiles[typed];
+        }
+        refreshLiveProfileStatus(resolveCurrentLiveProfileName());
+        return;
+      }
+      const name = setCurrentLiveProfileName(selectedName);
+      syncLiveProfileSelectOptions(name);
       refreshLiveProfileStatus(name);
     });
   }
@@ -5701,36 +6077,86 @@ function initLiveProfileControls() {
     el.liveProfileSaveBtn.onclick = () => {
       const name = setCurrentLiveProfileName(resolveCurrentLiveProfileName());
       const store = readLiveProfileStore();
+      const snapshot = buildLiveProfileSnapshotFromUi();
       store.profiles[name] = {
         savedAt: Date.now(),
-        snapshot: buildLiveProfileSnapshotFromUi()
+        snapshot
       };
       writeLiveProfileStore(store);
-      refreshLiveProfileStatus(name);
+      syncLiveProfileSelectOptions(name);
+      refreshLiveProfileStatus(name, `LIVE PROFILE: ${name} saved | ${formatLiveProfileSnapshotSummary(snapshot)}`);
+      scheduleLiveProfileStatusReset(name);
       setBadge(el.health, "ok", `LIVE PROFILE SAVED (${name.toUpperCase()})`);
     };
   }
 
   if (el.liveProfileLoadBtn) {
     el.liveProfileLoadBtn.onclick = async () => {
-      const name = setCurrentLiveProfileName(resolveCurrentLiveProfileName());
       const store = readLiveProfileStore();
+      const name = setCurrentLiveProfileName(resolveLiveProfileActionName());
       const entry = store.profiles[name];
-      const snapshot = entry?.snapshot || LIVE_PROFILE_DEFAULT;
-      const ok = await applyLiveProfileSnapshot(snapshot, { announce: false });
+      if (!entry?.snapshot) {
+        syncLiveProfileSelectOptions(name);
+        refreshLiveProfileStatus(name, `LIVE PROFILE: ${name} not found`);
+        scheduleLiveProfileStatusReset(name);
+        setBadge(el.health, "warn", `LIVE PROFILE MISSING (${name.toUpperCase()})`);
+        return;
+      }
+      const snapshot = normalizeLiveProfileSnapshot(entry.snapshot, LIVE_PROFILE_DEFAULT);
+      const ok = await applyLiveProfileSnapshot(snapshot, { announce: false, forcePoll: true, pulse: true });
+      syncLiveProfileSelectOptions(name);
+      const summary = formatLiveProfileSnapshotSummary(snapshot);
       refreshLiveProfileStatus(name, ok
-        ? `LIVE PROFILE: ${name} loaded`
-        : `LIVE PROFILE: ${name} loaded with partial failures`);
+        ? `LIVE PROFILE: ${name} loaded | ${summary}`
+        : `LIVE PROFILE: ${name} loaded (partial) | ${summary}`);
+      scheduleLiveProfileStatusReset(name);
       setBadge(el.health, ok ? "ok" : "warn", ok ? `LIVE PROFILE LOADED (${name.toUpperCase()})` : `LIVE PROFILE PARTIAL (${name.toUpperCase()})`);
+    };
+  }
+
+  if (el.liveProfileDeleteBtn) {
+    el.liveProfileDeleteBtn.onclick = () => {
+      const store = readLiveProfileStore();
+      const selected = resolveLiveProfileSelectedName();
+      const typed = normalizeLiveProfileName(resolveCurrentLiveProfileName(), "");
+      const target = store.profiles[selected]
+        ? selected
+        : (store.profiles[typed] ? typed : "");
+      if (!target) {
+        const name = resolveCurrentLiveProfileName();
+        syncLiveProfileSelectOptions(name);
+        refreshLiveProfileStatus(name, `LIVE PROFILE: ${name} not saved`);
+        scheduleLiveProfileStatusReset(name);
+        setBadge(el.health, "warn", "NO SAVED PROFILE TO DELETE");
+        return;
+      }
+      const confirmDelete = window.confirm(`Delete LIVE profile "${target}" from local storage?`);
+      if (!confirmDelete) return;
+      delete store.profiles[target];
+      const written = writeLiveProfileStore(store);
+      const current = resolveCurrentLiveProfileName();
+      const entries = getLiveProfileStoreEntriesSorted(written);
+      const nextName = current === target
+        ? (entries[0]?.name || "default")
+        : current;
+      setCurrentLiveProfileName(nextName);
+      syncLiveProfileSelectOptions(nextName);
+      refreshLiveProfileStatus(nextName, `LIVE PROFILE: ${target} deleted`);
+      scheduleLiveProfileStatusReset(nextName);
+      setBadge(el.health, "ok", `LIVE PROFILE DELETED (${target.toUpperCase()})`);
     };
   }
 
   if (el.liveProfileResetBtn) {
     el.liveProfileResetBtn.onclick = async () => {
-      const ok = await applyLiveProfileSnapshot(LIVE_PROFILE_DEFAULT, { announce: false });
+      const ok = await applyLiveProfileSnapshot(LIVE_PROFILE_DEFAULT, { announce: false, forcePoll: true, pulse: true });
+      const name = resolveCurrentLiveProfileName();
+      const summary = formatLiveProfileSnapshotSummary(LIVE_PROFILE_DEFAULT);
+      syncLiveProfileSelectOptions(name);
       refreshLiveProfileStatus(resolveCurrentLiveProfileName(), ok
-        ? "LIVE PROFILE: defaults loaded"
-        : "LIVE PROFILE: defaults loaded with partial failures");
+        ? `LIVE PROFILE: defaults loaded | ${summary}`
+        : `LIVE PROFILE: defaults loaded (partial) | ${summary}`);
+      scheduleLiveProfileStatusReset(name);
       setBadge(el.health, ok ? "ok" : "warn", ok ? "LIVE PROFILE DEFAULTS APPLIED" : "LIVE PROFILE DEFAULTS PARTIAL");
     };
   }
@@ -5766,6 +6192,11 @@ const PALETTE_CYCLE_MODE_LABELS = Object.freeze({
   timed_cycle: "TIMED CYCLE",
   reactive_shift: "REACTIVE SHIFT",
   spectrum_mapper: "SPECTRUM MAPPER"
+});
+const PALETTE_BRIGHTNESS_MODE_ORDER = Object.freeze(["legacy", "test"]);
+const PALETTE_BRIGHTNESS_MODE_LABELS = Object.freeze({
+  legacy: "LEGACY",
+  test: "TEST FOLLOW"
 });
 const PALETTE_SPECTRUM_MAP_MODE_ORDER = Object.freeze(["auto", "manual"]);
 const PALETTE_AUDIO_FEATURE_KEYS = Object.freeze([
@@ -5803,6 +6234,16 @@ const PALETTE_BEAT_LOCK_GRACE_MIN_SEC = 0;
 const PALETTE_BEAT_LOCK_GRACE_MAX_SEC = 8;
 const PALETTE_REACTIVE_MARGIN_MIN = 5;
 const PALETTE_REACTIVE_MARGIN_MAX = 100;
+const PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MIN = 0;
+const PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MAX = 2;
+const PALETTE_VIVIDNESS_LEVEL_OPTIONS = Object.freeze([0, 1, 2, 3, 4]);
+const PALETTE_VIVIDNESS_LABELS = Object.freeze({
+  0: "SOFT",
+  1: "BALANCED",
+  2: "HIGH",
+  3: "ULTRA",
+  4: "MAX"
+});
 
 function normalizePaletteControlScopeUi(value, fallback = "global") {
   const mode = String(value || "").trim().toLowerCase();
@@ -6040,6 +6481,49 @@ function normalizePaletteReactiveMarginUi(value, fallback = 28) {
   return 28;
 }
 
+function normalizePaletteBrightnessModeUi(value, fallback = "legacy") {
+  const mode = String(value || "").trim().toLowerCase();
+  if (PALETTE_BRIGHTNESS_MODE_ORDER.includes(mode)) return mode;
+  const fallbackMode = String(fallback || "").trim().toLowerCase();
+  return PALETTE_BRIGHTNESS_MODE_ORDER.includes(fallbackMode) ? fallbackMode : "legacy";
+}
+
+function normalizePaletteBrightnessFollowAmountUi(value, fallback = 1) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(
+      parsed,
+      PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MIN,
+      PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MAX,
+      1
+    );
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(
+      fallbackNum,
+      PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MIN,
+      PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MAX,
+      1
+    );
+  }
+  return 1;
+}
+
+function normalizePaletteVividnessUi(value, fallback = 2) {
+  const minLevel = PALETTE_VIVIDNESS_LEVEL_OPTIONS[0];
+  const maxLevel = PALETTE_VIVIDNESS_LEVEL_OPTIONS[PALETTE_VIVIDNESS_LEVEL_OPTIONS.length - 1];
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(Math.round(parsed), minLevel, maxLevel, 2);
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(Math.round(fallbackNum), minLevel, maxLevel, 2);
+  }
+  return 2;
+}
+
 function normalizePaletteSpectrumMapModeUi(value, fallback = "auto") {
   const mode = String(value || "").trim().toLowerCase();
   if (PALETTE_SPECTRUM_MAP_MODE_ORDER.includes(mode)) return mode;
@@ -6094,6 +6578,9 @@ function normalizePaletteConfigUi(config = {}, fallback = null) {
         beatLock: ui.paletteBeatLock === true,
         beatLockGraceSec: ui.paletteBeatLockGraceSec || 2,
         reactiveMargin: ui.paletteReactiveMargin || 28,
+        brightnessMode: ui.paletteBrightnessMode || "legacy",
+        brightnessFollowAmount: ui.paletteBrightnessFollowAmount ?? 1,
+        vividness: ui.paletteVividness || 2,
         spectrumMapMode: ui.paletteSpectrumMapMode || "auto",
         spectrumFeatureMap: ui.paletteSpectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
       };
@@ -6123,6 +6610,18 @@ function normalizePaletteConfigUi(config = {}, fallback = null) {
     reactiveMargin: normalizePaletteReactiveMarginUi(
       source.reactiveMargin,
       base.reactiveMargin || 28
+    ),
+    brightnessMode: normalizePaletteBrightnessModeUi(
+      source.brightnessMode,
+      base.brightnessMode || "legacy"
+    ),
+    brightnessFollowAmount: normalizePaletteBrightnessFollowAmountUi(
+      source.brightnessFollowAmount,
+      base.brightnessFollowAmount ?? 1
+    ),
+    vividness: normalizePaletteVividnessUi(
+      source.vividness,
+      base.vividness || 2
     ),
     spectrumMapMode: normalizePaletteSpectrumMapModeUi(
       source.spectrumMapMode,
@@ -6356,6 +6855,9 @@ function applyPaletteSnapshotToUi(config = {}, options = {}) {
       beatLock: ui.paletteBeatLock === true,
       beatLockGraceSec: ui.paletteBeatLockGraceSec || 2,
       reactiveMargin: ui.paletteReactiveMargin || 28,
+      brightnessMode: ui.paletteBrightnessMode || "legacy",
+      brightnessFollowAmount: ui.paletteBrightnessFollowAmount ?? 1,
+      vividness: ui.paletteVividness || 2,
       spectrumMapMode: ui.paletteSpectrumMapMode || "auto",
       spectrumFeatureMap: ui.paletteSpectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
     }
@@ -6369,6 +6871,9 @@ function applyPaletteSnapshotToUi(config = {}, options = {}) {
   ui.paletteBeatLock = normalizedGlobal.beatLock === true;
   ui.paletteBeatLockGraceSec = normalizedGlobal.beatLockGraceSec;
   ui.paletteReactiveMargin = normalizedGlobal.reactiveMargin;
+  ui.paletteBrightnessMode = normalizedGlobal.brightnessMode;
+  ui.paletteBrightnessFollowAmount = normalizedGlobal.brightnessFollowAmount;
+  ui.paletteVividness = normalizedGlobal.vividness;
   ui.paletteSpectrumMapMode = normalizedGlobal.spectrumMapMode;
   ui.paletteSpectrumFeatureMap = normalizePaletteSpectrumFeatureMapUi(
     normalizedGlobal.spectrumFeatureMap,
@@ -6407,6 +6912,9 @@ function getPaletteGlobalConfigUi() {
     beatLock: ui.paletteBeatLock,
     beatLockGraceSec: ui.paletteBeatLockGraceSec,
     reactiveMargin: ui.paletteReactiveMargin,
+    brightnessMode: ui.paletteBrightnessMode,
+    brightnessFollowAmount: ui.paletteBrightnessFollowAmount,
+    vividness: ui.paletteVividness,
     spectrumMapMode: ui.paletteSpectrumMapMode,
     spectrumFeatureMap: ui.paletteSpectrumFeatureMap
   });
@@ -6514,12 +7022,28 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
   const beatLock = parseBooleanUi(config.beatLock, false) === true;
   const beatLockGraceSec = normalizePaletteBeatLockGraceSecUi(config.beatLockGraceSec, 2);
   const reactiveMargin = normalizePaletteReactiveMarginUi(config.reactiveMargin, 28);
+  const brightnessMode = normalizePaletteBrightnessModeUi(config.brightnessMode, "legacy");
+  const brightnessFollowAmount = normalizePaletteBrightnessFollowAmountUi(config.brightnessFollowAmount, 1);
+  const brightnessFollowPct = Math.round(brightnessFollowAmount * 100);
+  const vividness = normalizePaletteVividnessUi(config.vividness, 2);
   const spectrumMapMode = normalizePaletteSpectrumMapModeUi(config.spectrumMapMode, "auto");
   const spectrumFeatureMap = normalizePaletteSpectrumFeatureMapUi(
     config.spectrumFeatureMap,
     PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
   );
   const modeNotice = String(ui.paletteBrandModeNotices?.[brandKey] || "").trim();
+  const fixtureOverrideCount = (Array.isArray(fixtures) ? fixtures : []).reduce((count, entry) => {
+    const fixtureId = String(entry?.id || "").trim();
+    if (!fixtureId) return count;
+    const override = ui.paletteFixtureOverrides && ui.paletteFixtureOverrides[fixtureId];
+    return override && override.brand === brandKey ? count + 1 : count;
+  }, 0);
+  const targetScopeHint = selectedFixture === PALETTE_ALL_FIXTURES_VALUE
+    ? `Scope: brand default (${brandLabel} all fixtures).`
+    : `Scope: fixture override (${selectedFixture}).`;
+  const targetOverrideHint = selectedFixture === PALETTE_ALL_FIXTURES_VALUE && fixtureOverrideCount > 0
+    ? `${fixtureOverrideCount} fixture override${fixtureOverrideCount === 1 ? "" : "s"} active. Brand edits do not replace fixture-specific overrides until cleared.`
+    : "";
   const metricConfig = getFixtureMetricScopedConfigUi(brandKey, selectedFixture);
   const metricMode = normalizeFixtureMetricModeUi(metricConfig.mode, FIXTURE_METRIC_CONFIG_DEFAULT.mode);
   const metricKey = normalizeFixtureMetricKeyUi(metricConfig.metric, FIXTURE_METRIC_CONFIG_DEFAULT.metric);
@@ -6552,6 +7076,9 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
   const familyButtons = PALETTE_FAMILY_ORDER.map(family => (
     `<button type="button" data-palette-brand-family="${brandKey}" data-family="${family}" class="${families.includes(family) ? "active" : ""}" title="Toggle ${family.toUpperCase()} family in the playback sequence for this target.">${family.toUpperCase()}</button>`
   )).join("");
+  const vividnessButtons = PALETTE_VIVIDNESS_LEVEL_OPTIONS.map(level => (
+    `<button type="button" data-palette-brand-vividness="${brandKey}" data-level="${level}" class="${level === vividness ? "active" : ""}" title="Set ${brandLabel} vividness to ${(PALETTE_VIVIDNESS_LABELS[level] || String(level)).toUpperCase()}.">${(PALETTE_VIVIDNESS_LABELS[level] || String(level)).toUpperCase()}</button>`
+  )).join("");
   const metricModeButtons = FIXTURE_METRIC_MODE_ORDER.map(mode => (
     `<button type="button" data-fixture-metric-mode="${brandKey}" data-mode="${mode}" class="${metricMode === mode ? "active" : ""}" title="${mode === "meta_auto" ? "Let the engine auto-assign different song metrics across fixtures." : "Manually lock this target to one selected song metric."}">${mode === "meta_auto" ? "META AUTO" : "MANUAL"}</button>`
   )).join("");
@@ -6568,6 +7095,9 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
           : "Choose active palette group from mapped audio features (lows/mids/highs/etc). Colors still move inside the selected group.";
     return `<button type="button" data-palette-brand-cycle-mode="${brandKey}" data-mode="${mode}" class="${cycleMode === mode ? "active" : ""}" title="${modeTitle}">${(PALETTE_CYCLE_MODE_LABELS[mode] || mode).toUpperCase()}</button>`;
   }).join("");
+  const brightnessModeButtons = PALETTE_BRIGHTNESS_MODE_ORDER.map(mode => (
+    `<button type="button" data-palette-brand-brightness-mode="${brandKey}" data-mode="${mode}" class="${brightnessMode === mode ? "active" : ""}" title="${mode === "test" ? "Brightness follows palette color movement + audio dynamics for this scope." : "Keep current legacy brightness behavior for this scope."}">${(PALETTE_BRIGHTNESS_MODE_LABELS[mode] || mode).toUpperCase()}</button>`
+  )).join("");
   const beatLockButtons = [
     `<button type="button" data-palette-brand-beat-lock="${brandKey}" data-enabled="false" class="${!beatLock ? "active" : ""}" title="Advance exactly on the timer interval.">OFF</button>`,
     `<button type="button" data-palette-brand-beat-lock="${brandKey}" data-enabled="true" class="${beatLock ? "active" : ""}" title="Wait for beat/drop near interval, then advance.">ON</button>`
@@ -6588,6 +7118,7 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
   const timedWrapClass = cycleMode === "timed_cycle" ? "" : "hidden";
   const reactiveWrapClass = cycleMode === "reactive_shift" ? "" : "hidden";
   const spectrumWrapClass = cycleMode === "spectrum_mapper" ? "" : "hidden";
+  const brightnessFollowWrapClass = brightnessMode === "test" ? "" : "hidden";
 
   return (
     `<div class="paletteBrandCard" data-palette-brand-card="${brandKey}">` +
@@ -6603,6 +7134,10 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
               `</div>` +
               `<button type="button" data-palette-brand-clear="${brandKey}" title="Clear all palette and song-metric overrides for the currently selected target.">CLEAR ALL OVERRIDE</button>` +
             `</div>` +
+            `<p class="hint paletteScopeHint">${escapeHtmlUi(targetScopeHint)}</p>` +
+            (targetOverrideHint
+              ? `<p class="hint paletteScopeHint paletteScopeHintWarn">${escapeHtmlUi(targetOverrideHint)}</p>`
+              : "") +
           `</div>` +
         `</details>` +
         `<details class="paletteBrandSection" open>` +
@@ -6610,6 +7145,8 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
           `<div class="paletteBrandSectionBody">` +
             `<p class="paletteBrandSubLabel">COLORS PER FAMILY</p>` +
             `<div class="paletteBrandMiniGrid">${countButtons}</div>` +
+            `<p class="paletteBrandSubLabel">VIVIDNESS</p>` +
+            `<div class="paletteBrandMiniGrid">${vividnessButtons}</div>` +
             `<p class="paletteBrandSubLabel">FAMILIES</p>` +
             `<div class="paletteBrandFamilyGrid">${familyButtons}</div>` +
           `</div>` +
@@ -6636,6 +7173,15 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
           `<div class="paletteBrandSectionBody">` +
             `<p class="paletteModeNotice" data-palette-brand-mode-notice="${brandKey}">${escapeHtmlUi(modeNotice)}</p>` +
             `<div class="paletteCycleGrid">${cycleButtons}</div>` +
+            `<p class="paletteBrandSubLabel">BRIGHTNESS ENGINE (RAVE TEST)</p>` +
+            `<div class="paletteBrandOrderGrid">${brightnessModeButtons}</div>` +
+            `<div class="paletteBrandSlider ${brightnessFollowWrapClass}" data-palette-brand-brightness-follow-wrap="${brandKey}">` +
+              `<label>` +
+                `<span>FOLLOW AMOUNT</span>` +
+                `<span class="paletteBrandValue" data-palette-brand-brightness-follow-val="${brandKey}">${brightnessFollowAmount.toFixed(2)}x</span>` +
+              `</label>` +
+              `<input type="range" min="0" max="200" step="1" value="${brightnessFollowPct}" data-palette-brand-brightness-follow="${brandKey}" ${brightnessMode === "test" ? "" : "disabled"} title="Strength of brightness-follow behavior in TEST mode.">` +
+            `</div>` +
             `<div class="paletteControlWrap ${timedWrapClass}" data-palette-brand-timed-wrap="${brandKey}">` +
               `<div class="paletteBrandSlider">` +
                 `<label>` +
@@ -12495,13 +13041,52 @@ audioQuickPresetButtons.forEach(btn => {
   };
 });
 
+if (el.aIsoSimpleMode) {
+  el.aIsoSimpleMode.checked = ui.audioSimpleRoutingMode !== false;
+  el.aIsoSimpleMode.onchange = () => {
+    ui.audioSimpleRoutingMode = el.aIsoSimpleMode.checked === true;
+    localStorage.setItem(AUDIO_SIMPLE_MODE_KEY, ui.audioSimpleRoutingMode ? "1" : "0");
+    syncAudioRoutingComplexityUi();
+  };
+}
+
+if (el.aAppsShowAll) {
+  el.aAppsShowAll.checked = ui.audioAppsShowAll === true;
+  el.aAppsShowAll.onchange = () => {
+    ui.audioAppsShowAll = el.aAppsShowAll.checked === true;
+    localStorage.setItem(AUDIO_APPS_SHOW_ALL_KEY, ui.audioAppsShowAll ? "1" : "0");
+    setAudioAppSelectOptions(el.aAppPrimary, el.aAppPrimary?.value || "");
+    setAudioAppSelectOptions(el.aAppFallback, el.aAppFallback?.value || "");
+    updateAudioAppsFilterHintUi();
+  };
+}
+
+if (el.aOptionalToolsInfoBtn) {
+  el.aOptionalToolsInfoBtn.onclick = () => {
+    openAudioOptionalToolsHelp();
+  };
+}
+
+if (el.aOptionalToolsDismissBtn) {
+  el.aOptionalToolsDismissBtn.onclick = () => {
+    ui.audioOptionalToolsDismissed = true;
+    localStorage.setItem(AUDIO_OPTIONAL_TOOLS_DISMISS_KEY, "1");
+    renderAudioOptionalToolsBanner();
+  };
+}
+
+syncAudioRoutingComplexityUi();
+updateAudioAppsFilterHintUi();
+renderAudioOptionalToolsBanner();
+
 el.aRefreshBtn.onclick = async () => {
-  const [cfgOk, reactOk, appsOk] = await Promise.all([
+  const [cfgOk, reactOk, appsOk, optionalOk] = await Promise.all([
     loadAudioConfig(),
     loadAudioReactivityMap(),
-    loadAudioApps()
+    loadAudioApps(),
+    loadAudioOptionalToolsStatus()
   ]);
-  const ok = cfgOk && reactOk && appsOk;
+  const ok = cfgOk && reactOk && appsOk && optionalOk;
   setBadge(el.health, ok ? "ok" : "bad", ok ? "AUDIO CFG+REACT REFRESH" : "AUDIO REFRESH FAIL");
 };
 
@@ -13108,6 +13693,16 @@ function formatPaletteCycleModeLabelUi(mode) {
   return PALETTE_CYCLE_MODE_LABELS[key] || key.toUpperCase();
 }
 
+function formatPaletteBrightnessModeLabelUi(mode) {
+  const key = normalizePaletteBrightnessModeUi(mode, "legacy");
+  return PALETTE_BRIGHTNESS_MODE_LABELS[key] || key.toUpperCase();
+}
+
+function formatPaletteVividnessLabelUi(level) {
+  const key = normalizePaletteVividnessUi(level, 2);
+  return PALETTE_VIVIDNESS_LABELS[key] || String(key);
+}
+
 function describePaletteCycleModeUi(mode) {
   const key = normalizePaletteCycleModeUi(mode, "on_trigger");
   if (key === "timed_cycle") {
@@ -13218,6 +13813,21 @@ function syncPaletteReactiveMarginSliderUi() {
   if (el.paletteReactiveMarginVal) el.paletteReactiveMarginVal.textContent = String(margin);
 }
 
+function formatPaletteBrightnessFollowAmountUi(value = 1) {
+  const amount = normalizePaletteBrightnessFollowAmountUi(value, 1);
+  return `${amount.toFixed(2)}x`;
+}
+
+function syncPaletteBrightnessFollowSliderUi() {
+  const amount = normalizePaletteBrightnessFollowAmountUi(ui.paletteBrightnessFollowAmount, 1);
+  ui.paletteBrightnessFollowAmount = amount;
+  const pct = Math.round(amount * 100);
+  if (el.paletteBrightnessFollowAmount) el.paletteBrightnessFollowAmount.value = String(pct);
+  if (el.paletteBrightnessFollowAmountVal) {
+    el.paletteBrightnessFollowAmountVal.textContent = formatPaletteBrightnessFollowAmountUi(amount);
+  }
+}
+
 function collectPaletteSpectrumFeatureMapFromSelectorsUi(selectors = getPaletteSpectrumFeatureSelectors()) {
   const next = [];
   const nodes = Array.isArray(selectors) ? selectors : [];
@@ -13295,6 +13905,17 @@ paletteBeatLockButtons.forEach(btn => {
   };
 });
 
+paletteBrightnessModeButtons.forEach(btn => {
+  btn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const mode = normalizePaletteBrightnessModeUi(btn.dataset.paletteBrightnessMode, ui.paletteBrightnessMode || "legacy");
+    const ok = await applyPalettePatch({ brightnessMode: mode }, "PALETTE BRIGHTNESS");
+    if (ok) {
+      setBadge(el.health, "ok", `PALETTE BRIGHTNESS ${formatPaletteBrightnessModeLabelUi(mode)}`);
+    }
+  };
+});
+
 paletteSpectrumModeButtons.forEach(btn => {
   btn.onclick = async () => {
     if (!isPaletteGlobalScopeActiveUi()) return;
@@ -13305,6 +13926,30 @@ paletteSpectrumModeButtons.forEach(btn => {
     }
   };
 });
+
+if (el.paletteBrightnessFollowAmount) {
+  el.paletteBrightnessFollowAmount.oninput = () => {
+    ui.paletteBrightnessFollowAmount = normalizePaletteBrightnessFollowAmountUi(
+      Number(el.paletteBrightnessFollowAmount.value) / 100,
+      ui.paletteBrightnessFollowAmount ?? 1
+    );
+    syncPaletteBrightnessFollowSliderUi();
+  };
+  el.paletteBrightnessFollowAmount.onchange = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    if (normalizePaletteBrightnessModeUi(ui.paletteBrightnessMode, "legacy") !== "test") return;
+    const amount = normalizePaletteBrightnessFollowAmountUi(
+      Number(el.paletteBrightnessFollowAmount.value) / 100,
+      ui.paletteBrightnessFollowAmount ?? 1
+    );
+    ui.paletteBrightnessFollowAmount = amount;
+    syncPaletteBrightnessFollowSliderUi();
+    const ok = await applyPalettePatch({ brightnessFollowAmount: amount }, "PALETTE BRIGHTNESS");
+    if (ok) {
+      setBadge(el.health, "ok", `PALETTE FOLLOW ${formatPaletteBrightnessFollowAmountUi(amount)}`);
+    }
+  };
+}
 
 if (el.paletteTimedIntervalSec) {
   el.paletteTimedIntervalSec.oninput = () => {
@@ -13395,6 +14040,17 @@ paletteCountButtons.forEach(btn => {
     const ok = await applyPalettePatch({ colorsPerFamily: count }, "PALETTE COUNT");
     if (ok) {
       setBadge(el.health, "ok", `PALETTE COUNT ${count}`);
+    }
+  };
+});
+
+paletteVividnessButtons.forEach(btn => {
+  btn.onclick = async () => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const level = normalizePaletteVividnessUi(btn.dataset.paletteVividness, ui.paletteVividness || 2);
+    const ok = await applyPalettePatch({ vividness: level }, "PALETTE VIVIDNESS");
+    if (ok) {
+      setBadge(el.health, "ok", `PALETTE VIVIDNESS ${formatPaletteVividnessLabelUi(level)}`);
     }
   };
 });
@@ -13559,6 +14215,20 @@ if (el.paletteBrandMenus) {
       return;
     }
 
+    const brightnessFollowSlider = e.target.closest("input[data-palette-brand-brightness-follow]");
+    if (brightnessFollowSlider) {
+      const brand = normalizePaletteBrandUi(brightnessFollowSlider.dataset.paletteBrandBrightnessFollow);
+      if (!brand) return;
+      const amount = normalizePaletteBrightnessFollowAmountUi(
+        Number(brightnessFollowSlider.value) / 100,
+        1
+      );
+      const valueNode = el.paletteBrandMenus.querySelector(`[data-palette-brand-brightness-follow-val="${brand}"]`);
+      if (valueNode) valueNode.textContent = formatPaletteBrightnessFollowAmountUi(amount);
+      brightnessFollowSlider.value = String(Math.round(amount * 100));
+      return;
+    }
+
     const harmonySlider = e.target.closest("input[data-fixture-metric-harmony]");
     if (harmonySlider) {
       const brand = normalizePaletteBrandUi(harmonySlider.dataset.fixtureMetricHarmony);
@@ -13613,6 +14283,23 @@ if (el.paletteBrandMenus) {
       );
       if (ok) {
         setBadge(el.health, "ok", `${brand.toUpperCase()} COUNT ${count}`);
+      }
+      return;
+    }
+
+    const vividnessBtn = e.target.closest("[data-palette-brand-vividness]");
+    if (vividnessBtn) {
+      const brand = normalizePaletteBrandUi(vividnessBtn.dataset.paletteBrandVividness);
+      if (!brand) return;
+      const level = normalizePaletteVividnessUi(vividnessBtn.dataset.level, 2);
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const ok = await applyPalettePatch(
+        { ...scopePatch, vividness: level },
+        `${brand.toUpperCase()} PALETTE VIVIDNESS`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} VIVIDNESS ${formatPaletteVividnessLabelUi(level)}`);
       }
       return;
     }
@@ -13684,6 +14371,23 @@ if (el.paletteBrandMenus) {
           );
         }
         setBadge(el.health, "ok", `${brand.toUpperCase()} MODE ${formatPaletteCycleModeLabelUi(nextMode)}`);
+      }
+      return;
+    }
+
+    const brightnessModeBtn = e.target.closest("[data-palette-brand-brightness-mode]");
+    if (brightnessModeBtn) {
+      const brand = normalizePaletteBrandUi(brightnessModeBtn.dataset.paletteBrandBrightnessMode);
+      if (!brand) return;
+      const mode = normalizePaletteBrightnessModeUi(brightnessModeBtn.dataset.mode, "legacy");
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const ok = await applyPalettePatch(
+        { ...scopePatch, brightnessMode: mode },
+        `${brand.toUpperCase()} BRIGHTNESS`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} BRIGHTNESS ${formatPaletteBrightnessModeLabelUi(mode)}`);
       }
       return;
     }
@@ -13873,6 +14577,26 @@ if (el.paletteBrandMenus) {
       );
       if (ok) {
         setBadge(el.health, "ok", `${brand.toUpperCase()} REACTIVE MARGIN ${margin}`);
+      }
+      return;
+    }
+
+    const brightnessFollowSlider = e.target.closest("input[data-palette-brand-brightness-follow]");
+    if (brightnessFollowSlider) {
+      const brand = normalizePaletteBrandUi(brightnessFollowSlider.dataset.paletteBrandBrightnessFollow);
+      if (!brand) return;
+      const amount = normalizePaletteBrightnessFollowAmountUi(
+        Number(brightnessFollowSlider.value) / 100,
+        1
+      );
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const ok = await applyPalettePatch(
+        { ...scopePatch, brightnessFollowAmount: amount },
+        `${brand.toUpperCase()} BRIGHTNESS`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} FOLLOW ${formatPaletteBrightnessFollowAmountUi(amount)}`);
       }
       return;
     }
@@ -14852,6 +15576,10 @@ function sync() {
     const count = normalizePaletteColorCountUi(btn.dataset.paletteCount, ui.paletteColorsPerFamily || 3);
     btn.classList.toggle("active", count === ui.paletteColorsPerFamily);
   });
+  paletteVividnessButtons.forEach(btn => {
+    const level = normalizePaletteVividnessUi(btn.dataset.paletteVividness, ui.paletteVividness || 2);
+    btn.classList.toggle("active", level === normalizePaletteVividnessUi(ui.paletteVividness, 2));
+  });
   palettePresetButtons.forEach(btn => {
     const key = String(btn.dataset.palettePreset || "").trim().toLowerCase();
     btn.classList.toggle("active", isPalettePresetActiveUi(key));
@@ -14872,6 +15600,10 @@ function sync() {
     const enabled = String(btn.dataset.paletteBeatLock || "").trim().toLowerCase() === "true";
     btn.classList.toggle("active", enabled === (ui.paletteBeatLock === true));
   });
+  paletteBrightnessModeButtons.forEach(btn => {
+    const mode = normalizePaletteBrightnessModeUi(btn.dataset.paletteBrightnessMode, "legacy");
+    btn.classList.toggle("active", mode === normalizePaletteBrightnessModeUi(ui.paletteBrightnessMode, "legacy"));
+  });
   paletteSpectrumModeButtons.forEach(btn => {
     const mode = normalizePaletteSpectrumMapModeUi(btn.dataset.paletteSpectrumMode, "auto");
     btn.classList.toggle("active", mode === normalizePaletteSpectrumMapModeUi(ui.paletteSpectrumMapMode, "auto"));
@@ -14880,7 +15612,15 @@ function sync() {
   syncPaletteTimedIntervalSliderUi();
   syncPaletteBeatLockGraceSliderUi();
   syncPaletteReactiveMarginSliderUi();
+  syncPaletteBrightnessFollowSliderUi();
   syncPaletteSpectrumFeatureSelectorsUi();
+  const brightnessMode = normalizePaletteBrightnessModeUi(ui.paletteBrightnessMode, "legacy");
+  if (el.paletteBrightnessFollowWrap) {
+    el.paletteBrightnessFollowWrap.classList.toggle("hidden", brightnessMode !== "test");
+  }
+  if (el.paletteBrightnessFollowAmount) {
+    el.paletteBrightnessFollowAmount.disabled = brightnessMode !== "test";
+  }
   const globalCycleMode = normalizePaletteCycleModeUi(ui.paletteCycleMode, "on_trigger");
   const showTimed = globalCycleMode === "timed_cycle";
   const showReactive = globalCycleMode === "reactive_shift";
@@ -14900,7 +15640,7 @@ function sync() {
     node.disabled = !canEditSpectrumMap;
   });
   if (el.paletteStat) {
-    el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} x${ui.paletteColorsPerFamily}`;
+    el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} x${ui.paletteColorsPerFamily} | ${formatPaletteVividnessLabelUi(ui.paletteVividness)}`;
   }
   if (el.paletteOrderStat) {
     el.paletteOrderStat.textContent = ui.paletteDisorder
@@ -15409,16 +16149,66 @@ function normalizeAudioAppNameUi(value) {
   return raw.slice(0, 128);
 }
 
+function normalizeAudioAppTokenUi(value) {
+  const appName = normalizeAudioAppNameUi(value).toLowerCase();
+  if (!appName) return "";
+  return appName.endsWith(".exe") ? appName.slice(0, -4) : appName;
+}
+
+function getAudioSelectableAppsUi() {
+  const apps = Array.isArray(ui.audioRunningApps) ? ui.audioRunningApps : [];
+  if (ui.audioAppsShowAll === true) return apps;
+  const filtered = apps.filter(app => {
+    if (app?.audioCapable === true) return true;
+    if (app?.likelyAudio === true) return true;
+    if (app?.hasWindow === true) return true;
+    if (Array.isArray(app?.windowTitles) && app.windowTitles.length > 0) return true;
+    return false;
+  });
+  return filtered.length ? filtered : apps;
+}
+
+function updateAudioAppsFilterHintUi() {
+  if (!el.aAppsFilterHint) return;
+  const totalApps = Array.isArray(ui.audioRunningApps) ? ui.audioRunningApps.length : 0;
+  const visibleApps = getAudioSelectableAppsUi().length;
+  const source = String(ui.audioAppHintMeta?.source || "").trim().toLowerCase();
+  const sourceText = source === "proctap_audio_processes" ? "audio-probe" : "window-fallback";
+  const audioCapable = Array.isArray(ui.audioRunningApps)
+    ? ui.audioRunningApps.filter(app => app?.audioCapable === true).length
+    : 0;
+
+  if (ui.audioAppsShowAll === true) {
+    el.aAppsFilterHint.textContent = `APP LIST MODE: all processes (${visibleApps})`;
+    return;
+  }
+  if (audioCapable > 0) {
+    el.aAppsFilterHint.textContent = `APP LIST MODE: audio-capable (${visibleApps}/${totalApps}) via ${sourceText}`;
+    return;
+  }
+  el.aAppsFilterHint.textContent = `APP LIST MODE: likely audio apps (${visibleApps}/${totalApps}) via ${sourceText}`;
+}
+
+function syncAudioRoutingComplexityUi() {
+  const simpleMode = ui.audioSimpleRoutingMode !== false;
+  if (el.aIsoSimpleMode) el.aIsoSimpleMode.checked = simpleMode;
+  document.querySelectorAll(".audioIsoAdvanced").forEach(node => {
+    node.classList.toggle("hidden", simpleMode);
+  });
+}
+
 function setAudioAppSelectOptions(selectNode, selectedValue = "") {
   if (!selectNode) return;
   const selected = normalizeAudioAppNameUi(selectedValue);
-  const apps = Array.isArray(ui.audioRunningApps) ? ui.audioRunningApps : [];
+  const apps = getAudioSelectableAppsUi();
   const options = [{ value: "", label: "NONE" }];
   for (const app of apps) {
     const appName = normalizeAudioAppNameUi(app?.displayName || app?.app || app?.processName || "");
     if (!appName) continue;
     const instances = Number(app?.instances || 0);
-    const label = instances > 1 ? `${appName} (${instances})` : appName;
+    const labelBase = instances > 1 ? `${appName} (${instances})` : appName;
+    const suffix = ui.audioAppsShowAll === true && app?.audioCapable !== true ? " [other]" : "";
+    const label = `${labelBase}${suffix}`;
     options.push({ value: appName, label });
   }
   if (selected && !options.some(option => option.value.toLowerCase() === selected.toLowerCase())) {
@@ -15437,9 +16227,80 @@ function setAudioAppSelectOptions(selectNode, selectedValue = "") {
 }
 
 function updateAudioAppIsolationStatusText(text = "") {
-  const line = String(text || "").trim() || "App isolation scan idle.";
+  const line = String(text || "").trim() || "App source scan idle.";
   if (el.aAppIsolationStatus) el.aAppIsolationStatus.value = line;
   if (el.liveAudioAppSearchStat) el.liveAudioAppSearchStat.value = line;
+}
+
+function renderAudioOptionalToolsBanner() {
+  if (!el.aOptionalToolsBanner || !el.aOptionalToolsBadge || !el.aOptionalToolsText) return;
+  const status = ui.audioOptionalToolsStatus && typeof ui.audioOptionalToolsStatus === "object"
+    ? ui.audioOptionalToolsStatus
+    : null;
+  if (!status || String(status.platform || "").trim() !== "win32") {
+    el.aOptionalToolsBanner.classList.add("hidden");
+    return;
+  }
+
+  const ffmpegOk = status?.checks?.ffmpeg?.available === true;
+  const procTapOk = status?.checks?.procTap?.available === true;
+  const ready = status.optionalToolsReady === true;
+  const needsInstall = status.needsOptionalInstall === true;
+  const dismissed = ui.audioOptionalToolsDismissed === true;
+  const showBanner = needsInstall || !dismissed;
+  if (!showBanner) {
+    el.aOptionalToolsBanner.classList.add("hidden");
+    return;
+  }
+
+  el.aOptionalToolsBanner.classList.remove("hidden", "ok", "warn");
+  el.aOptionalToolsBanner.classList.add(ready ? "ok" : "warn");
+  el.aOptionalToolsBadge.className = `statusPill ${ready ? "ok" : "warn"}`;
+  el.aOptionalToolsBadge.textContent = ready ? "INSTALLED" : "OPTIONAL INSTALL AVAILABLE";
+
+  const scriptName = String(status?.installScript?.fileName || "RaveLink-Bridge-Install-Optional-Audio-Tools.bat");
+  if (ready) {
+    el.aOptionalToolsText.innerHTML =
+      `Advanced app-isolation tools are installed. You can reinstall any time using <code>${escapeHtmlUi(scriptName)}</code>.`;
+    return;
+  }
+
+  const missingParts = [];
+  if (!ffmpegOk) missingParts.push("ffmpeg");
+  if (!procTapOk) missingParts.push("process loopback tools");
+  const missingWord = missingParts.length ? missingParts.join(" + ") : "optional tools";
+  el.aOptionalToolsText.innerHTML =
+    `Optional advanced app-isolation needs <b>${escapeHtmlUi(missingWord)}</b>. Install with one click from Start Menu: <b>RaveLink Bridge > Install Optional Audio Tools</b>.`;
+}
+
+function openAudioOptionalToolsHelp() {
+  const status = ui.audioOptionalToolsStatus && typeof ui.audioOptionalToolsStatus === "object"
+    ? ui.audioOptionalToolsStatus
+    : null;
+  const scriptName = String(status?.installScript?.fileName || "RaveLink-Bridge-Install-Optional-Audio-Tools.bat");
+  const startMenuHint = String(
+    status?.installScript?.startMenuHint || "Start Menu > RaveLink Bridge > Install Optional Audio Tools"
+  );
+  const lines = [
+    "Optional Audio Tools Setup",
+    "",
+    "1) Open:",
+    `   ${startMenuHint}`,
+    "",
+    "2) If using portable ZIP, run this file from app folder:",
+    `   ${scriptName}`,
+    "",
+    "3) Wait for installer window to finish, then click REFRESH CFG in AUDIO tab."
+  ];
+  window.alert(lines.join("\n"));
+}
+
+async function loadAudioOptionalToolsStatus() {
+  const r = await getJson("/audio/optional-tools/status");
+  if (!r || !r.ok || !r.status || typeof r.status !== "object") return false;
+  ui.audioOptionalToolsStatus = { ...r.status };
+  renderAudioOptionalToolsBanner();
+  return true;
 }
 
 function applyAudioAppIsolationTelemetry(telemetry = null) {
@@ -15509,29 +16370,44 @@ function applyAudioAppIsolationTelemetry(telemetry = null) {
   updateAudioAppIsolationStatusText(line);
 }
 
-async function loadAudioApps() {
-  const r = await getJson("/audio/apps");
+async function loadAudioApps(options = {}) {
+  const applyTelemetry = options?.applyTelemetry !== false;
+  const r = await getJson("/audio/apps?includeAudioHints=1");
   if (!r || !r.ok || !Array.isArray(r.apps)) return false;
   ui.audioRunningApps = r.apps.slice();
+  ui.audioRunningAppsHinted = r.apps.slice();
+  ui.audioAppHintMeta = r.audioHints && typeof r.audioHints === "object"
+    ? { ...r.audioHints }
+    : null;
+  ui.audioAudioCapableTokens = Array.isArray(r.audioHints?.audioTokens)
+    ? r.audioHints.audioTokens
+      .map(token => normalizeAudioAppTokenUi(token))
+      .filter(Boolean)
+    : [];
   ui.audioAppsLoaded = true;
   setAudioAppSelectOptions(el.aAppPrimary, el.aAppPrimary?.value || "");
   setAudioAppSelectOptions(el.aAppFallback, el.aAppFallback?.value || "");
-  applyAudioAppIsolationTelemetry(r.telemetry || null);
+  updateAudioAppsFilterHintUi();
+  if (applyTelemetry) applyAudioAppIsolationTelemetry(r.telemetry || null);
   return true;
 }
 
 async function forceAudioAppIsolationScan() {
   const r = await postJson("/audio/ffmpeg/app-isolation/scan", {});
   if (!r.ok || !r.data) return false;
-  if (Array.isArray(r.data.runningApps)) {
+  const appsReloaded = await loadAudioApps({ applyTelemetry: false });
+  if (!appsReloaded && Array.isArray(r.data.runningApps)) {
     ui.audioRunningApps = r.data.runningApps.slice();
+    ui.audioRunningAppsHinted = r.data.runningApps.slice();
+    ui.audioAppHintMeta = null;
+    ui.audioAudioCapableTokens = [];
     ui.audioAppsLoaded = true;
+    setAudioAppSelectOptions(el.aAppPrimary, el.aAppPrimary?.value || "");
+    setAudioAppSelectOptions(el.aAppFallback, el.aAppFallback?.value || "");
+    updateAudioAppsFilterHintUi();
   }
   if (r.data.config && typeof r.data.config === "object") {
     applyAudioConfigToInputs(r.data.config);
-  } else {
-    setAudioAppSelectOptions(el.aAppPrimary, el.aAppPrimary?.value || "");
-    setAudioAppSelectOptions(el.aAppFallback, el.aAppFallback?.value || "");
   }
   applyAudioAppIsolationTelemetry(r.data.telemetry || null);
   return true;
@@ -16116,6 +16992,7 @@ function computeSmartMatchTelemetryFingerprint() {
     String(ui.audioReactivityPreset || "balanced"),
     String(ui.sceneLock || "auto"),
     String(ui.paletteColorsPerFamily || 3),
+    String(normalizePaletteVividnessUi(ui.paletteVividness, 2)),
     getPaletteFamiliesLabelUi(ui.paletteFamilies),
     ui.paletteDisorder ? "disorder" : "ordered",
     String(Math.round(normalizePaletteDisorderAggressionUi(ui.paletteDisorderAggression, 0.35) * 100)),
@@ -16124,6 +17001,8 @@ function computeSmartMatchTelemetryFingerprint() {
     ui.paletteBeatLock ? "beatlock" : "free",
     String(normalizePaletteBeatLockGraceSecUi(ui.paletteBeatLockGraceSec, 2)),
     String(normalizePaletteReactiveMarginUi(ui.paletteReactiveMargin, 28)),
+    normalizePaletteBrightnessModeUi(ui.paletteBrightnessMode, "legacy"),
+    String(normalizePaletteBrightnessFollowAmountUi(ui.paletteBrightnessFollowAmount, 1).toFixed(2)),
     normalizePaletteSpectrumMapModeUi(ui.paletteSpectrumMapMode, "auto"),
     normalizePaletteSpectrumFeatureMapUi(
       ui.paletteSpectrumFeatureMap,
@@ -16611,7 +17490,7 @@ async function poll(options = {}) {
   el.phrase.textContent = t.phrase || "-";
   el.dropStat.textContent = t.drop ? "YES" : "NO";
   if (el.paletteStat) {
-    el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} x${ui.paletteColorsPerFamily}`;
+    el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} x${ui.paletteColorsPerFamily} | ${formatPaletteVividnessLabelUi(ui.paletteVividness)}`;
   }
   if (el.paletteOrderStat) {
     el.paletteOrderStat.textContent = ui.paletteDisorder
@@ -16686,6 +17565,24 @@ async function poll(options = {}) {
     ui.paletteReactiveMargin = normalizePaletteReactiveMarginUi(
       t.paletteReactiveMargin,
       ui.paletteReactiveMargin || 28
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteBrightnessMode")) {
+    ui.paletteBrightnessMode = normalizePaletteBrightnessModeUi(
+      t.paletteBrightnessMode,
+      ui.paletteBrightnessMode || "legacy"
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteBrightnessFollowAmount")) {
+    ui.paletteBrightnessFollowAmount = normalizePaletteBrightnessFollowAmountUi(
+      t.paletteBrightnessFollowAmount,
+      ui.paletteBrightnessFollowAmount ?? 1
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(t, "paletteVividness")) {
+    ui.paletteVividness = normalizePaletteVividnessUi(
+      t.paletteVividness,
+      ui.paletteVividness || 2
     );
   }
   if (Object.prototype.hasOwnProperty.call(t, "paletteSpectrumMapMode")) {
@@ -16880,6 +17777,7 @@ loadAudioConfig();
 loadAudioReactivityMap();
 loadAudioDevices();
 loadAudioApps();
+loadAudioOptionalToolsStatus();
 loadMidiStatus();
 refreshStandaloneFixtures();
 refreshFixturesFromServer({ attempts: 3 });

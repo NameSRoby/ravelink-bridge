@@ -22,12 +22,10 @@
       "lightId": 1
     },
     {
-      "id": "wiz-background-1",
+      "id": "wiz-main-1",
       "brand": "wiz",
-      "zone": "background",
+      "zone": "wiz",
       "enabled": true,
-      "controlMode": "engine",
-      "engineBinding": "wiz",
       "engineEnabled": true,
       "twitchEnabled": true,
       "customEnabled": false,
@@ -36,12 +34,10 @@
     {
       "id": "wiz-custom-1",
       "brand": "wiz",
-      "zone": "desk",
+      "zone": "custom",
       "enabled": true,
-      "controlMode": "standalone",
-      "engineBinding": "standalone",
       "engineEnabled": false,
-      "twitchEnabled": false,
+      "twitchEnabled": true,
       "customEnabled": true,
       "ip": "192.168.x.x"
     }

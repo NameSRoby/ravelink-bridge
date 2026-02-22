@@ -424,6 +424,10 @@ npm run sanitize:release
 npm run export:redistributable
 ```
 
+Optional local-only override:
+- `node scripts/sanitize-release.js --keep-backups`
+- or set env `RAVELINK_SANITIZE_KEEP_BACKUPS=1`
+
 Sanitization/export scripts:
 - `scripts/sanitize-release.js`
 - `scripts/export-redistributable.js`

@@ -20,17 +20,22 @@
 // [TITLE] - Twitch/Color Command Routing
 // [TITLE] - REST API Endpoints
 
-const LOG_SENSITIVE_KEY_RE = /(client[\s_-]*key|clientkey|client_key|app[\s_-]*key|user[\s_-]*name|username|authorization|token|password|api[_-]?key|secret|cookie|set-cookie|bridge[\s_-]*id|bridgeid|entertainment[\s_-]*area(?:[\s_-]*id)?|entertainmentareaid)\s*[=:]\s*([^\s,;|]+)/gi;
-const LOG_SENSITIVE_JSON_KEY_RE = /("(?:clientkey|client_key|app[_-]?key|username|user[_-]?name|authorization|token|password|api[_-]?key|secret|cookie|set-cookie|bridgeid|bridge[_-]?id|entertainmentareaid|entertainment[_-]?area(?:[_-]?id)?)"\s*:\s*")([^"]*)(")/gi;
-const LOG_SENSITIVE_HEX_RE = /\b[a-f0-9]{24,}\b/gi;
-const LOG_SENSITIVE_BRIDGE_HEX_RE = /\b[a-f0-9]{16}\b/gi;
-const LOG_SENSITIVE_UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
-const LOG_SENSITIVE_LONG_TOKEN_RE = /\b[a-z0-9_-]{20,}\b/gi;
-const LOG_SENSITIVE_IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
-const LOG_SENSITIVE_API_SEGMENT_RE = /(\/api\/)([^\/\s?]+)/gi;
-const LOG_SENSITIVE_QUERY_RE = /([?&](?:token|apikey|api_key|clientkey|client_key|username|password|authorization)=)[^&\s]+/gi;
-const LOG_SENSITIVE_BEARER_RE = /(bearer\s+)[a-z0-9._~+/-]+/gi;
-const LOG_SENSITIVE_OBJECT_KEY_RE = /^(clientkey|client_key|app[_-]?key|username|user[_-]?name|authorization|token|password|api[_-]?key|secret|cookie|set-cookie|bridgeid|bridge[_-]?id|entertainmentareaid|entertainment[_-]?area(?:[_-]?id)?)$/i;
+const {
+  redactSensitiveLogValue: redactSensitiveText,
+  sanitizeLogValue: sanitizeSensitiveLogValue
+} = require("./core/utils/log-redaction");
+const {
+  parseIpv4Parts: parsePrivateIpv4Parts,
+  isPrivateOrLoopbackIpv4,
+  normalizePrivateOrLoopbackIpv4
+} = require("./core/utils/private-ipv4");
+const {
+  parseBooleanToken: parseBooleanTokenShared,
+  parseBooleanLoose: parseBooleanLooseShared
+} = require("./core/utils/booleans");
+const { hsvToRgb255: convertHsvToRgb255 } = require("./core/utils/hsv-rgb");
+const { createServerColorUtils } = require("./core/server/color-utils");
+const { createRequestPatchUtils } = require("./core/server/request-patch-utils");
 let unsafeExposeSensitiveLogsRuntime = String(process.env.RAVELINK_UNSAFE_LOG_SECRETS || "").trim() === "1";
 
 function setUnsafeExposeSensitiveLogsRuntime(enabled) {
@@ -46,58 +51,15 @@ function setUnsafeExposeSensitiveLogsRuntime(enabled) {
 }
 
 function redactLogString(value, fallback = "unknown") {
-  let text = String(value || "").trim();
-  if (!text) return fallback;
-  text = text.replace(LOG_SENSITIVE_KEY_RE, (_, key) => `${key}=[redacted]`);
-  text = text.replace(LOG_SENSITIVE_JSON_KEY_RE, (_, lead, __, tail) => `${lead}[redacted]${tail}`);
-  text = text.replace(LOG_SENSITIVE_QUERY_RE, (_, prefix) => `${prefix}[redacted]`);
-  text = text.replace(LOG_SENSITIVE_BEARER_RE, (_, prefix) => `${prefix}[redacted]`);
-  text = text.replace(LOG_SENSITIVE_API_SEGMENT_RE, (_, lead) => `${lead}[redacted]`);
-  text = text.replace(LOG_SENSITIVE_BRIDGE_HEX_RE, "[redacted-id]");
-  text = text.replace(LOG_SENSITIVE_UUID_RE, "[redacted-id]");
-  text = text.replace(LOG_SENSITIVE_HEX_RE, "[redacted]");
-  text = text.replace(LOG_SENSITIVE_LONG_TOKEN_RE, "[redacted]");
-  text = text.replace(LOG_SENSITIVE_IPV4_RE, "[redacted-ip]");
-  if (text.length > 3000) text = `${text.slice(0, 2997)}...`;
-  return text;
+  return redactSensitiveText(value, { fallback, maxLength: 3000, maxDepth: 5 });
 }
 
-function sanitizeLogValue(value, seen = new WeakSet(), depth = 0) {
-  if (value === null || value === undefined) return value;
-  if (typeof value === "string") return redactLogString(value);
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return value;
-  if (typeof value === "symbol") return String(value);
-  if (typeof value === "function") return `[Function ${value.name || "anonymous"}]`;
+function redactSensitiveLogValue(value, fallback = "unknown") {
+  return redactSensitiveText(value, { fallback, maxLength: 300, maxDepth: 5 });
+}
 
-  if (value instanceof Error) {
-    return redactLogString(value.stack || value.message || String(value));
-  }
-
-  if (depth >= 5) return "[MaxDepth]";
-  if (Array.isArray(value)) {
-    return value.map(item => sanitizeLogValue(item, seen, depth + 1));
-  }
-
-  if (typeof value === "object") {
-    if (seen.has(value)) return "[Circular]";
-    seen.add(value);
-    const out = {};
-    for (const [key, item] of Object.entries(value)) {
-      if (LOG_SENSITIVE_OBJECT_KEY_RE.test(String(key || ""))) {
-        out[key] = "[redacted]";
-      } else {
-        out[key] = sanitizeLogValue(item, seen, depth + 1);
-      }
-    }
-    seen.delete(value);
-    return out;
-  }
-
-  try {
-    return redactLogString(String(value));
-  } catch {
-    return "[Unserializable]";
-  }
+function sanitizeLogValue(value) {
+  return sanitizeSensitiveLogValue(value, { fallback: "unknown", maxLength: 3000, maxDepth: 5 });
 }
 
 function installGlobalLogRedaction() {
@@ -148,7 +110,7 @@ const http = require("http");
 const net = require("net");
 const fs = require("fs");
 const path = require("path");
-const { execFile, execFileSync, spawn } = require("child_process");
+const { execFile, execFileSync, spawn, spawnSync } = require("child_process");
 
 // [TITLE] Section: Core Dependencies
 // ======================================================
@@ -160,6 +122,9 @@ const fixtureRegistry = require("./core/fixtures");
 const automationRules = require("./core/automation-rules");
 const state = require("./core/state");
 const createModLoader = require("./core/mods/mod-loader");
+const createStandaloneLogic = require("./core/standalone/logic");
+const createStandaloneRuntime = require("./core/standalone/runtime");
+const createTwitchColorRuntime = require("./core/twitch-color-runtime");
 
 // [TITLE] Section: MIDI Dependencies
 // ======================================================
@@ -184,6 +149,13 @@ const pickWizColor = require("./wiz/wiz-energy-strategy");
 const createWizAdapter = require("./adapters/wiz-adapter");
 const colorEngine = require("./colors/color-engine");
 const registerRavePaletteMetricRoutes = require("./routes/rave-palette-metric-routes");
+const registerMidiRoutes = require("./routes/midi-routes");
+const registerRaveOverclockRoutes = require("./routes/rave-overclock-routes");
+const registerRaveSceneSyncRoutes = require("./routes/rave-scene-sync-routes");
+const registerSystemRoutes = require("./routes/system-routes");
+const registerStandaloneRoutes = require("./routes/standalone-routes");
+const registerFixturesConnectivityRoutes = require("./routes/fixtures-connectivity-routes");
+const registerFixturesRoutes = require("./routes/fixtures-routes");
 
 // [TITLE] Section: Runtime Configuration
 // ======================================================
@@ -201,6 +173,8 @@ const SYSTEM_CONFIG_PATH = path.join(__dirname, "core", "system.config.json");
 const STANDALONE_STATE_CONFIG_PATH = path.join(__dirname, "core", "standalone.state.json");
 const PALETTE_FIXTURE_OVERRIDES_CONFIG_PATH = path.join(__dirname, "core", "palette.fixture.overrides.json");
 const FIXTURE_METRIC_ROUTING_CONFIG_PATH = path.join(__dirname, "core", "fixture.metric.routing.json");
+const OPTIONAL_AUDIO_TOOLS_SCRIPT_NAME = "RaveLink-Bridge-Install-Optional-Audio-Tools.bat";
+const OPTIONAL_AUDIO_TOOLS_SCRIPT_PATH = path.join(__dirname, OPTIONAL_AUDIO_TOOLS_SCRIPT_NAME);
 const MODS_README_PATH = path.join(__dirname, "docs", "MODS.md");
 const TWITCH_COLOR_TARGETS = new Set(["hue", "wiz", "both", "other"]);
 const TWITCH_COLOR_PREFIX_RE = /^[a-z][a-z0-9_-]{0,31}$/;
@@ -209,8 +183,9 @@ const MOD_IMPORT_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
 const TWITCH_COLOR_CONFIG_DEFAULT = Object.freeze({
   version: 1,
   defaultTarget: "hue",
+  autoDefaultTarget: true,
   prefixes: Object.freeze({
-    hue: "hue",
+    hue: "",
     wiz: "wiz",
     other: ""
   }),
@@ -246,6 +221,22 @@ const META_AUTO_TEMPO_TRACKER_KEYS = Object.freeze([
 const HUE_TRANSPORT_PREFERENCE = Object.freeze({
   AUTO: "auto",
   REST: "rest"
+});
+const HUE_TRANSPORT_PREFERENCE_VALUES = new Set(Object.values(HUE_TRANSPORT_PREFERENCE));
+const CANONICAL_ROUTE_ZONE_BY_BRAND = Object.freeze({
+  hue: "hue",
+  wiz: "wiz"
+});
+const FIXTURE_LIST_METHOD_BY_MODE = Object.freeze({
+  engine: "listEngineBy",
+  twitch: "listTwitchBy",
+  custom: "listCustomBy"
+});
+const CONNECTIVITY_STATUS_TO_SUMMARY_KEY = Object.freeze({
+  reachable: "reachable",
+  unreachable: "unreachable",
+  not_configured: "notConfigured",
+  skipped: "skipped"
 });
 const AUDIO_REACTIVITY_MAP_DEFAULT = Object.freeze({
   version: 1,
@@ -296,6 +287,7 @@ const PALETTE_CYCLE_MODE_ORDER = Object.freeze([
   "reactive_shift",
   "spectrum_mapper"
 ]);
+const PALETTE_BRIGHTNESS_MODE_ORDER = Object.freeze(["legacy", "test"]);
 const PALETTE_SPECTRUM_MAP_MODE_ORDER = Object.freeze(["auto", "manual"]);
 const PALETTE_AUDIO_FEATURE_KEYS = Object.freeze([
   "lows",
@@ -308,6 +300,17 @@ const PALETTE_AUDIO_FEATURE_KEYS = Object.freeze([
   "transients",
   "beat"
 ]);
+const PALETTE_SIGNAL_FEATURE_FIELD_MAP = Object.freeze({
+  lows: "lows",
+  mids: "mids",
+  highs: "highs",
+  rms: "rms",
+  energy: "energy",
+  flux: "flux",
+  peaks: "peaks",
+  transients: "transients",
+  beat: "beat"
+});
 const PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP = Object.freeze([
   "lows",
   "mids",
@@ -321,6 +324,9 @@ const PALETTE_BEAT_LOCK_GRACE_MIN_SEC = 0;
 const PALETTE_BEAT_LOCK_GRACE_MAX_SEC = 8;
 const PALETTE_REACTIVE_MARGIN_MIN = 5;
 const PALETTE_REACTIVE_MARGIN_MAX = 100;
+const PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MIN = 0;
+const PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MAX = 2;
+const PALETTE_VIVIDNESS_LEVEL_OPTIONS = Object.freeze([0, 1, 2, 3, 4]);
 const PALETTE_CONFIG_DEFAULT = Object.freeze({
   colorsPerFamily: 3,
   families: Object.freeze(["red", "green", "blue"]),
@@ -331,6 +337,9 @@ const PALETTE_CONFIG_DEFAULT = Object.freeze({
   beatLock: false,
   beatLockGraceSec: 2,
   reactiveMargin: 28,
+  brightnessMode: "legacy",
+  brightnessFollowAmount: 1,
+  vividness: 2,
   spectrumMapMode: "auto",
   spectrumFeatureMap: PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
 });
@@ -339,56 +348,63 @@ const PALETTE_FAMILY_DEFS = Object.freeze({
     id: "red",
     label: "RED",
     colors: Object.freeze([
-      Object.freeze({ r: 110, g: 0, b: 10 }),
-      Object.freeze({ r: 154, g: 0, b: 18 }),
-      Object.freeze({ r: 196, g: 8, b: 24 }),
-      Object.freeze({ r: 236, g: 22, b: 30 }),
-      Object.freeze({ r: 255, g: 52, b: 42 }),
-      Object.freeze({ r: 255, g: 84, b: 88 }),
-      Object.freeze({ r: 255, g: 74, b: 132 }),
-      Object.freeze({ r: 246, g: 58, b: 174 }),
-      Object.freeze({ r: 220, g: 50, b: 214 }),
-      Object.freeze({ r: 186, g: 56, b: 242 }),
-      Object.freeze({ r: 150, g: 58, b: 252 }),
-      Object.freeze({ r: 120, g: 46, b: 224 })
+      Object.freeze({ r: 255, g: 120, b: 0 }),
+      Object.freeze({ r: 255, g: 96, b: 0 }),
+      Object.freeze({ r: 255, g: 72, b: 0 }),
+      Object.freeze({ r: 255, g: 48, b: 0 }),
+      Object.freeze({ r: 255, g: 24, b: 0 }),
+      Object.freeze({ r: 255, g: 0, b: 0 }),
+      Object.freeze({ r: 255, g: 0, b: 32 }),
+      Object.freeze({ r: 255, g: 0, b: 72 }),
+      Object.freeze({ r: 255, g: 0, b: 116 }),
+      Object.freeze({ r: 255, g: 0, b: 164 }),
+      Object.freeze({ r: 255, g: 24, b: 214 }),
+      Object.freeze({ r: 255, g: 56, b: 255 })
     ])
   }),
   green: Object.freeze({
     id: "green",
     label: "GREEN",
     colors: Object.freeze([
-      Object.freeze({ r: 6, g: 66, b: 10 }),
-      Object.freeze({ r: 8, g: 106, b: 14 }),
-      Object.freeze({ r: 14, g: 146, b: 22 }),
-      Object.freeze({ r: 28, g: 186, b: 30 }),
-      Object.freeze({ r: 56, g: 222, b: 42 }),
-      Object.freeze({ r: 96, g: 242, b: 38 }),
-      Object.freeze({ r: 142, g: 250, b: 30 }),
-      Object.freeze({ r: 190, g: 248, b: 24 }),
-      Object.freeze({ r: 136, g: 255, b: 86 }),
-      Object.freeze({ r: 74, g: 252, b: 138 }),
-      Object.freeze({ r: 30, g: 236, b: 186 }),
-      Object.freeze({ r: 18, g: 214, b: 220 })
+      Object.freeze({ r: 200, g: 255, b: 0 }),
+      Object.freeze({ r: 160, g: 255, b: 0 }),
+      Object.freeze({ r: 120, g: 255, b: 0 }),
+      Object.freeze({ r: 80, g: 255, b: 0 }),
+      Object.freeze({ r: 40, g: 255, b: 0 }),
+      Object.freeze({ r: 0, g: 255, b: 0 }),
+      Object.freeze({ r: 0, g: 255, b: 36 }),
+      Object.freeze({ r: 0, g: 255, b: 82 }),
+      Object.freeze({ r: 0, g: 255, b: 132 }),
+      Object.freeze({ r: 0, g: 255, b: 184 }),
+      Object.freeze({ r: 0, g: 238, b: 232 }),
+      Object.freeze({ r: 0, g: 212, b: 255 })
     ])
   }),
   blue: Object.freeze({
     id: "blue",
     label: "BLUE",
     colors: Object.freeze([
-      Object.freeze({ r: 6, g: 14, b: 106 }),
-      Object.freeze({ r: 10, g: 36, b: 156 }),
-      Object.freeze({ r: 18, g: 72, b: 206 }),
-      Object.freeze({ r: 22, g: 114, b: 246 }),
-      Object.freeze({ r: 16, g: 156, b: 255 }),
-      Object.freeze({ r: 20, g: 198, b: 255 }),
-      Object.freeze({ r: 86, g: 236, b: 255 }),
-      Object.freeze({ r: 72, g: 126, b: 255 }),
-      Object.freeze({ r: 96, g: 110, b: 255 }),
-      Object.freeze({ r: 118, g: 98, b: 255 }),
-      Object.freeze({ r: 140, g: 86, b: 255 }),
-      Object.freeze({ r: 162, g: 76, b: 248 })
+      Object.freeze({ r: 0, g: 244, b: 255 }),
+      Object.freeze({ r: 0, g: 214, b: 255 }),
+      Object.freeze({ r: 0, g: 178, b: 255 }),
+      Object.freeze({ r: 0, g: 140, b: 255 }),
+      Object.freeze({ r: 0, g: 98, b: 255 }),
+      Object.freeze({ r: 0, g: 56, b: 255 }),
+      Object.freeze({ r: 0, g: 20, b: 255 }),
+      Object.freeze({ r: 44, g: 0, b: 255 }),
+      Object.freeze({ r: 88, g: 0, b: 255 }),
+      Object.freeze({ r: 132, g: 0, b: 255 }),
+      Object.freeze({ r: 182, g: 0, b: 255 }),
+      Object.freeze({ r: 234, g: 0, b: 255 })
     ])
   })
+});
+const PALETTE_FAMILY_INDEX_SPAN = Object.freeze({
+  1: Object.freeze([5]),
+  3: Object.freeze([4, 5, 6]),
+  5: Object.freeze([3, 4, 5, 6, 7]),
+  8: Object.freeze([2, 3, 4, 5, 6, 7, 8, 9]),
+  12: Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
 });
 const PALETTE_FIXTURE_OVERRIDES_DEFAULT = Object.freeze({
   version: 1,
@@ -459,34 +475,6 @@ function stringifyHueError(err) {
   return raw;
 }
 
-const SENSITIVE_LOG_KEY_RE = /(client[\s_-]*key|clientkey|client_key|app[\s_-]*key|user[\s_-]*name|username|authorization|token|password|api[_-]?key|secret|cookie|set-cookie|bridge[\s_-]*id|bridgeid|entertainment[\s_-]*area(?:[\s_-]*id)?|entertainmentareaid)\s*[=:]\s*([^\s,;|]+)/gi;
-const SENSITIVE_LOG_JSON_KEY_RE = /("(?:clientkey|client_key|app[_-]?key|username|user[_-]?name|authorization|token|password|api[_-]?key|secret|cookie|set-cookie|bridgeid|bridge[_-]?id|entertainmentareaid|entertainment[_-]?area(?:[_-]?id)?)"\s*:\s*")([^"]*)(")/gi;
-const SENSITIVE_LOG_HEX_RE = /\b[a-f0-9]{24,}\b/gi;
-const SENSITIVE_LOG_BRIDGE_HEX_RE = /\b[a-f0-9]{16}\b/gi;
-const SENSITIVE_LOG_UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
-const SENSITIVE_LOG_LONG_TOKEN_RE = /\b[a-z0-9_-]{20,}\b/gi;
-const SENSITIVE_LOG_IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
-const SENSITIVE_LOG_API_SEGMENT_RE = /(\/api\/)([^\/\s?]+)/gi;
-const SENSITIVE_LOG_QUERY_RE = /([?&](?:token|apikey|api_key|clientkey|client_key|username|password|authorization)=)[^&\s]+/gi;
-const SENSITIVE_LOG_BEARER_RE = /(bearer\s+)[a-z0-9._~+/-]+/gi;
-
-function redactSensitiveLogValue(value, fallback = "unknown") {
-  let text = String(value || "").trim();
-  if (!text) return fallback;
-  text = text.replace(SENSITIVE_LOG_KEY_RE, (_, key) => `${key}=[redacted]`);
-  text = text.replace(SENSITIVE_LOG_JSON_KEY_RE, (_, lead, __, tail) => `${lead}[redacted]${tail}`);
-  text = text.replace(SENSITIVE_LOG_QUERY_RE, (_, prefix) => `${prefix}[redacted]`);
-  text = text.replace(SENSITIVE_LOG_BEARER_RE, (_, prefix) => `${prefix}[redacted]`);
-  text = text.replace(SENSITIVE_LOG_API_SEGMENT_RE, (_, lead) => `${lead}[redacted]`);
-  text = text.replace(SENSITIVE_LOG_BRIDGE_HEX_RE, "[redacted-id]");
-  text = text.replace(SENSITIVE_LOG_UUID_RE, "[redacted-id]");
-  text = text.replace(SENSITIVE_LOG_HEX_RE, "[redacted]");
-  text = text.replace(SENSITIVE_LOG_LONG_TOKEN_RE, "[redacted]");
-  text = text.replace(SENSITIVE_LOG_IPV4_RE, "[redacted-ip]");
-  if (text.length > 300) text = `${text.slice(0, 297)}...`;
-  return text;
-}
-
 function redactErrorForLog(err, fallback = "unknown error") {
   if (!err) return fallback;
   return redactSensitiveLogValue(err.message || err, fallback);
@@ -497,31 +485,15 @@ function sanitizeHueFallbackReason(value, fallback = "entertainment fallback") {
 }
 
 function parseIpv4Parts(ip) {
-  const text = String(ip || "").trim();
-  if (net.isIP(text) !== 4) return null;
-  const parts = text.split(".").map(part => Number(part));
-  if (parts.length !== 4 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)) {
-    return null;
-  }
-  return parts;
+  return parsePrivateIpv4Parts(ip);
 }
 
 function isPrivateHueBridgeIp(ip) {
-  const parts = parseIpv4Parts(ip);
-  if (!parts) return false;
-  const [a, b] = parts;
-  if (a === 10) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 169 && b === 254) return true; // Link-local.
-  if (a === 127) return true; // Local testing only.
-  return false;
+  return isPrivateOrLoopbackIpv4(ip);
 }
 
 function normalizeHueBridgeIp(ip) {
-  const target = String(ip || "").trim();
-  if (!target) return "";
-  return isPrivateHueBridgeIp(target) ? target : "";
+  return normalizePrivateOrLoopbackIpv4(ip);
 }
 
 function isLoopbackRequest(req) {
@@ -539,23 +511,152 @@ function isLoopbackRequest(req) {
   );
 }
 
+function parseBooleanToken(value) {
+  return parseBooleanTokenShared(value);
+}
+
 function parseBooleanLoose(value, fallback = false) {
-  if (value === true || value === false) return value;
-  if (value === 1 || value === "1") return true;
-  if (value === 0 || value === "0") return false;
-  if (typeof value === "string") {
-    const raw = value.trim().toLowerCase();
-    if (raw === "true" || raw === "on" || raw === "yes") return true;
-    if (raw === "false" || raw === "off" || raw === "no") return false;
+  return parseBooleanLooseShared(value, fallback);
+}
+
+function parseBoolean(value, fallback = false) {
+  return parseBooleanLoose(value, fallback);
+}
+
+function clampNumber(value, min, max, fallback = min) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    const fallbackNum = Number(fallback);
+    return Number.isFinite(fallbackNum) ? fallbackNum : min;
   }
-  return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+const {
+  clampRgb255,
+  miredToKelvin,
+  kelvinToRgb,
+  xyBriToRgb,
+  hueStateToWizState,
+  clamp01,
+  getAudioTelemetryMotionProfile,
+  boostRgbSaturation,
+  rgbToHsv255,
+  hsvToRgb255,
+  resolveAudioReactivitySourceLevel
+} = createServerColorUtils({ clampNumber, convertHsvToRgb255 });
+
+const {
+  hasOwn,
+  isNonArrayObject,
+  getRequestMap,
+  createRequestValueReader,
+  patchOptionalBoolean,
+  patchOptionalNumber,
+  patchOptionalLowerString,
+  mergePatchObject,
+  parseLowerTokenList
+} = createRequestPatchUtils({ parseBoolean });
+
+function probeCommand(command, args = [], options = {}) {
+  try {
+    const result = spawnSync(command, args, {
+      windowsHide: true,
+      encoding: "utf8",
+      timeout: Math.max(250, Math.min(10000, Number(options.timeoutMs || 2400))),
+      stdio: "pipe"
+    });
+    const failedBySpawn = Boolean(result?.error && result.error.code === "ENOENT");
+    const reached = !failedBySpawn;
+    const ok = reached && result?.status === 0;
+    return {
+      reached,
+      ok,
+      status: Number(result?.status || 0),
+      error: result?.error ? String(result.error.message || result.error) : "",
+      stdout: String(result?.stdout || "").trim(),
+      stderr: String(result?.stderr || "").trim()
+    };
+  } catch (err) {
+    return {
+      reached: false,
+      ok: false,
+      status: 0,
+      error: String(err?.message || err || "command probe failed").trim(),
+      stdout: "",
+      stderr: ""
+    };
+  }
+}
+
+function resolveOptionalAudioToolsStatus() {
+  const platform = process.platform;
+  const ffmpegEnvPath = String(process.env.RAVE_AUDIO_FFMPEG_PATH || "").trim();
+  const ffmpegEnvPathExists = ffmpegEnvPath ? fs.existsSync(ffmpegEnvPath) : false;
+  const bundledFfmpegPath = path.join(__dirname, "runtime", "tools", "ffmpeg", "ffmpeg.exe");
+  const bundledFfmpegExists = fs.existsSync(bundledFfmpegPath);
+  const ffmpegProbe = probeCommand("ffmpeg", ["-version"], { timeoutMs: 1800 });
+  const ffmpegAvailable = Boolean(ffmpegProbe.ok || ffmpegEnvPathExists || bundledFfmpegExists);
+  let ffmpegSource = "missing";
+  if (ffmpegEnvPathExists) ffmpegSource = "env_path";
+  else if (bundledFfmpegExists) ffmpegSource = "bundled";
+  else if (ffmpegProbe.ok) ffmpegSource = "path";
+
+  const py313Probe = platform === "win32"
+    ? probeCommand("py", ["-3.13", "--version"], { timeoutMs: 1800 })
+    : { reached: false, ok: false, status: 0, error: "windows-only", stdout: "", stderr: "" };
+  const python313Available = platform === "win32" ? py313Probe.ok : false;
+
+  const procTapProbe = platform === "win32" && python313Available
+    ? probeCommand("py", ["-3.13", "-c", "import proctap, psutil"], { timeoutMs: 2400 })
+    : { reached: false, ok: false, status: 0, error: "python-3.13-missing", stdout: "", stderr: "" };
+  const processLoopbackAvailable = platform === "win32" ? procTapProbe.ok : false;
+
+  const windowsAdvancedFeaturesReady = ffmpegAvailable && processLoopbackAvailable;
+  const needsOptionalInstall = platform === "win32" && !windowsAdvancedFeaturesReady;
+  const installScriptExists = fs.existsSync(OPTIONAL_AUDIO_TOOLS_SCRIPT_PATH);
+  const installCommand = installScriptExists ? OPTIONAL_AUDIO_TOOLS_SCRIPT_NAME : "";
+
+  return {
+    platform,
+    windowsOnlyFeature: true,
+    optionalToolsReady: platform === "win32" ? windowsAdvancedFeaturesReady : true,
+    needsOptionalInstall,
+    installScript: {
+      exists: installScriptExists,
+      fileName: OPTIONAL_AUDIO_TOOLS_SCRIPT_NAME,
+      command: installCommand,
+      startMenuHint: "Start Menu > RaveLink Bridge > Install Optional Audio Tools"
+    },
+    checks: {
+      ffmpeg: {
+        available: ffmpegAvailable,
+        source: ffmpegSource,
+        envPath: ffmpegEnvPath,
+        envPathExists: ffmpegEnvPathExists,
+        bundledPath: bundledFfmpegExists ? bundledFfmpegPath : "",
+        pathCommandReachable: ffmpegProbe.reached,
+        pathCommandOk: ffmpegProbe.ok
+      },
+      python313: {
+        available: python313Available,
+        launcherReachable: py313Probe.reached,
+        launcherOk: py313Probe.ok
+      },
+      procTap: {
+        available: processLoopbackAvailable,
+        importOk: procTapProbe.ok
+      }
+    }
+  };
 }
 
 function sanitizeHueTransportPreference(value, fallback = HUE_TRANSPORT_PREFERENCE.AUTO) {
   const raw = String(value || "").trim().toLowerCase();
-  if (raw === HUE_TRANSPORT_PREFERENCE.REST) return HUE_TRANSPORT_PREFERENCE.REST;
-  if (raw === HUE_TRANSPORT_PREFERENCE.AUTO) return HUE_TRANSPORT_PREFERENCE.AUTO;
-  return sanitizeHueTransportPreference(fallback, HUE_TRANSPORT_PREFERENCE.AUTO);
+  if (HUE_TRANSPORT_PREFERENCE_VALUES.has(raw)) return raw;
+  const fallbackRaw = String(fallback || "").trim().toLowerCase();
+  if (HUE_TRANSPORT_PREFERENCE_VALUES.has(fallbackRaw)) return fallbackRaw;
+  return HUE_TRANSPORT_PREFERENCE.AUTO;
 }
 
 function clampSystemBrowserLaunchDelayMs(value, fallback = SYSTEM_CONFIG_DEFAULT.browserLaunchDelayMs) {
@@ -991,6 +1092,54 @@ function normalizePaletteReactiveMargin(value, fallback = PALETTE_CONFIG_DEFAULT
   return PALETTE_CONFIG_DEFAULT.reactiveMargin;
 }
 
+function normalizePaletteBrightnessMode(value, fallback = PALETTE_CONFIG_DEFAULT.brightnessMode) {
+  const mode = String(value || "").trim().toLowerCase();
+  if (PALETTE_BRIGHTNESS_MODE_ORDER.includes(mode)) return mode;
+  const fallbackMode = String(fallback || "").trim().toLowerCase();
+  return PALETTE_BRIGHTNESS_MODE_ORDER.includes(fallbackMode)
+    ? fallbackMode
+    : PALETTE_CONFIG_DEFAULT.brightnessMode;
+}
+
+function normalizePaletteBrightnessFollowAmount(
+  value,
+  fallback = PALETTE_CONFIG_DEFAULT.brightnessFollowAmount
+) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(
+      parsed,
+      PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MIN,
+      PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MAX,
+      PALETTE_CONFIG_DEFAULT.brightnessFollowAmount
+    );
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(
+      fallbackNum,
+      PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MIN,
+      PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MAX,
+      PALETTE_CONFIG_DEFAULT.brightnessFollowAmount
+    );
+  }
+  return PALETTE_CONFIG_DEFAULT.brightnessFollowAmount;
+}
+
+function normalizePaletteVividness(value, fallback = PALETTE_CONFIG_DEFAULT.vividness) {
+  const minLevel = PALETTE_VIVIDNESS_LEVEL_OPTIONS[0];
+  const maxLevel = PALETTE_VIVIDNESS_LEVEL_OPTIONS[PALETTE_VIVIDNESS_LEVEL_OPTIONS.length - 1];
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return clampNumber(Math.round(parsed), minLevel, maxLevel, PALETTE_CONFIG_DEFAULT.vividness);
+  }
+  const fallbackNum = Number(fallback);
+  if (Number.isFinite(fallbackNum)) {
+    return clampNumber(Math.round(fallbackNum), minLevel, maxLevel, PALETTE_CONFIG_DEFAULT.vividness);
+  }
+  return PALETTE_CONFIG_DEFAULT.vividness;
+}
+
 function normalizePaletteSpectrumMapMode(value, fallback = PALETTE_CONFIG_DEFAULT.spectrumMapMode) {
   const key = String(value || "").trim().toLowerCase();
   if (PALETTE_SPECTRUM_MAP_MODE_ORDER.includes(key)) return key;
@@ -1089,6 +1238,21 @@ function normalizePaletteConfigSnapshot(source = {}, fallback = PALETTE_CONFIG_D
     reactiveMargin: normalizePaletteReactiveMargin(
       raw.reactiveMargin,
       normalizePaletteReactiveMargin(safeFallback.reactiveMargin, PALETTE_CONFIG_DEFAULT.reactiveMargin)
+    ),
+    brightnessMode: normalizePaletteBrightnessMode(
+      raw.brightnessMode,
+      normalizePaletteBrightnessMode(safeFallback.brightnessMode, PALETTE_CONFIG_DEFAULT.brightnessMode)
+    ),
+    brightnessFollowAmount: normalizePaletteBrightnessFollowAmount(
+      raw.brightnessFollowAmount,
+      normalizePaletteBrightnessFollowAmount(
+        safeFallback.brightnessFollowAmount,
+        PALETTE_CONFIG_DEFAULT.brightnessFollowAmount
+      )
+    ),
+    vividness: normalizePaletteVividness(
+      raw.vividness,
+      normalizePaletteVividness(safeFallback.vividness, PALETTE_CONFIG_DEFAULT.vividness)
     ),
     spectrumMapMode: normalizePaletteSpectrumMapMode(raw.spectrumMapMode, safeFallback.spectrumMapMode),
     spectrumFeatureMap: normalizePaletteSpectrumFeatureMap(
@@ -1428,6 +1592,7 @@ function validateBrowserOrigin(req) {
   const originPort = normalizeOriginPort(parsedOrigin);
   const requestPort = requestHost.port || PORT;
   const requestHostName = String(requestHost.host || "").trim().toLowerCase();
+  const requestIsLoopback = isLoopbackRequest(req);
 
   const sameHost = Boolean(
     requestHostName &&
@@ -1442,6 +1607,9 @@ function validateBrowserOrigin(req) {
   );
 
   if (!sameHost && !loopbackAliasMatch) {
+    if (requestIsLoopback || ALLOW_REMOTE_WRITE_RUNTIME) {
+      return { ok: true, allowOrigin: origin };
+    }
     return {
       ok: false,
       allowOrigin: "",
@@ -1479,6 +1647,8 @@ app.disable("x-powered-by");
 app.set("etag", false);
 app.use((req, res, next) => {
   const originValidation = validateBrowserOrigin(req);
+  const loopbackRequest = isLoopbackRequest(req);
+  const allowCrossSiteMutatingRequest = ALLOW_REMOTE_WRITE_RUNTIME || loopbackRequest;
   if (originValidation.allowOrigin) {
     res.setHeader("Access-Control-Allow-Origin", originValidation.allowOrigin);
     res.setHeader("Vary", "Origin");
@@ -1497,7 +1667,7 @@ app.use((req, res, next) => {
   );
 
   if (req.method === "OPTIONS") {
-    if (!originValidation.ok) {
+    if (!originValidation.ok && !allowCrossSiteMutatingRequest) {
       res.status(403).json({ ok: false, error: "untrusted_origin", detail: originValidation.reason });
       return;
     }
@@ -1505,7 +1675,11 @@ app.use((req, res, next) => {
     return;
   }
 
-  if (isCrossSiteBrowserRequest(req) && MUTATING_HTTP_METHODS.has(req.method)) {
+  if (
+    isCrossSiteBrowserRequest(req) &&
+    MUTATING_HTTP_METHODS.has(req.method) &&
+    !allowCrossSiteMutatingRequest
+  ) {
     res.status(403).json({
       ok: false,
       error: "cross_site_blocked",
@@ -1514,7 +1688,7 @@ app.use((req, res, next) => {
     return;
   }
 
-  if (!originValidation.ok && MUTATING_HTTP_METHODS.has(req.method)) {
+  if (!originValidation.ok && MUTATING_HTTP_METHODS.has(req.method) && !allowCrossSiteMutatingRequest) {
     res.status(403).json({ ok: false, error: "untrusted_origin", detail: originValidation.reason });
     return;
   }
@@ -2045,8 +2219,8 @@ function normalizeRouteZoneToken(value, fallback = "") {
 
 function getCanonicalZoneFallback(brand, fallback = "custom") {
   const brandKey = String(brand || "").trim().toLowerCase();
-  if (brandKey === "hue") return "hue";
-  if (brandKey === "wiz") return "wiz";
+  const canonical = CANONICAL_ROUTE_ZONE_BY_BRAND[brandKey];
+  if (canonical) return canonical;
   const normalizedFallback = normalizeRouteZoneToken(fallback, "");
   return normalizedFallback || brandKey || "custom";
 }
@@ -2091,12 +2265,9 @@ function listFixturesByModeScoped(mode, brand, zone, options = {}) {
   const zoneKey = normalizeRouteZoneToken(zone);
 
   let fixtures = [];
-  if (modeKey === "engine" && typeof fixtureRegistry.listEngineBy === "function") {
-    fixtures = fixtureRegistry.listEngineBy(brandKey, "", { requireConfigured });
-  } else if (modeKey === "twitch" && typeof fixtureRegistry.listTwitchBy === "function") {
-    fixtures = fixtureRegistry.listTwitchBy(brandKey, "", { requireConfigured });
-  } else if (modeKey === "custom" && typeof fixtureRegistry.listCustomBy === "function") {
-    fixtures = fixtureRegistry.listCustomBy(brandKey, "", { requireConfigured });
+  const preferredMethod = FIXTURE_LIST_METHOD_BY_MODE[modeKey];
+  if (preferredMethod && typeof fixtureRegistry[preferredMethod] === "function") {
+    fixtures = fixtureRegistry[preferredMethod](brandKey, "", { requireConfigured });
   } else if (typeof fixtureRegistry.listBy === "function") {
     fixtures = fixtureRegistry.listBy(brandKey, "", { requireConfigured });
   }
@@ -2956,8 +3127,15 @@ const wizTelemetry = {
   skippedScheduler: 0,
   skippedNoTargets: 0,
   sendErrors: 0,
-  lastDurationMs: 0
+  lastDurationMs: 0,
+  adaptiveTxReduced: 0,
+  adaptiveTxSoft: 0,
+  adaptiveTxHard: 0,
+  adaptiveTxSavedPackets: 0,
+  adaptiveTxLastScore: 0,
+  adaptiveTxLastRepeats: 1
 };
+const WIZ_ADAPTIVE_TX_GOVERNOR_ENABLED = String(process.env.RAVELINK_WIZ_ADAPTIVE_TX_GOVERNOR || "1").trim() !== "0";
 const fixtureConnectivityCache = new Map();
 const fixtureConnectivityInFlight = new Map();
 const CONNECTIVITY_CACHE_TTL_MS = 30000;
@@ -3008,6 +3186,102 @@ function getFixtureConnectivityMissingReason(fixture) {
     return "invalid wiz config";
   }
   return "mod fixture connectivity handled by its adapter";
+}
+
+function clampWizTxNumber(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function normalizeWizTxRepeats(value, fallback = 1) {
+  return Math.round(clampWizTxNumber(value, 1, 3, fallback));
+}
+
+function normalizeWizTxDelayMs(value, fallback = 18) {
+  return Math.round(clampWizTxNumber(value, 8, 120, fallback));
+}
+
+function resolveAdaptiveWizTxOptions(tx = {}, context = {}) {
+  const source = tx && typeof tx === "object" ? tx : {};
+  const baseRepeats = normalizeWizTxRepeats(source.repeats, 1);
+  const baseDelayMs = normalizeWizTxDelayMs(source.repeatDelayMs, 18);
+  if (!WIZ_ADAPTIVE_TX_GOVERNOR_ENABLED || baseRepeats <= 1) {
+    return {
+      tx: {
+        ...source,
+        repeats: baseRepeats,
+        repeatDelayMs: baseDelayMs
+      },
+      adjusted: false,
+      baseRepeats,
+      repeats: baseRepeats,
+      score: 0,
+      severity: "none"
+    };
+  }
+
+  const now = Date.now();
+  const isDrop = source.isDrop === true || context.isDrop === true;
+  const isBeat = source.isBeat === true || context.isBeat === true;
+  const targetCount = Math.max(1, Math.round(Number(context.targetCount || source.targetCount || 1)));
+  const minIntervalMs = Math.max(
+    30,
+    Math.round(Number(context.minIntervalMs || source.minIntervalMs || 120))
+  );
+  const pressureEma = Math.max(0, Number(transportPressureFeedback?.ema || 0));
+  const holdUntil = Number(transportPressureFeedback?.holdUntil || 0);
+  const heldPressure = now < holdUntil
+    ? Math.max(pressureEma, 0.14)
+    : pressureEma;
+  const hueBusyPenalty = hueTelemetry.inflight === true
+    ? clampWizTxNumber((Number(hueTelemetry.lastDurationMs || 0) - 110) / 380, 0, 0.35, 0)
+    : 0;
+  const fanoutPenalty = targetCount >= 8
+    ? 0.14
+    : (targetCount >= 5 ? 0.09 : (targetCount >= 3 ? 0.05 : 0));
+  const ratePenalty = minIntervalMs <= 85
+    ? 0.12
+    : (minIntervalMs <= 125 ? 0.08 : 0.04);
+  const priorityDiscount = isDrop
+    ? 0.12
+    : (isBeat ? 0.04 : 0);
+  const score = clampWizTxNumber(
+    heldPressure + hueBusyPenalty + fanoutPenalty + ratePenalty - priorityDiscount,
+    0,
+    2.4,
+    0
+  );
+
+  let maxRepeats = baseRepeats;
+  let severity = "none";
+  if (score >= 1.32) {
+    maxRepeats = isDrop ? 2 : 1;
+    severity = "hard";
+  } else if (score >= 0.86) {
+    maxRepeats = isDrop ? 2 : 1;
+    severity = "soft";
+  } else if (score >= 0.52) {
+    maxRepeats = isDrop ? 2 : Math.min(2, baseRepeats);
+    severity = "soft";
+  }
+
+  const repeats = Math.max(1, Math.min(baseRepeats, maxRepeats));
+  const repeatDelayMs = repeats < baseRepeats
+    ? normalizeWizTxDelayMs(Math.round(baseDelayMs * (severity === "hard" ? 0.8 : 0.9)), baseDelayMs)
+    : baseDelayMs;
+  return {
+    tx: {
+      ...source,
+      repeats,
+      repeatDelayMs
+    },
+    adjusted: repeats < baseRepeats,
+    baseRepeats,
+    repeats,
+    score,
+    severity
+  };
 }
 
 function runHostPing(host, timeoutMs = 1200) {
@@ -3210,10 +3484,8 @@ function summarizeConnectivityResults(results = []) {
   for (const item of results) {
     if (!item) continue;
     summary.total += 1;
-    if (item.status === "reachable") summary.reachable += 1;
-    else if (item.status === "unreachable") summary.unreachable += 1;
-    else if (item.status === "not_configured") summary.notConfigured += 1;
-    else if (item.status === "skipped") summary.skipped += 1;
+    const counterKey = CONNECTIVITY_STATUS_TO_SUMMARY_KEY[item.status];
+    if (counterKey) summary[counterKey] += 1;
     else summary.unknown += 1;
   }
 
@@ -3540,9 +3812,22 @@ function enqueueWiz(state, zone = "wiz", options = {}) {
     logNoEngineTargets("wiz", zone);
     return;
   }
+  const adaptiveTx = resolveAdaptiveWizTxOptions(scheduleOptions.tx, {
+    targetCount: targets.length,
+    minIntervalMs: scheduleOptions.minIntervalMs
+  });
+  const txOptions = adaptiveTx.tx;
+  wizTelemetry.adaptiveTxLastScore = Number(adaptiveTx.score || 0);
+  wizTelemetry.adaptiveTxLastRepeats = Number(adaptiveTx.repeats || 1);
+  if (adaptiveTx.adjusted) {
+    wizTelemetry.adaptiveTxReduced += 1;
+    if (adaptiveTx.severity === "hard") wizTelemetry.adaptiveTxHard += 1;
+    else wizTelemetry.adaptiveTxSoft += 1;
+  }
 
   const start = Date.now();
   let sentCount = 0;
+  const repeatsSavedPerTarget = Math.max(0, Number(adaptiveTx.baseRepeats || 1) - Number(adaptiveTx.repeats || 1));
   for (const target of targets) {
     const stateForTarget = applyFixturePaletteToWizState(
       state,
@@ -3560,8 +3845,11 @@ function enqueueWiz(state, zone = "wiz", options = {}) {
       continue;
     }
     try {
-      target.send(stateForTarget, scheduleOptions.tx);
+      target.send(stateForTarget, txOptions);
       sentCount += 1;
+      if (repeatsSavedPerTarget > 0) {
+        wizTelemetry.adaptiveTxSavedPackets += repeatsSavedPerTarget;
+      }
     } catch (err) {
       wizTelemetry.sendErrors++;
       console.error("[WIZ] send failed:", err.message || err);
@@ -3577,6 +3865,7 @@ function enqueueWiz(state, zone = "wiz", options = {}) {
 }
 
 const fixturePaletteSequenceState = new Map();
+const fixturePaletteBrightnessState = new Map();
 const fixturePaletteSequenceCache = new Map();
 const PALETTE_SEQUENCE_CACHE_MAX = 192;
 const PALETTE_PATCH_FIELDS = Object.freeze([
@@ -3589,12 +3878,92 @@ const PALETTE_PATCH_FIELDS = Object.freeze([
   "beatLock",
   "beatLockGraceSec",
   "reactiveMargin",
+  "brightnessMode",
+  "brightnessFollowAmount",
+  "vividness",
   "spectrumMapMode",
   "spectrumFeatureMap"
 ]);
 
+function hasPatchKey(source, key) {
+  return Object.prototype.hasOwnProperty.call(source, key);
+}
+
 function hasPalettePatchFields(patch = {}) {
-  return PALETTE_PATCH_FIELDS.some(key => Object.prototype.hasOwnProperty.call(patch, key));
+  return PALETTE_PATCH_FIELDS.some(key => hasPatchKey(patch, key));
+}
+
+function applyPaletteConfigPatch(updated, current, next) {
+  if (hasPatchKey(next, "colorsPerFamily")) {
+    updated.colorsPerFamily = normalizePaletteColorCount(next.colorsPerFamily, current.colorsPerFamily);
+  }
+  if (hasPatchKey(next, "families")) {
+    updated.families = normalizePaletteFamilies(next.families, current.families);
+  }
+  if (hasPatchKey(next, "disorder")) {
+    updated.disorder = Boolean(next.disorder);
+  }
+  if (hasPatchKey(next, "disorderAggression")) {
+    updated.disorderAggression = normalizePaletteDisorderAggression(
+      next.disorderAggression,
+      current.disorderAggression
+    );
+  }
+  if (hasPatchKey(next, "cycleMode")) {
+    updated.cycleMode = normalizePaletteCycleMode(next.cycleMode, current.cycleMode);
+  }
+  if (hasPatchKey(next, "timedIntervalSec")) {
+    updated.timedIntervalSec = normalizePaletteTimedIntervalSec(
+      next.timedIntervalSec,
+      current.timedIntervalSec
+    );
+  }
+  if (hasPatchKey(next, "beatLock")) {
+    updated.beatLock = parseBooleanLoose(next.beatLock, Boolean(current.beatLock));
+  }
+  if (hasPatchKey(next, "beatLockGraceSec")) {
+    updated.beatLockGraceSec = normalizePaletteBeatLockGraceSec(
+      next.beatLockGraceSec,
+      current.beatLockGraceSec
+    );
+  }
+  if (hasPatchKey(next, "reactiveMargin")) {
+    updated.reactiveMargin = normalizePaletteReactiveMargin(
+      next.reactiveMargin,
+      current.reactiveMargin
+    );
+  }
+  if (hasPatchKey(next, "brightnessMode")) {
+    updated.brightnessMode = normalizePaletteBrightnessMode(
+      next.brightnessMode,
+      current.brightnessMode
+    );
+  }
+  if (hasPatchKey(next, "brightnessFollowAmount")) {
+    updated.brightnessFollowAmount = normalizePaletteBrightnessFollowAmount(
+      next.brightnessFollowAmount,
+      current.brightnessFollowAmount
+    );
+  }
+  if (hasPatchKey(next, "vividness")) {
+    updated.vividness = normalizePaletteVividness(
+      next.vividness,
+      current.vividness
+    );
+  }
+  if (hasPatchKey(next, "spectrumMapMode")) {
+    updated.spectrumMapMode = normalizePaletteSpectrumMapMode(
+      next.spectrumMapMode,
+      current.spectrumMapMode
+    );
+  }
+  if (hasPatchKey(next, "spectrumFeatureMap")) {
+    updated.spectrumFeatureMap = normalizePaletteSpectrumFeatureMap(
+      next.spectrumFeatureMap,
+      current.spectrumFeatureMap
+    );
+  }
+  return updated;
 }
 
 function getEngineGlobalPaletteConfig() {
@@ -3738,34 +4107,112 @@ function getFixturePaletteOverrideConfig(fixtureId, brandKey) {
   return normalizePaletteConfigSnapshot(raw, getEnginePaletteConfigForBrand(brand));
 }
 
-function buildPaletteFamilyColors(familyId, colorsPerFamily) {
+function resolvePaletteVividnessProfile(level = PALETTE_CONFIG_DEFAULT.vividness) {
+  const vividness = normalizePaletteVividness(level, PALETTE_CONFIG_DEFAULT.vividness);
+  const satBoostScaleByLevel = [0.72, 0.9, 1, 1.16, 1.32];
+  const satBoostAddByLevel = [0, 0.03, 0.08, 0.14, 0.2];
+  const minSatDeltaByLevel = [-0.12, -0.06, 0, 0.05, 0.1];
+  const minValueDeltaByLevel = [-0.04, -0.01, 0, 0.03, 0.06];
+  const softSatScaleByLevel = [0.76, 0.88, 1, 1.14, 1.28];
+  const softSatAddByLevel = [0, 0.02, 0.05, 0.1, 0.14];
+  const softMinSatDeltaByLevel = [-0.12, -0.07, 0, 0.05, 0.1];
+  const softMinValueDeltaByLevel = [-0.05, -0.02, 0, 0.02, 0.04];
+  return {
+    vividness,
+    satBoostScale: satBoostScaleByLevel[vividness],
+    satBoostAdd: satBoostAddByLevel[vividness],
+    minSatDelta: minSatDeltaByLevel[vividness],
+    minValueDelta: minValueDeltaByLevel[vividness],
+    softSatScale: softSatScaleByLevel[vividness],
+    softSatAdd: softSatAddByLevel[vividness],
+    softMinSatDelta: softMinSatDeltaByLevel[vividness],
+    softMinValueDelta: softMinValueDeltaByLevel[vividness]
+  };
+}
+
+function tunePaletteVibrancy255(color = {}, options = {}) {
+  const base = {
+    r: clampRgb255(color?.r),
+    g: clampRgb255(color?.g),
+    b: clampRgb255(color?.b)
+  };
+  const baseHsv = rgbToHsv255(base);
+  const preserveNeutralBelow = clampNumber(Number(options.preserveNeutralBelow) || 0, 0, 0.3, 0);
+  if (baseHsv.s <= preserveNeutralBelow) {
+    return base;
+  }
+  const satBoost = clampNumber(Number(options.satBoost) || 0, 0, 1, 0);
+  const minSat = clampNumber(Number(options.minSat) || 0, 0, 1, 0);
+  const minValue = clampNumber(Number(options.minValue) || 0, 0, 1, 0);
+  const maxValue = clampNumber(Number(options.maxValue) || 1, minValue, 1, 1);
+  const boosted = boostRgbSaturation(base, satBoost);
+  const hsv = rgbToHsv255(boosted);
+  return hsvToRgb255(
+    hsv.h,
+    Math.max(hsv.s, minSat),
+    clampNumber(Math.max(hsv.v, minValue), minValue, maxValue, maxValue)
+  );
+}
+
+function tunePaletteArrayVibrancy255(palette = [], options = {}) {
+  const src = Array.isArray(palette) ? palette : [];
+  const softEvery = Math.max(0, Math.round(Number(options.softEvery) || 0));
+  return src.map((color, index) => {
+    const softTone = softEvery > 0 && ((index + 1) % softEvery === 0);
+    return tunePaletteVibrancy255(color, {
+      satBoost: softTone ? options.softSatBoost : options.satBoost,
+      minSat: softTone ? options.softMinSat : options.minSat,
+      minValue: softTone ? options.softMinValue : options.minValue,
+      maxValue: options.maxValue,
+      preserveNeutralBelow: options.preserveNeutralBelow
+    });
+  });
+}
+
+function buildPaletteFamilyColors(familyId, colorsPerFamily, vividnessLevel = PALETTE_CONFIG_DEFAULT.vividness) {
   const family = PALETTE_FAMILY_DEFS[familyId];
   if (!family) return [];
   const colors = Array.isArray(family.colors) ? family.colors.slice() : [];
   if (!colors.length) return [];
   const count = normalizePaletteColorCount(colorsPerFamily, PALETTE_CONFIG_DEFAULT.colorsPerFamily);
-  const pickEvenly = (pool, targetCount) => {
-    if (!Array.isArray(pool) || !pool.length || targetCount <= 0) return [];
-    if (targetCount >= pool.length) return pool.slice();
-    if (targetCount === 1) return [pool[Math.floor((pool.length - 1) / 2)]];
-    const out = [];
-    const used = new Set();
-    for (let i = 0; i < targetCount; i += 1) {
-      const pos = (i * (pool.length - 1)) / (targetCount - 1);
-      let idx = clampNumber(Math.round(pos), 0, pool.length - 1, 0);
-      while (used.has(idx) && idx < pool.length - 1) idx += 1;
-      while (used.has(idx) && idx > 0) idx -= 1;
-      if (used.has(idx)) continue;
-      used.add(idx);
-      out.push(pool[idx]);
-    }
-    return out.length ? out : pool.slice(0, targetCount);
-  };
-  const corePalette = colors.slice(0, Math.min(5, colors.length));
-  if (count <= corePalette.length) {
-    return pickEvenly(corePalette, count);
-  }
-  return pickEvenly(colors, Math.min(count, colors.length));
+  const span = PALETTE_FAMILY_INDEX_SPAN[count] || PALETTE_FAMILY_INDEX_SPAN[3];
+  const picked = span
+    .map(idx => colors[idx])
+    .filter(Boolean);
+  const sourcePalette = picked.length
+    ? picked
+    : colors.slice(0, Math.max(1, Math.min(count, colors.length)));
+  const ultraDensity = count >= 12;
+  const highDensity = count >= 8 && count < 12;
+  const mediumDensity = count >= 5 && count < 8;
+  const narrowDensity = count <= 3;
+  const profile = resolvePaletteVividnessProfile(vividnessLevel);
+  const baseSatBoost = narrowDensity
+    ? 0.72
+    : ultraDensity
+      ? 0.62
+      : highDensity
+        ? 0.66
+        : 0.69;
+  const baseMinSat = narrowDensity
+    ? 0.93
+    : ultraDensity
+      ? 0.89
+      : highDensity
+        ? 0.9
+        : 0.91;
+  const baseMinValue = narrowDensity ? 0.38 : 0.32;
+  return tunePaletteArrayVibrancy255(sourcePalette, {
+    satBoost: clampNumber((baseSatBoost * profile.satBoostScale) + profile.satBoostAdd, 0, 1, 0.68),
+    minSat: clampNumber(baseMinSat + profile.minSatDelta, 0, 1, 0.9),
+    minValue: clampNumber(baseMinValue + profile.minValueDelta, 0, 1, 0.32),
+    maxValue: 1,
+    softEvery: narrowDensity ? 0 : (ultraDensity ? 6 : (highDensity ? 5 : (mediumDensity ? 4 : 0))),
+    softSatBoost: clampNumber((0.26 * profile.softSatScale) + profile.softSatAdd, 0, 1, 0.3),
+    softMinSat: clampNumber(0.76 + profile.softMinSatDelta, 0, 1, 0.72),
+    softMinValue: clampNumber(0.3 + profile.softMinValueDelta, 0, 1, 0.3),
+    preserveNeutralBelow: 0.06
+  });
 }
 
 function normalizePaletteHueDeg(value) {
@@ -3891,7 +4338,7 @@ function buildPaletteSequence(config = {}) {
 
   const out = [];
   const familySegments = normalizePaletteFamilies(normalized.families, PALETTE_CONFIG_DEFAULT.families)
-    .map(familyId => buildPaletteFamilyColors(familyId, normalized.colorsPerFamily))
+    .map(familyId => buildPaletteFamilyColors(familyId, normalized.colorsPerFamily, normalized.vividness))
     .filter(segment => Array.isArray(segment) && segment.length > 0);
   const flowSegments = !normalized.disorder && familySegments.length >= 2
     ? orientPaletteFamiliesForOrderedFlow(familySegments)
@@ -3907,7 +4354,7 @@ function buildPaletteSequence(config = {}) {
     }
   }
   if (!out.length) {
-    return buildPaletteFamilyColors("red", 3).map(color => ({
+    return buildPaletteFamilyColors("red", 3, normalized.vividness).map(color => ({
       r: clampRgb255(color.r),
       g: clampRgb255(color.g),
       b: clampRgb255(color.b)
@@ -3933,6 +4380,7 @@ function getPaletteConfigFingerprint(config = {}) {
     normalized.beatLock ? "1" : "0",
     String(normalizePaletteBeatLockGraceSec(normalized.beatLockGraceSec, PALETTE_CONFIG_DEFAULT.beatLockGraceSec)),
     String(normalizePaletteReactiveMargin(normalized.reactiveMargin, PALETTE_CONFIG_DEFAULT.reactiveMargin)),
+    String(normalizePaletteVividness(normalized.vividness, PALETTE_CONFIG_DEFAULT.vividness)),
     normalizePaletteSpectrumMapMode(normalized.spectrumMapMode, PALETTE_CONFIG_DEFAULT.spectrumMapMode),
     normalizePaletteSpectrumFeatureMap(normalized.spectrumFeatureMap, PALETTE_CONFIG_DEFAULT.spectrumFeatureMap).join(",")
   ].join("|");
@@ -3966,15 +4414,8 @@ function getPaletteSignalFromIntent(intent = {}) {
 function getPaletteSignalFeatureValue(signal = null, featureKey = "rms") {
   const src = signal && typeof signal === "object" ? signal : {};
   const feature = normalizePaletteAudioFeatureKey(featureKey, "rms");
-  if (feature === "lows") return clampNumber(src.lows, 0, 1, 0);
-  if (feature === "mids") return clampNumber(src.mids, 0, 1, 0);
-  if (feature === "highs") return clampNumber(src.highs, 0, 1, 0);
-  if (feature === "energy") return clampNumber(src.energy, 0, 1, 0);
-  if (feature === "flux") return clampNumber(src.flux, 0, 1, 0);
-  if (feature === "peaks") return clampNumber(src.peaks, 0, 1, 0);
-  if (feature === "transients") return clampNumber(src.transients, 0, 1, 0);
-  if (feature === "beat") return clampNumber(src.beat, 0, 1, 0);
-  return clampNumber(src.rms, 0, 1, 0);
+  const field = PALETTE_SIGNAL_FEATURE_FIELD_MAP[feature] || "rms";
+  return clampNumber(src[field], 0, 1, 0);
 }
 
 function resolvePaletteGroupSize(config = {}, sequenceLength = 1) {
@@ -4173,14 +4614,265 @@ function pickFixtureSpectrumPaletteIndex(sequenceLength, config = {}, signal = {
   }
   const previousIndex = clampNumber(Number(state.lastSpectrumIndex), 0, Math.max(0, len - 1), 0);
   const previousValue = values[previousIndex] || 0;
-  if (previousIndex >= 0 && (bestValue - previousValue) < 0.05) {
+  const nowMs = clampNumber(signal.nowMs, 0, Number.MAX_SAFE_INTEGER, Date.now());
+  const activity = clampNumber(
+    Math.max(
+      clampNumber(signal.energy, 0, 1, 0),
+      clampNumber(signal.flux, 0, 1, 0),
+      clampNumber(signal.beat, 0, 1, 0)
+    ),
+    0,
+    1,
+    0
+  );
+  const minHoldMs = Math.round(140 + ((1 - activity) * 220));
+  const lastSwitchAt = clampNumber(state.lastSpectrumSwitchAt, 0, Number.MAX_SAFE_INTEGER, 0);
+  if (
+    bestIndex !== previousIndex &&
+    lastSwitchAt > 0 &&
+    (nowMs - lastSwitchAt) < minHoldMs
+  ) {
     return previousIndex;
+  }
+  const requiredDelta = 0.045 + ((1 - activity) * 0.03);
+  if (previousIndex >= 0 && (bestValue - previousValue) < requiredDelta) {
+    return previousIndex;
+  }
+  if (bestIndex !== previousIndex) {
+    state.lastSpectrumSwitchAt = nowMs;
   }
   return bestIndex;
 }
 
-function pickFixturePaletteColor(fixtureId, brandKey, intent = {}) {
-  const config = getFixturePaletteOverrideConfig(fixtureId, brandKey);
+function resolvePaletteMotionMetricKey(fixtureId = "", brandKey = "", telemetry = {}) {
+  const id = String(fixtureId || "").trim();
+  const brand = normalizePaletteBrandKey(brandKey);
+  if (!id || !brand) return "baseline";
+  if (!hasFixtureMetricRoutingActiveConfig(id, brand)) return "baseline";
+  const scoped = getScopedFixtureMetricConfig(id, brand);
+  const mode = normalizeFixtureMetricMode(scoped.mode, FIXTURE_METRIC_CONFIG_DEFAULT.mode);
+  if (mode !== "meta_auto") {
+    return normalizeFixtureMetricKey(scoped.metric, FIXTURE_METRIC_CONFIG_DEFAULT.metric);
+  }
+  const dominant = String(telemetry?.metaAutoDominantTracker || "").trim().toLowerCase();
+  if (dominant) {
+    return normalizeFixtureMetricKey(dominant, FIXTURE_METRIC_CONFIG_DEFAULT.metric);
+  }
+  return FIXTURE_METRIC_CONFIG_DEFAULT.metric;
+}
+
+function resolveFixturePaletteMotionProfile(
+  fixtureId = "",
+  brandKey = "",
+  intent = {},
+  signal = {},
+  state = {}
+) {
+  const telemetry = engine?.getTelemetry?.() || {};
+  const metricKey = resolvePaletteMotionMetricKey(fixtureId, brandKey, telemetry);
+  const metricLevel = clampNumber(
+    resolveFixtureMetricLevel(metricKey, telemetry, intent),
+    0,
+    1,
+    0
+  );
+  const nowMs = clampNumber(signal.nowMs, 0, Number.MAX_SAFE_INTEGER, Date.now());
+  const rms = clampNumber(signal.rms, 0, 1, 0);
+  const energy = clampNumber(signal.energy, 0, 1, rms);
+  const transients = clampNumber(signal.transients, 0, 1, 0);
+  const flux = clampNumber(signal.flux, 0, 1, 0);
+  const beat = clampNumber(signal.beat, 0, 1, 0);
+  const peaksMetric = metricKey === "peaks";
+  const transientsMetric = metricKey === "transients";
+  const fluxMetric = metricKey === "flux";
+  const low = clampNumber(signal.lows, 0, 1, 0);
+  const mid = clampNumber(signal.mids, 0, 1, 0);
+  const high = clampNumber(signal.highs, 0, 1, 0);
+  const drums = clamp01(
+    (low * 0.55) +
+    (transients * 0.28) +
+    (flux * 0.17) +
+    (beat * 0.1),
+    0
+  );
+  const weightedMetricLevel = metricKey === "baseline"
+    ? clamp01((metricLevel * 0.7) + (drums * 0.3), metricLevel)
+    : peaksMetric
+      ? clamp01(
+        (metricLevel * 0.86) +
+        (transients * 0.09) +
+        (flux * 0.05),
+        metricLevel
+      )
+      : transientsMetric
+        ? clamp01(
+          (metricLevel * 0.84) +
+          (flux * 0.1) +
+          (drums * 0.06),
+          metricLevel
+        )
+        : fluxMetric
+          ? clamp01(
+            (metricLevel * 0.84) +
+            (transients * 0.1) +
+            (energy * 0.06),
+            metricLevel
+          )
+        : metricLevel;
+  const supportLevel = peaksMetric
+    ? clamp01(
+      (transients * 0.46) +
+      (flux * 0.3) +
+      (energy * 0.14) +
+      (rms * 0.1),
+      0
+    )
+    : transientsMetric
+      ? clamp01(
+        (transients * 0.56) +
+        (flux * 0.24) +
+        (energy * 0.12) +
+        (rms * 0.08),
+        0
+      )
+      : fluxMetric
+        ? clamp01(
+          (flux * 0.58) +
+          (transients * 0.24) +
+          (energy * 0.12) +
+          (rms * 0.06),
+          0
+        )
+      : clamp01(
+        (energy * 0.36) +
+        (rms * 0.2) +
+        (transients * 0.22) +
+        (flux * 0.22),
+        0
+      );
+  const rawLevel = clamp01(
+    (weightedMetricLevel * 0.82) + (supportLevel * 0.18),
+    weightedMetricLevel
+  );
+  const previousEma = clampNumber(Number(state.motionEma), 0, 1, rawLevel);
+  const alpha = rawLevel >= previousEma
+    ? (peaksMetric ? 0.34 : (transientsMetric ? 0.36 : (fluxMetric ? 0.32 : 0.24)))
+    : (peaksMetric ? 0.2 : (transientsMetric ? 0.18 : (fluxMetric ? 0.16 : 0.1)));
+  const level = clampNumber(previousEma + ((rawLevel - previousEma) * alpha), 0, 1, rawLevel);
+  state.motionEma = level;
+  const previousMetricLevel = clampNumber(Number(state.lastMetricLevel), 0, 1, metricLevel);
+  const previousMotionLevel = clampNumber(Number(state.lastMotionLevel), 0, 1, level);
+  const metricRise = Math.max(0, metricLevel - previousMetricLevel);
+  const motionRise = Math.max(0, level - previousMotionLevel);
+  state.lastMetricLevel = metricLevel;
+  state.lastMotionLevel = level;
+
+  const driveBase = peaksMetric
+    ? clamp01(
+      Math.max(
+        (metricLevel * 0.9) + (transients * 0.08) + (flux * 0.02),
+        (level * 0.86) + (metricRise * 0.54),
+        (transients * 0.62) + (flux * 0.38)
+      ),
+      metricLevel
+    )
+    : transientsMetric
+      ? clamp01(
+        Math.max(
+          (metricLevel * 0.84) + (flux * 0.16),
+          (level * 0.9) + (metricRise * 0.42),
+          (transients * 0.74) + (flux * 0.26)
+        ),
+        metricLevel
+      )
+      : fluxMetric
+        ? clamp01(
+          Math.max(
+            (metricLevel * 0.86) + (transients * 0.14),
+            (level * 0.88) + (metricRise * 0.48),
+            (flux * 0.78) + (transients * 0.22)
+          ),
+          metricLevel
+        )
+      : clamp01(
+        Math.max(
+          metricLevel,
+          level * 0.94,
+          supportLevel * 0.88,
+          (transients * 0.72) + (flux * 0.28)
+        ),
+        metricLevel
+      );
+  const drive = clamp01(Math.pow(driveBase, 0.72), driveBase);
+  const impulse = peaksMetric
+    ? clamp01(
+      (metricRise * 1.75) +
+      (motionRise * 1.05) +
+      (transients * 0.14) +
+      (flux * 0.08),
+      0
+    )
+    : transientsMetric
+      ? clamp01(
+        (metricRise * 1.55) +
+        (motionRise * 1.22) +
+        (transients * 0.2) +
+        (flux * 0.1),
+        0
+      )
+      : fluxMetric
+        ? clamp01(
+          (metricRise * 1.4) +
+          (motionRise * 1.18) +
+          (flux * 0.24) +
+          (transients * 0.12),
+          0
+        )
+      : clamp01(
+        (metricRise * 1.3) +
+        (motionRise * 1.12) +
+        (transients * 0.18) +
+        (flux * 0.12),
+        0
+      );
+
+  const silenceEvidence = clamp01(
+    Math.max(
+      rms,
+      energy * 0.94,
+      transients * 0.88,
+      flux * 0.86,
+      low * 0.74,
+      mid * 0.7,
+      high * 0.7,
+      metricLevel * 0.92,
+      beat * 0.84
+    ),
+    0
+  );
+  const silent = peaksMetric
+    ? (silenceEvidence < 0.035 && level < 0.055 && drive < 0.06)
+    : transientsMetric
+      ? (silenceEvidence < 0.036 && level < 0.054 && drive < 0.058)
+      : fluxMetric
+        ? (silenceEvidence < 0.034 && level < 0.052 && drive < 0.056)
+      : (silenceEvidence < 0.04 && level < 0.06 && drive < 0.065);
+
+  return {
+    nowMs,
+    metricKey,
+    level,
+    metricLevel,
+    drive,
+    impulse,
+    silent
+  };
+}
+
+function pickFixturePaletteColor(fixtureId, brandKey, intent = {}, configOverride = null) {
+  const config = configOverride && typeof configOverride === "object"
+    ? configOverride
+    : getFixturePaletteOverrideConfig(fixtureId, brandKey);
   if (!config) return null;
   const sequence = buildPaletteSequence(config);
   if (!sequence.length) return null;
@@ -4200,7 +4892,14 @@ function pickFixturePaletteColor(fixtureId, brandKey, intent = {}) {
       lastAdvanceAt: nowMs,
       waitStartAt: 0,
       lastSignal: null,
-      lastSpectrumIndex: 0
+      lastSpectrumIndex: 0,
+      lastSpectrumSwitchAt: 0,
+      lastColorShiftAt: nowMs,
+      lastColorTickAt: nowMs,
+      colorPhase: 0,
+      motionEma: 0,
+      lastMetricLevel: 0,
+      lastMotionLevel: 0
     };
   }
 
@@ -4208,30 +4907,135 @@ function pickFixturePaletteColor(fixtureId, brandKey, intent = {}) {
   const groupSize = resolvePaletteGroupSize(config, sequence.length);
   const groupCount = Math.max(1, Math.ceil(sequence.length / groupSize));
   let index = normalizePaletteGroupBaseIndex(Number(state.index) || 0, sequence.length, groupSize);
+  const motionProfile = resolveFixturePaletteMotionProfile(id, brandKey, intent, signal, state);
   const applyGroupColorOffset = () => {
+    const baseIndex = normalizePaletteGroupBaseIndex(index, sequence.length, groupSize);
     const groupSpan = Math.max(1, Math.min(groupSize, sequence.length - index));
     let offset = clampNumber(Math.round(Number(state.colorOffset) || 0), 0, Math.max(0, groupSpan - 1), 0);
-    if (groupSpan > 1) {
-      if (config.disorder) {
-        const aggression = normalizePaletteDisorderAggression(config.disorderAggression, 0.35);
-        const randomChance = clampNumber(
-          0.24 + aggression * 0.56 + (Boolean(intent?.beat) ? 0.08 : 0) + (Boolean(intent?.drop) ? 0.14 : 0),
-          0.12,
-          0.98,
-          0.48
+    let phase = Number(state.colorPhase);
+    if (!Number.isFinite(phase)) phase = offset;
+    if (groupSpan <= 1) {
+      offset = 0;
+      state.colorOffset = offset;
+      state.colorPhase = 0;
+      return baseIndex + offset;
+    }
+
+    const prevTickAt = clampNumber(Number(state.lastColorTickAt), 0, Number.MAX_SAFE_INTEGER, 0);
+    const dtMs = prevTickAt > 0
+      ? clampNumber(nowMs - prevTickAt, 8, 360, 66)
+      : 66;
+    state.lastColorTickAt = nowMs;
+
+    const metricLevel = clampNumber(motionProfile.metricLevel, 0, 1, 0);
+    const motionLevel = clampNumber(motionProfile.level, 0, 1, metricLevel);
+    const drive = clampNumber(motionProfile.drive, 0, 1, clamp01(Math.max(metricLevel, motionLevel), metricLevel));
+    const impulse = clampNumber(motionProfile.impulse, 0, 1, 0);
+    const metricKey = String(motionProfile.metricKey || "baseline").trim().toLowerCase();
+    const peaksMetric = metricKey === "peaks";
+    const transientsMetric = metricKey === "transients";
+    const fluxMetric = metricKey === "flux";
+    const aggression = normalizePaletteDisorderAggression(config.disorderAggression, 0.35);
+    const motionPace = peaksMetric
+      ? clamp01(
+        (drive * 0.56) +
+        (motionLevel * 0.2) +
+        (impulse * 0.94) +
+        (metricLevel * 0.22),
+        drive
+      )
+      : transientsMetric
+        ? clamp01(
+          (drive * 0.6) +
+          (motionLevel * 0.22) +
+          (impulse * 0.86) +
+          (metricLevel * 0.14),
+          drive
+        )
+        : fluxMetric
+          ? clamp01(
+            (drive * 0.64) +
+            (motionLevel * 0.24) +
+            (impulse * 0.74) +
+            (metricLevel * 0.18),
+            drive
+          )
+        : clamp01(
+          (drive * 0.72) +
+          (motionLevel * 0.24) +
+          (impulse * 0.58),
+          drive
         );
-        if (Math.random() < randomChance) {
-          offset = Math.floor(Math.random() * groupSpan);
-        }
+    const cadencePerSec = config.disorder
+      ? (
+        peaksMetric
+          ? (0.18 + motionPace * 6.1 + aggression * 1.1)
+          : transientsMetric
+            ? (0.17 + motionPace * 5.8 + aggression * 1.12)
+            : fluxMetric
+              ? (0.18 + motionPace * 5.95 + aggression * 1.08)
+            : (0.16 + motionPace * 5.2 + aggression * 1.15)
+      )
+      : (
+        peaksMetric
+          ? (0.14 + motionPace * 5.35)
+          : transientsMetric
+            ? (0.13 + motionPace * 4.95)
+            : fluxMetric
+              ? (0.14 + motionPace * 5.2)
+            : (0.12 + motionPace * 4.4)
+      );
+    const allowMotion = !motionProfile.silent && motionPace >= (
+      config.disorder
+        ? 0.008
+        : (peaksMetric ? 0.005 : (transientsMetric ? 0.0055 : (fluxMetric ? 0.0052 : 0.006)))
+    );
+    const phaseAdvance = allowMotion
+      ? ((cadencePerSec * dtMs) / 1000)
+      : 0;
+
+    if (!(phaseAdvance > 0)) {
+      state.colorOffset = offset;
+      state.colorPhase = phase;
+      return baseIndex + offset;
+    }
+
+    const prevPhase = phase;
+    phase += phaseAdvance;
+    state.colorPhase = phase;
+
+    let nextOffset = offset;
+    if (config.disorder) {
+      const crossedSteps = Math.max(0, Math.floor(phase) - Math.floor(prevPhase));
+      if (!(crossedSteps > 0)) {
+        state.colorOffset = nextOffset;
+        return baseIndex + nextOffset;
+      }
+      const randomChance = clampNumber(
+        (0.22 + aggression * 0.54 + motionPace * 0.24 + impulse * (peaksMetric ? 0.3 : (transientsMetric ? 0.26 : (fluxMetric ? 0.24 : 0.18)))),
+        0.08,
+        0.98,
+        0.42
+      );
+      if (Math.random() < randomChance && groupSpan > 2) {
+        nextOffset = Math.floor(Math.random() * groupSpan);
       } else {
-        const step = Boolean(intent?.drop) && groupSpan > 2 ? 2 : 1;
-        offset = (offset + step) % groupSpan;
+        const shouldDoubleStep = groupSpan > 3 && (
+          aggression > 0.62 ||
+          (peaksMetric ? impulse > 0.34 : (transientsMetric ? impulse > 0.32 : (fluxMetric ? impulse > 0.36 : impulse > 0.42)))
+        );
+        const step = shouldDoubleStep ? 2 : 1;
+        nextOffset = (nextOffset + step) % groupSpan;
       }
     } else {
-      offset = 0;
+      nextOffset = ((Math.floor(phase) % groupSpan) + groupSpan) % groupSpan;
     }
-    state.colorOffset = offset;
-    return normalizePaletteGroupBaseIndex(index, sequence.length, groupSize) + offset;
+
+    if (nextOffset !== offset) {
+      state.lastColorShiftAt = nowMs;
+    }
+    state.colorOffset = nextOffset;
+    return baseIndex + nextOffset;
   };
 
   let emitIndex = index;
@@ -4283,13 +5087,336 @@ function pickFixturePaletteColor(fixtureId, brandKey, intent = {}) {
   };
 }
 
+function normalizePaletteBrightnessStateColor(color = null) {
+  if (!color || typeof color !== "object") return null;
+  return {
+    r: clampRgb255(color.r),
+    g: clampRgb255(color.g),
+    b: clampRgb255(color.b)
+  };
+}
+
+function computePaletteColorMotion(previousColor = null, nextColor = null) {
+  const prev = normalizePaletteBrightnessStateColor(previousColor);
+  const next = normalizePaletteBrightnessStateColor(nextColor);
+  if (!prev || !next) return 0;
+  const prevHsv = rgbToHsv255(prev);
+  const nextHsv = rgbToHsv255(next);
+  const hueDelta = Math.abs((((Number(nextHsv.h || 0) - Number(prevHsv.h || 0)) + 540) % 360) - 180) / 180;
+  const satDelta = Math.abs(Number(nextHsv.s || 0) - Number(prevHsv.s || 0));
+  const valueDelta = Math.abs(Number(nextHsv.v || 0) - Number(prevHsv.v || 0));
+  return clamp01((hueDelta * 0.56) + (satDelta * 0.24) + (valueDelta * 0.2), 0);
+}
+
+function getPaletteBrightnessStateKey(brandKey = "", fixtureId = "") {
+  const brand = normalizePaletteBrandKey(brandKey);
+  const id = String(fixtureId || "").trim();
+  if (!brand || !id) return "";
+  return `${brand}:${id.toLowerCase()}`;
+}
+
+function resolvePaletteBrightnessFollowDrive(intent = {}, colorMotion = 0) {
+  const signal = getPaletteSignalFromIntent(intent);
+  const baseline = clampNumber(signal.rms, 0, 1, 0);
+  const energy = clampNumber(signal.energy, 0, 1, baseline);
+  const transients = clampNumber(signal.transients, 0, 1, 0);
+  const flux = clampNumber(signal.flux, 0, 1, 0);
+  const beat = clampNumber(signal.beat, 0, 1, 0);
+  const drums = clamp01(
+    (signal.lows * 0.54) +
+    (transients * 0.28) +
+    (flux * 0.18) +
+    (beat * 0.14),
+    0
+  );
+  const scene = String(signal.scene || "").trim().toLowerCase();
+  const sceneBoost = scene === "pulse_strobe"
+    ? 0.12
+    : (scene.startsWith("flow_") ? 0.08 : 0);
+  const phrase = String(signal.phrase || "").trim().toLowerCase();
+  const phraseBoost = phrase === "drop"
+    ? 0.1
+    : (phrase === "build" ? 0.06 : 0);
+  const dropBoost = intent?.drop ? 0.2 : 0;
+
+  const reactiveDrive = clamp01(
+    (energy * 0.3) +
+    (drums * 0.3) +
+    (transients * 0.16) +
+    (flux * 0.14) +
+    (beat * 0.1) +
+    sceneBoost +
+    phraseBoost +
+    dropBoost,
+    0
+  );
+  const punch = clamp01(
+    (transients * 0.46) +
+    (flux * 0.24) +
+    (beat * 0.18) +
+    (drums * 0.2),
+    0
+  );
+  const silenceEvidence = clamp01(
+    Math.max(
+      baseline * 0.95,
+      energy * 0.96,
+      drums * 0.98,
+      transients * 0.9,
+      flux * 0.88,
+      beat * 0.84
+    ),
+    0
+  );
+  const combinedDrive = clamp01(
+    Math.max(
+      (reactiveDrive * 0.7) + (colorMotion * 0.2) + (punch * 0.1),
+      (colorMotion * 0.5) + (transients * 0.28) + (flux * 0.22)
+    ),
+    reactiveDrive
+  );
+  const silent = silenceEvidence < 0.04 && combinedDrive < 0.075;
+  return {
+    combinedDrive,
+    reactiveDrive,
+    punch,
+    silenceEvidence,
+    silent
+  };
+}
+
+function applyPaletteBrightnessFollowToHueState(
+  state = {},
+  fixtureId = "",
+  config = {},
+  intent = {},
+  color = null
+) {
+  const source = state && typeof state === "object" ? state : null;
+  if (!source || source.on === false) return source;
+  const fixtureKey = getPaletteBrightnessStateKey("hue", fixtureId);
+  if (!fixtureKey) return source;
+
+  const brightnessMode = normalizePaletteBrightnessMode(
+    config?.brightnessMode,
+    PALETTE_CONFIG_DEFAULT.brightnessMode
+  );
+  if (brightnessMode !== "test") {
+    fixturePaletteBrightnessState.delete(fixtureKey);
+    return source;
+  }
+
+  const followAmount = normalizePaletteBrightnessFollowAmount(
+    config?.brightnessFollowAmount,
+    PALETTE_CONFIG_DEFAULT.brightnessFollowAmount
+  );
+  if (followAmount <= 0) {
+    fixturePaletteBrightnessState.set(fixtureKey, {
+      ema: clampNumber(source.bri, 1, 254, 160),
+      color: normalizePaletteBrightnessStateColor(color)
+    });
+    return source;
+  }
+
+  const runtimeState = fixturePaletteBrightnessState.get(fixtureKey) || {};
+  const safeColor = normalizePaletteBrightnessStateColor(color) || runtimeState.color || null;
+  const colorMotion = computePaletteColorMotion(runtimeState.color, safeColor);
+  const drive = resolvePaletteBrightnessFollowDrive(intent, colorMotion);
+  const followGain = clampNumber(0.68 + (followAmount * 0.44), 0.2, 1.6, 1);
+  const dynamicDrive = clamp01(
+    (drive.combinedDrive * followGain * 1.08) + (drive.punch * 0.12),
+    0
+  );
+
+  const baseBri = clampNumber(source.bri, 1, 254, 160);
+  const floorPercent = clampNumber(
+    0.12 + ((1 - dynamicDrive) * 0.44) - (colorMotion * 0.16) - (drive.punch * 0.08),
+    0.03,
+    0.86,
+    0.24
+  );
+  const floorBri = Math.max(1, Math.min(254, Math.round(baseBri * floorPercent)));
+  let targetBri = floorBri + (
+    (baseBri - floorBri) *
+    clampNumber(0.44 + (dynamicDrive * 1.04) + (drive.punch * 0.16), 0.12, 1.44, 0.86)
+  );
+  if (dynamicDrive > 0.86) {
+    const headroom = Math.max(0, 254 - baseBri);
+    const spike = clampNumber((dynamicDrive - 0.86) / 0.14, 0, 1, 0);
+    targetBri = Math.max(
+      targetBri,
+      baseBri + (headroom * spike * (0.45 + colorMotion * 0.4))
+    );
+  }
+  if (drive.silent) {
+    const silentCap = Math.max(1, Math.round(baseBri * clampNumber(0.08 + (followAmount * 0.06), 0.08, 0.2, 0.12)));
+    targetBri = Math.min(targetBri, silentCap);
+  }
+  targetBri = clampNumber(Math.round(targetBri), 1, 254, baseBri);
+
+  const previousEma = Number(runtimeState.ema);
+  const seeded = Number.isFinite(previousEma)
+    ? clampNumber(previousEma, 1, 254, baseBri)
+    : baseBri;
+  const riseAlpha = clampNumber(
+    0.22 +
+      (dynamicDrive * 0.26) +
+      (colorMotion * 0.2) +
+      (drive.punch * 0.12) +
+      (intent?.beat ? 0.08 : 0) +
+      (intent?.drop ? 0.14 : 0),
+    0.16,
+    0.86,
+    0.36
+  );
+  const fallAlpha = clampNumber(
+    0.14 + ((1 - dynamicDrive) * 0.2) + (colorMotion * 0.08),
+    0.06,
+    0.46,
+    0.22
+  );
+  const alpha = targetBri >= seeded
+    ? riseAlpha
+    : Math.max(fallAlpha, drive.silent ? 0.56 : 0);
+  const smoothed = clampNumber(Math.round(seeded + ((targetBri - seeded) * alpha)), 1, 254, targetBri);
+
+  fixturePaletteBrightnessState.set(fixtureKey, {
+    ema: smoothed,
+    color: safeColor
+  });
+
+  if (smoothed === baseBri) return source;
+  return {
+    ...source,
+    bri: smoothed
+  };
+}
+
+function applyPaletteBrightnessFollowToWizState(
+  state = {},
+  fixtureId = "",
+  config = {},
+  intent = {},
+  color = null
+) {
+  const source = state && typeof state === "object" ? state : null;
+  if (!source || source.on === false) return source;
+  const fixtureKey = getPaletteBrightnessStateKey("wiz", fixtureId);
+  if (!fixtureKey) return source;
+
+  const brightnessMode = normalizePaletteBrightnessMode(
+    config?.brightnessMode,
+    PALETTE_CONFIG_DEFAULT.brightnessMode
+  );
+  if (brightnessMode !== "test") {
+    fixturePaletteBrightnessState.delete(fixtureKey);
+    return source;
+  }
+
+  const followAmount = normalizePaletteBrightnessFollowAmount(
+    config?.brightnessFollowAmount,
+    PALETTE_CONFIG_DEFAULT.brightnessFollowAmount
+  );
+  const baseDimming = clampNumber(
+    source.dimming,
+    1,
+    100,
+    Math.round(clampNumber(source.brightness, 0.01, 1, 0.72) * 100)
+  );
+  if (followAmount <= 0) {
+    fixturePaletteBrightnessState.set(fixtureKey, {
+      ema: baseDimming,
+      color: normalizePaletteBrightnessStateColor(color)
+    });
+    return source;
+  }
+
+  const runtimeState = fixturePaletteBrightnessState.get(fixtureKey) || {};
+  const safeColor = normalizePaletteBrightnessStateColor(color) || runtimeState.color || null;
+  const colorMotion = computePaletteColorMotion(runtimeState.color, safeColor);
+  const drive = resolvePaletteBrightnessFollowDrive(intent, colorMotion);
+  const followGain = clampNumber(0.68 + (followAmount * 0.44), 0.2, 1.6, 1);
+  const dynamicDrive = clamp01(
+    (drive.combinedDrive * followGain * 1.08) + (drive.punch * 0.12),
+    0
+  );
+
+  const floorPercent = clampNumber(
+    0.1 + ((1 - dynamicDrive) * 0.48) - (colorMotion * 0.12) - (drive.punch * 0.1),
+    0.02,
+    0.86,
+    0.24
+  );
+  const floor = Math.max(1, Math.min(100, Math.round(baseDimming * floorPercent)));
+  let targetDimming = floor + (
+    (baseDimming - floor) *
+    clampNumber(0.42 + (dynamicDrive * 1.08) + (drive.punch * 0.16), 0.12, 1.46, 0.86)
+  );
+  if (dynamicDrive > 0.86) {
+    const headroom = Math.max(0, 100 - baseDimming);
+    const spike = clampNumber((dynamicDrive - 0.86) / 0.14, 0, 1, 0);
+    targetDimming = Math.max(
+      targetDimming,
+      baseDimming + (headroom * spike * (0.42 + colorMotion * 0.4))
+    );
+  }
+  if (drive.silent) {
+    const silentCap = Math.max(1, Math.round(baseDimming * clampNumber(0.04 + (followAmount * 0.06), 0.04, 0.18, 0.1)));
+    targetDimming = Math.min(targetDimming, silentCap);
+  }
+  targetDimming = clampNumber(Math.round(targetDimming), 1, 100, baseDimming);
+
+  const previousEma = Number(runtimeState.ema);
+  const seeded = Number.isFinite(previousEma)
+    ? clampNumber(previousEma, 1, 100, baseDimming)
+    : baseDimming;
+  const riseAlpha = clampNumber(
+    0.24 +
+      (dynamicDrive * 0.28) +
+      (colorMotion * 0.18) +
+      (drive.punch * 0.1) +
+      (intent?.beat ? 0.08 : 0) +
+      (intent?.drop ? 0.12 : 0),
+    0.16,
+    0.88,
+    0.36
+  );
+  const fallAlpha = clampNumber(
+    0.14 + ((1 - dynamicDrive) * 0.2) + (colorMotion * 0.08),
+    0.06,
+    0.52,
+    0.22
+  );
+  const alpha = targetDimming >= seeded
+    ? riseAlpha
+    : Math.max(fallAlpha, drive.silent ? 0.64 : 0);
+  const smoothed = clampNumber(Math.round(seeded + ((targetDimming - seeded) * alpha)), 1, 100, targetDimming);
+
+  fixturePaletteBrightnessState.set(fixtureKey, {
+    ema: smoothed,
+    color: safeColor
+  });
+
+  if (smoothed === baseDimming) return source;
+  const next = {
+    ...source,
+    dimming: smoothed
+  };
+  if (Object.prototype.hasOwnProperty.call(next, "brightness")) {
+    next.brightness = Math.max(0.01, Math.min(1, smoothed / 100));
+  }
+  return next;
+}
+
 function applyFixturePaletteToHueState(state = {}, fixture = null, intent = {}) {
   const source = state && typeof state === "object" ? state : null;
   if (!source || source.on === false) return source;
   const fixtureId = String(fixture?.id || "").trim();
   if (!fixtureId) return source;
+  const config = getFixturePaletteOverrideConfig(fixtureId, "hue");
+  if (!config) return source;
 
-  const color = pickFixturePaletteColor(fixtureId, "hue", intent);
+  const color = pickFixturePaletteColor(fixtureId, "hue", intent, config);
   const base = color
     ? (() => {
       const hsv = rgbToHsv255(color);
@@ -4303,7 +5430,8 @@ function applyFixturePaletteToHueState(state = {}, fixture = null, intent = {}) 
     })()
     : source;
 
-  return applyFixtureMetricToHueState(base, fixture, intent);
+  const metricApplied = applyFixtureMetricToHueState(base, fixture, intent);
+  return applyPaletteBrightnessFollowToHueState(metricApplied, fixtureId, config, intent, color);
 }
 
 function applyFixturePaletteToWizState(state = {}, fixtureId = "", intent = {}) {
@@ -4311,8 +5439,10 @@ function applyFixturePaletteToWizState(state = {}, fixtureId = "", intent = {}) 
   if (!source || source.on === false) return source;
   const id = String(fixtureId || "").trim();
   if (!id) return source;
+  const config = getFixturePaletteOverrideConfig(id, "wiz");
+  if (!config) return source;
 
-  const color = pickFixturePaletteColor(id, "wiz", intent);
+  const color = pickFixturePaletteColor(id, "wiz", intent, config);
   const next = color
     ? {
       ...source,
@@ -4324,7 +5454,8 @@ function applyFixturePaletteToWizState(state = {}, fixtureId = "", intent = {}) 
   if (Object.prototype.hasOwnProperty.call(next, "temp")) {
     delete next.temp;
   }
-  return applyFixtureMetricToWizState(next, id, intent);
+  const metricApplied = applyFixtureMetricToWizState(next, id, intent);
+  return applyPaletteBrightnessFollowToWizState(metricApplied, id, config, intent, color);
 }
 
 function setFixturePaletteOverrideConfig(patch = {}) {
@@ -4369,6 +5500,7 @@ function setFixturePaletteOverrideConfig(patch = {}) {
       });
     }
     fixturePaletteSequenceState.delete(fixtureId);
+    fixturePaletteBrightnessState.delete(getPaletteBrightnessStateKey(fixtureBrand, fixtureId));
     return {
       ok: true,
       fixtureId,
@@ -4384,59 +5516,7 @@ function setFixturePaletteOverrideConfig(patch = {}) {
   const base = getEnginePaletteConfigForBrand(fixtureBrand);
   const currentRaw = paletteFixtureOverridesRuntime.fixtures?.[fixtureId] || {};
   const current = normalizePaletteConfigSnapshot(currentRaw, base);
-  const updated = { ...current };
-
-  if (Object.prototype.hasOwnProperty.call(next, "colorsPerFamily")) {
-    updated.colorsPerFamily = normalizePaletteColorCount(next.colorsPerFamily, current.colorsPerFamily);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "families")) {
-    updated.families = normalizePaletteFamilies(next.families, current.families);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "disorder")) {
-    updated.disorder = Boolean(next.disorder);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "disorderAggression")) {
-    updated.disorderAggression = normalizePaletteDisorderAggression(
-      next.disorderAggression,
-      current.disorderAggression
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "cycleMode")) {
-    updated.cycleMode = normalizePaletteCycleMode(next.cycleMode, current.cycleMode);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "timedIntervalSec")) {
-    updated.timedIntervalSec = normalizePaletteTimedIntervalSec(
-      next.timedIntervalSec,
-      current.timedIntervalSec
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "beatLock")) {
-    updated.beatLock = parseBooleanLoose(next.beatLock, Boolean(current.beatLock));
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "beatLockGraceSec")) {
-    updated.beatLockGraceSec = normalizePaletteBeatLockGraceSec(
-      next.beatLockGraceSec,
-      current.beatLockGraceSec
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "reactiveMargin")) {
-    updated.reactiveMargin = normalizePaletteReactiveMargin(
-      next.reactiveMargin,
-      current.reactiveMargin
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "spectrumMapMode")) {
-    updated.spectrumMapMode = normalizePaletteSpectrumMapMode(
-      next.spectrumMapMode,
-      current.spectrumMapMode
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "spectrumFeatureMap")) {
-    updated.spectrumFeatureMap = normalizePaletteSpectrumFeatureMap(
-      next.spectrumFeatureMap,
-      current.spectrumFeatureMap
-    );
-  }
+  const updated = applyPaletteConfigPatch({ ...current }, current, next);
 
   const normalized = normalizePaletteConfigSnapshot(updated, base);
   paletteFixtureOverridesRuntime = writePaletteFixtureOverridesConfig({
@@ -4524,7 +5604,26 @@ const FIXTURE_METRIC_PATCH_FIELDS = Object.freeze([
 ]);
 
 function hasFixtureMetricPatchFields(patch = {}) {
-  return FIXTURE_METRIC_PATCH_FIELDS.some(key => Object.prototype.hasOwnProperty.call(patch, key));
+  return FIXTURE_METRIC_PATCH_FIELDS.some(key => hasPatchKey(patch, key));
+}
+
+function applyFixtureMetricConfigPatch(updated, current, next) {
+  if (hasPatchKey(next, "mode")) {
+    updated.mode = normalizeFixtureMetricMode(next.mode, current.mode);
+  }
+  if (hasPatchKey(next, "metric")) {
+    updated.metric = normalizeFixtureMetricKey(next.metric, current.metric);
+  }
+  if (hasPatchKey(next, "metaAutoFlip")) {
+    updated.metaAutoFlip = Boolean(next.metaAutoFlip);
+  }
+  if (hasPatchKey(next, "harmonySize")) {
+    updated.harmonySize = normalizeFixtureMetricHarmonySize(next.harmonySize, current.harmonySize);
+  }
+  if (hasPatchKey(next, "maxHz")) {
+    updated.maxHz = normalizeFixtureMetricMaxHz(next.maxHz, current.maxHz);
+  }
+  return updated;
 }
 
 function getFixtureMetricGlobalConfig() {
@@ -4775,9 +5874,30 @@ function resolveFixtureMetricLevel(metricId, telemetry = {}, intent = {}) {
   const t = telemetry && typeof telemetry === "object" ? telemetry : {};
   const i = intent && typeof intent === "object" ? intent : {};
   const baseline = clamp01(t.audioSourceLevel, clamp01(t.rms, clamp01(i.audioSourceLevel, 0)));
-  const peaks = clamp01(Number(t.audioPeak || 0) / 1.5, 0);
-  const transients = clamp01(Number(t.audioTransient || 0) / 1.2, 0);
-  const flux = clamp01(t.audioFlux, clamp01(t.spectralFlux, 0));
+  const peaksRaw = clamp01(Number(t.audioPeak || 0) / 1.5, 0);
+  const transientsRaw = clamp01(Number(t.audioTransient || 0) / 1.2, 0);
+  const fluxRaw = clamp01(t.audioFlux, clamp01(t.spectralFlux, 0));
+  const flux = clamp01(
+    Math.max(
+      Math.pow(fluxRaw, 1.18),
+      (fluxRaw * 0.7) + (transientsRaw * 0.2) + (peaksRaw * 0.1)
+    ),
+    0
+  );
+  const transients = clamp01(
+    Math.max(
+      Math.pow(transientsRaw, 1.22),
+      (transientsRaw * 0.66) + (flux * 0.24) + (peaksRaw * 0.1)
+    ),
+    0
+  );
+  const peaks = clamp01(
+    Math.max(
+      Math.pow(peaksRaw, 1.24),
+      (peaksRaw * 0.58) + (transients * 0.3) + (flux * 0.12)
+    ),
+    0
+  );
   switch (normalizeFixtureMetricKey(metricId, "baseline")) {
     case "peaks":
       return peaks;
@@ -5030,23 +6150,7 @@ function setFixtureMetricOverrideConfig(patch = {}) {
   const base = getFixtureMetricConfigForBrand(fixtureBrand);
   const currentRaw = fixtureMetricRoutingRuntime.fixtures?.[fixtureId] || {};
   const current = normalizeFixtureMetricConfigSnapshot(currentRaw, base);
-  const updated = { ...current };
-
-  if (Object.prototype.hasOwnProperty.call(next, "mode")) {
-    updated.mode = normalizeFixtureMetricMode(next.mode, current.mode);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "metric")) {
-    updated.metric = normalizeFixtureMetricKey(next.metric, current.metric);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "metaAutoFlip")) {
-    updated.metaAutoFlip = Boolean(next.metaAutoFlip);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "harmonySize")) {
-    updated.harmonySize = normalizeFixtureMetricHarmonySize(next.harmonySize, current.harmonySize);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "maxHz")) {
-    updated.maxHz = normalizeFixtureMetricMaxHz(next.maxHz, current.maxHz);
-  }
+  const updated = applyFixtureMetricConfigPatch({ ...current }, current, next);
 
   const normalized = normalizeFixtureMetricConfigSnapshot(updated, base);
   fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
@@ -5102,22 +6206,7 @@ function patchFixtureMetricRoutingConfig(patch = {}) {
     const base = getFixtureMetricConfigForBrand(requestedBrand);
     const currentRaw = fixtureMetricRoutingRuntime.brands?.[requestedBrand] || {};
     const current = normalizeFixtureMetricConfigSnapshot(currentRaw, base);
-    const updated = { ...current };
-    if (Object.prototype.hasOwnProperty.call(next, "mode")) {
-      updated.mode = normalizeFixtureMetricMode(next.mode, current.mode);
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "metric")) {
-      updated.metric = normalizeFixtureMetricKey(next.metric, current.metric);
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "metaAutoFlip")) {
-      updated.metaAutoFlip = Boolean(next.metaAutoFlip);
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "harmonySize")) {
-      updated.harmonySize = normalizeFixtureMetricHarmonySize(next.harmonySize, current.harmonySize);
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "maxHz")) {
-      updated.maxHz = normalizeFixtureMetricMaxHz(next.maxHz, current.maxHz);
-    }
+    const updated = applyFixtureMetricConfigPatch({ ...current }, current, next);
     const normalized = normalizeFixtureMetricConfigSnapshot(updated, base);
     fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
       ...fixtureMetricRoutingRuntime,
@@ -5148,22 +6237,7 @@ function patchFixtureMetricRoutingConfig(patch = {}) {
   }
 
   const current = getFixtureMetricGlobalConfig();
-  const updated = { ...current };
-  if (Object.prototype.hasOwnProperty.call(next, "mode")) {
-    updated.mode = normalizeFixtureMetricMode(next.mode, current.mode);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "metric")) {
-    updated.metric = normalizeFixtureMetricKey(next.metric, current.metric);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "metaAutoFlip")) {
-    updated.metaAutoFlip = Boolean(next.metaAutoFlip);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "harmonySize")) {
-    updated.harmonySize = normalizeFixtureMetricHarmonySize(next.harmonySize, current.harmonySize);
-  }
-  if (Object.prototype.hasOwnProperty.call(next, "maxHz")) {
-    updated.maxHz = normalizeFixtureMetricMaxHz(next.maxHz, current.maxHz);
-  }
+  const updated = applyFixtureMetricConfigPatch({ ...current }, current, next);
   const normalized = normalizeFixtureMetricConfigSnapshot(updated, current);
   fixtureMetricRoutingRuntime = writeFixtureMetricRoutingConfig({
     ...fixtureMetricRoutingRuntime,
@@ -5194,6 +6268,7 @@ function clearFixtureRoutingOverridesAtomic(patch = {}) {
   const paletteOverridesBefore = sanitizePaletteFixtureOverridesConfig(paletteFixtureOverridesRuntime);
   const metricRoutingBefore = sanitizeFixtureMetricRoutingConfig(fixtureMetricRoutingRuntime);
   const sequenceStateBefore = new Map(fixturePaletteSequenceState);
+  const brightnessStateBefore = new Map(fixturePaletteBrightnessState);
 
   let paletteBrandBefore = null;
   let paletteBrandHadOverride = false;
@@ -5280,6 +6355,10 @@ function clearFixtureRoutingOverridesAtomic(patch = {}) {
       for (const [id, state] of sequenceStateBefore.entries()) {
         fixturePaletteSequenceState.set(id, state);
       }
+      fixturePaletteBrightnessState.clear();
+      for (const [id, state] of brightnessStateBefore.entries()) {
+        fixturePaletteBrightnessState.set(id, state);
+      }
 
       if (!fixtureId && requestedBrand) {
         if (paletteBrandHadOverride && paletteBrandBefore) {
@@ -5294,6 +6373,9 @@ function clearFixtureRoutingOverridesAtomic(patch = {}) {
             beatLock: paletteBrandBefore.beatLock,
             beatLockGraceSec: paletteBrandBefore.beatLockGraceSec,
             reactiveMargin: paletteBrandBefore.reactiveMargin,
+            brightnessMode: paletteBrandBefore.brightnessMode,
+            brightnessFollowAmount: paletteBrandBefore.brightnessFollowAmount,
+            vividness: paletteBrandBefore.vividness,
             spectrumMapMode: paletteBrandBefore.spectrumMapMode,
             spectrumFeatureMap: paletteBrandBefore.spectrumFeatureMap
           });
@@ -5318,802 +6400,154 @@ function clearFixtureRoutingOverridesAtomic(patch = {}) {
 // ======================================================
 // STANDALONE FIXTURE CONTROL
 // ======================================================
-const standaloneStates = new Map();
-const standaloneTimers = new Map();
-const standaloneInFlight = new Set();
-const standaloneWizAdapters = new Map();
-const STANDALONE_SCENES = new Set(["sweep", "bounce", "pulse", "spark"]);
-const STANDALONE_SPEED_MODES = new Set(["fixed", "audio"]);
-const STANDALONE_COLOR_MODES = new Set(["hsv", "cct"]);
-
-function clampNumber(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, n));
-}
-
-function parseBoolean(value, fallback = false) {
-  if (typeof value === "boolean") return value;
-  if (value === 1 || value === "1") return true;
-  if (value === 0 || value === "0") return false;
-  if (typeof value === "string") {
-    const raw = value.trim().toLowerCase();
-    if (raw === "true" || raw === "on" || raw === "yes") return true;
-    if (raw === "false" || raw === "off" || raw === "no") return false;
-  }
-  return fallback;
-}
-
-function getStandalonePersistedState(id) {
-  const fixtureId = String(id || "").trim();
-  if (!fixtureId) return null;
-  const raw = standaloneStateConfigRuntime.fixtures?.[fixtureId];
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  return { ...raw };
-}
-
-function hasStandalonePersistedState(id) {
-  return Boolean(getStandalonePersistedState(id));
-}
-
-function persistStandaloneStateForFixture(id, state) {
-  const fixtureId = String(id || "").trim();
-  if (!fixtureId) return;
-
-  if (state && typeof state === "object" && !Array.isArray(state)) {
-    standaloneStateConfigRuntime.fixtures[fixtureId] = { ...state };
-  } else {
-    delete standaloneStateConfigRuntime.fixtures[fixtureId];
-  }
-
-  try {
-    const saved = writeStandaloneStateConfig(standaloneStateConfigRuntime);
-    standaloneStateConfigRuntime.version = saved.version;
-    standaloneStateConfigRuntime.fixtures = { ...saved.fixtures };
-  } catch (err) {
-    console.warn(`[STANDALONE] state persist failed for ${fixtureId}: ${err.message || err}`);
-  }
-}
-
-function isStandaloneFixture(fixture) {
-  return parseBoolean(fixture?.customEnabled, false);
-}
+const standaloneLogic = createStandaloneLogic({
+  parseBoolean: parseBooleanLoose,
+  getTelemetry: () => audio?.getTelemetry?.() || {},
+  getAudioReactivityDrive: () => getAudioReactivityDrive("other")
+});
+const {
+  normalizeStandaloneState,
+  nextStandaloneAnimatedState,
+  hsvToRgb
+} = standaloneLogic;
 
 function listStandaloneFixtures() {
-  return fixtureRegistry.getFixtures().filter(f => isStandaloneFixture(f));
+  const listCustomBy = fixtureRegistry.listCustomBy;
+  if (typeof listCustomBy === "function") {
+    const hue = listCustomBy("hue", "", { requireConfigured: false }) || [];
+    const wiz = listCustomBy("wiz", "", { requireConfigured: false }) || [];
+    return [...hue, ...wiz];
+  }
+  const fixtures = fixtureRegistry.getFixtures?.() || [];
+  return fixtures.filter(fixture => parseBooleanLoose(fixture?.customEnabled, false));
 }
 
 function getStandaloneFixtureById(id) {
   const fixtureId = String(id || "").trim();
   if (!fixtureId) return null;
-  return listStandaloneFixtures().find(f => String(f.id) === fixtureId) || null;
+  return listStandaloneFixtures().find(fixture => String(fixture?.id || "").trim() === fixtureId) || null;
 }
 
-function normalizeStandaloneScene(scene, fallback = "sweep") {
-  const key = String(scene || "").trim().toLowerCase();
-  if (STANDALONE_SCENES.has(key)) return key;
-  return STANDALONE_SCENES.has(fallback) ? fallback : "sweep";
+function hasStandalonePersistedState(id) {
+  const fixtureId = String(id || "").trim();
+  if (!fixtureId) return false;
+  const fixtures = standaloneStateConfigRuntime?.fixtures || {};
+  return Object.prototype.hasOwnProperty.call(fixtures, fixtureId);
 }
 
-function normalizeStandaloneSpeedMode(mode, fallback = "fixed") {
-  const key = String(mode || "").trim().toLowerCase();
-  if (STANDALONE_SPEED_MODES.has(key)) return key;
-  return STANDALONE_SPEED_MODES.has(fallback) ? fallback : "fixed";
+function getStandalonePersistedState(id) {
+  const fixtureId = String(id || "").trim();
+  if (!fixtureId) return null;
+  const fixtures = standaloneStateConfigRuntime?.fixtures || {};
+  const raw = fixtures[fixtureId];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const fixture = getStandaloneFixtureById(fixtureId);
+  const brand = fixture?.brand || "hue";
+  return normalizeStandaloneState({}, raw, brand);
 }
 
-function normalizeStandaloneColorMode(mode, fallback = "hsv") {
-  const key = String(mode || "").trim().toLowerCase();
-  if (STANDALONE_COLOR_MODES.has(key)) return key;
-  return STANDALONE_COLOR_MODES.has(fallback) ? fallback : "hsv";
-}
-
-function normalizeStandaloneStateRanges(source, base, keyMin, keyMax, min, max, fallbackMin, fallbackMax) {
-  const has = key => Object.prototype.hasOwnProperty.call(source, key);
-  const nextMin = has(keyMin)
-    ? clampNumber(source[keyMin], min, max, base[keyMin])
-    : base[keyMin];
-  const nextMax = has(keyMax)
-    ? clampNumber(source[keyMax], min, max, base[keyMax])
-    : base[keyMax];
-  let low = Math.round(Number.isFinite(Number(nextMin)) ? Number(nextMin) : fallbackMin);
-  let high = Math.round(Number.isFinite(Number(nextMax)) ? Number(nextMax) : fallbackMax);
-  low = Math.max(min, Math.min(max, low));
-  high = Math.max(min, Math.min(max, high));
-  if (low > high) {
-    const swap = low;
-    low = high;
-    high = swap;
-  }
-  return [low, high];
-}
-
-function normalizeStandaloneState(input, previous, brand = "hue") {
-  const defaults = {
-    on: true,
-    bri: 70,
-    hue: brand === "hue" ? 210 : 190,
-    sat: 80,
-    transitionMs: 350,
-    mode: "rgb",
-    scene: "sweep",
-    animate: false,
-    static: false,
-    updateOnRaveStart: false,
-    updateOnRaveStop: false,
-    raveStopBri: 100,
-    speedMode: "fixed",
-    speedHz: 1.2,
-    speedHzMin: 0.6,
-    speedHzMax: 3.2,
-    hueMin: 0,
-    hueMax: 359,
-    satMin: 45,
-    satMax: 100,
-    colorMode: "hsv",
-    cctKelvin: 4000,
-    cctMinKelvin: 2700,
-    cctMaxKelvin: 6500,
-    motionPhase: 0,
-    motionDirection: 1
-  };
-
-  const source = input && typeof input === "object" ? input : {};
-  const base = previous && typeof previous === "object"
-    ? { ...defaults, ...previous }
-    : { ...defaults };
-
-  const has = key => Object.prototype.hasOwnProperty.call(source, key);
-  const [hueMin, hueMax] = normalizeStandaloneStateRanges(source, base, "hueMin", "hueMax", 0, 359, 0, 359);
-  const [satMin, satMax] = normalizeStandaloneStateRanges(source, base, "satMin", "satMax", 0, 100, 45, 100);
-  const [cctMinKelvin, cctMaxKelvin] = normalizeStandaloneStateRanges(
-    source,
-    base,
-    "cctMinKelvin",
-    "cctMaxKelvin",
-    2200,
-    6500,
-    2700,
-    6500
-  );
-
-  const next = {
-    on: has("on") ? parseBoolean(source.on, base.on) : base.on,
-    mode: has("mode") ? String(source.mode || base.mode).trim().toLowerCase() : String(base.mode || "scene"),
-    scene: has("scene") ? normalizeStandaloneScene(source.scene, base.scene) : normalizeStandaloneScene(base.scene, "sweep"),
-    bri: has("bri")
-      ? clampNumber(source.bri, 1, 100, base.bri)
-      : base.bri,
-    hue: has("hue")
-      ? clampNumber(source.hue, 0, 359, base.hue)
-      : base.hue,
-    sat: has("sat")
-      ? clampNumber(source.sat, 0, 100, base.sat)
-      : base.sat,
-    transitionMs: has("transitionMs")
-      ? clampNumber(source.transitionMs, 0, 10000, base.transitionMs)
-      : base.transitionMs,
-    animate: has("animate")
-      ? parseBoolean(source.animate, base.animate)
-      : base.animate,
-    static: has("static")
-      ? parseBoolean(source.static, base.static)
-      : base.static,
-    updateOnRaveStart: has("updateOnRaveStart")
-      ? parseBoolean(source.updateOnRaveStart, base.updateOnRaveStart)
-      : base.updateOnRaveStart,
-    updateOnRaveStop: has("updateOnRaveStop")
-      ? parseBoolean(source.updateOnRaveStop, base.updateOnRaveStop)
-      : base.updateOnRaveStop,
-    raveStopBri: has("raveStopBri")
-      ? clampNumber(source.raveStopBri, 1, 100, base.raveStopBri)
-      : base.raveStopBri,
-    speedMode: has("speedMode")
-      ? normalizeStandaloneSpeedMode(source.speedMode, base.speedMode)
-      : normalizeStandaloneSpeedMode(base.speedMode, "fixed"),
-    speedHz: has("speedHz")
-      ? clampNumber(source.speedHz, 0.2, 12, base.speedHz)
-      : base.speedHz,
-    speedHzMin: has("speedHzMin")
-      ? clampNumber(source.speedHzMin, 0.2, 12, base.speedHzMin)
-      : base.speedHzMin,
-    speedHzMax: has("speedHzMax")
-      ? clampNumber(source.speedHzMax, 0.2, 12, base.speedHzMax)
-      : base.speedHzMax,
-    hueMin,
-    hueMax,
-    satMin,
-    satMax,
-    colorMode: has("colorMode")
-      ? normalizeStandaloneColorMode(source.colorMode, base.colorMode)
-      : normalizeStandaloneColorMode(base.colorMode, "hsv"),
-    cctKelvin: has("cctKelvin")
-      ? clampNumber(source.cctKelvin, 2200, 6500, base.cctKelvin)
-      : base.cctKelvin,
-    cctMinKelvin,
-    cctMaxKelvin,
-    motionPhase: has("motionPhase")
-      ? clampNumber(source.motionPhase, 0, 1, base.motionPhase)
-      : clampNumber(base.motionPhase, 0, 1, 0),
-    motionDirection: has("motionDirection")
-      ? (Number(source.motionDirection) < 0 ? -1 : 1)
-      : (Number(base.motionDirection) < 0 ? -1 : 1)
-  };
-
-  const modeExplicit = has("mode");
-  const animateExplicit = has("animate");
-  const nextMode = next.mode === "rgb" || next.mode === "scene" || next.mode === "auto"
-    ? next.mode
-    : (next.animate ? "scene" : "rgb");
-  next.mode = nextMode;
-  if (modeExplicit && (next.mode === "scene" || next.mode === "auto") && !animateExplicit) {
-    next.animate = true;
-  }
-  if (modeExplicit && (next.mode === "scene" || next.mode === "auto") && !has("static")) {
-    next.static = false;
-  }
-  if (next.mode === "rgb") {
-    next.animate = false;
-  }
-
-  return {
-    on: Boolean(next.on),
-    mode: next.mode,
-    scene: next.scene,
-    bri: Math.round(next.bri),
-    hue: Math.round(next.hue),
-    sat: Math.round(next.sat),
-    transitionMs: Math.round(next.transitionMs),
-    animate: Boolean(next.animate),
-    static: Boolean(next.static),
-    updateOnRaveStart: Boolean(next.updateOnRaveStart),
-    updateOnRaveStop: Boolean(next.updateOnRaveStop),
-    raveStopBri: Math.round(next.raveStopBri),
-    speedMode: next.speedMode,
-    speedHz: Number(next.speedHz.toFixed(2)),
-    speedHzMin: Number(next.speedHzMin.toFixed(2)),
-    speedHzMax: Number(next.speedHzMax.toFixed(2)),
-    hueMin: Math.round(next.hueMin),
-    hueMax: Math.round(next.hueMax),
-    satMin: Math.round(next.satMin),
-    satMax: Math.round(next.satMax),
-    colorMode: next.colorMode,
-    cctKelvin: Math.round(next.cctKelvin),
-    cctMinKelvin: Math.round(next.cctMinKelvin),
-    cctMaxKelvin: Math.round(next.cctMaxKelvin),
-    motionPhase: Number(next.motionPhase.toFixed(4)),
-    motionDirection: next.motionDirection < 0 ? -1 : 1
-  };
-}
-
-function getStandaloneReactiveEnergy() {
-  const telemetry = engine?.getTelemetry?.() || {};
-  const energy = clampNumber(Number(telemetry.energy), 0, 1, 0);
-  const rms = clampNumber(Number(telemetry.audioSourceLevel ?? telemetry.rms), 0, 1, 0);
-  const flux = clampNumber(Number(telemetry.audioFlux ?? telemetry.flux), 0, 1, 0);
-  const fallback = clampNumber(Math.max(energy, rms, flux * 0.8), 0, 1, 0.25);
-  const profile = getAudioReactivityDrive("other", telemetry);
-  if (!profile.enabled) {
-    return fallback;
-  }
-  const mappedDrive = clampNumber((Number(profile.drive) - 0.12) / 1.08, 0, 1, fallback);
-  const sourceLevel = clampNumber(Number(profile.level), 0, 1, fallback);
-  return clampNumber(Math.max(mappedDrive, sourceLevel), 0, 1, fallback);
-}
-
-function resolveStandaloneDynamicHz(state = {}) {
-  const mode = String(state.mode || "").trim().toLowerCase();
-  const fixedHz = clampNumber(state.speedHz, 0.2, 12, 1.2);
-  if (mode === "auto") {
-    const telemetry = engine?.getTelemetry?.() || {};
-    const bpm = Number(telemetry.bpm);
-    const bpmHz = Number.isFinite(bpm) && bpm > 0
-      ? clampNumber(bpm / 96, 0.35, 12, fixedHz)
-      : fixedHz;
-    const rms = clampNumber(Number(telemetry.audioSourceLevel ?? telemetry.rms), 0, 1, 0);
-    const beat = clampNumber(Number(telemetry.beatConfidence), 0, 1, 0);
-    const transient = clampNumber(Number(telemetry.audioTransient), 0, 1, 0);
-    const flux = clampNumber(Number(telemetry.audioFlux ?? telemetry.flux), 0, 1, 0);
-    const energy = getStandaloneReactiveEnergy();
-    const motion = clampNumber(Math.max(beat, transient, flux), 0, 1, 0);
-    const drive = clampNumber((energy * 0.58) + (motion * 0.42), 0, 1, 0);
-    const dynamicHz = clampNumber(
-      0.55 + (drive * 8.2) + (Math.max(0, motion - 0.58) * 4.6),
-      0.35,
-      12,
-      fixedHz
-    );
-    let autoHz = (bpmHz * 0.58) + (dynamicHz * 0.42);
-
-    const calmTrack = rms < 0.09 && transient < 0.14 && flux < 0.14 && motion < 0.2;
-    if (calmTrack) {
-      autoHz = Math.min(autoHz, 2.4 + (drive * 1.4));
+function persistStandaloneStateForFixture(id, state) {
+  const fixtureId = String(id || "").trim();
+  if (!fixtureId) return null;
+  const fixture = getStandaloneFixtureById(fixtureId);
+  const brand = fixture?.brand || "hue";
+  const normalizedState = normalizeStandaloneState({}, state, brand);
+  const safe = writeStandaloneStateConfig({
+    ...standaloneStateConfigRuntime,
+    fixtures: {
+      ...(standaloneStateConfigRuntime.fixtures || {}),
+      [fixtureId]: normalizedState
     }
-
-    const intensePeak = drive > 0.72 || motion > 0.68;
-    if (intensePeak) {
-      autoHz = Math.max(autoHz, clampNumber(6.2 + (drive * 5.2), 6.2, 12, 8));
-    }
-
-    return clampNumber(autoHz, 0.35, 12, fixedHz);
-  }
-  if (String(state.speedMode || "").trim().toLowerCase() !== "audio") {
-    return fixedHz;
-  }
-  const minHz = clampNumber(state.speedHzMin, 0.2, 12, 0.6);
-  const maxHz = clampNumber(state.speedHzMax, minHz, 12, 3.2);
-  const energy = getStandaloneReactiveEnergy();
-  return minHz + ((maxHz - minHz) * energy);
+  });
+  standaloneStateConfigRuntime.version = Number(safe.version || 1);
+  standaloneStateConfigRuntime.fixtures = { ...(safe.fixtures || {}) };
+  return normalizedState;
 }
 
-function normalizeStandaloneScenePhase(phase) {
-  let next = Number(phase);
-  if (!Number.isFinite(next)) next = 0;
-  while (next >= 1) next -= 1;
-  while (next < 0) next += 1;
-  return next;
+function wait(ms) {
+  const timeoutMs = Math.max(0, Math.round(Number(ms) || 0));
+  return new Promise(resolve => setTimeout(resolve, timeoutMs));
 }
 
-function nextStandaloneAnimatedState(fixture, current, intervalMs) {
-  const source = current && typeof current === "object" ? current : {};
-  const scene = normalizeStandaloneScene(source.scene, "sweep");
-  const colorMode = normalizeStandaloneColorMode(source.colorMode, "hsv");
-  const hueLow = Math.round(Math.min(source.hueMin ?? 0, source.hueMax ?? 359));
-  const hueHigh = Math.round(Math.max(source.hueMin ?? 0, source.hueMax ?? 359));
-  const satLow = Math.round(Math.min(source.satMin ?? 0, source.satMax ?? 100));
-  const satHigh = Math.round(Math.max(source.satMin ?? 0, source.satMax ?? 100));
-  const cctLow = Math.round(Math.min(source.cctMinKelvin ?? 2700, source.cctMaxKelvin ?? 6500));
-  const cctHigh = Math.round(Math.max(source.cctMinKelvin ?? 2700, source.cctMaxKelvin ?? 6500));
-  const hueSpan = Math.max(1, hueHigh - hueLow);
-  const satSpan = Math.max(0, satHigh - satLow);
-  const cctSpan = Math.max(0, cctHigh - cctLow);
-  const hz = resolveStandaloneDynamicHz(source);
-  const step = clampNumber((hz * Math.max(40, Number(intervalMs) || 120)) / 1000, 0.01, 0.8, 0.08);
-  const phase = normalizeStandaloneScenePhase(source.motionPhase);
-  const direction = Number(source.motionDirection) < 0 ? -1 : 1;
-
-  let nextPhase = phase;
-  let nextDirection = direction;
-  let hue = clampNumber(source.hue, 0, 359, hueLow);
-  let sat = clampNumber(source.sat, 0, 100, satHigh);
-  let bri = clampNumber(source.bri, 1, 100, 70);
-  let cctKelvin = clampNumber(source.cctKelvin, 2200, 6500, cctLow);
-
-  if (scene === "bounce") {
-    let bouncePhase = phase + (step * direction);
-    if (bouncePhase >= 1) {
-      bouncePhase = 1 - (bouncePhase - 1);
-      nextDirection = -1;
-    } else if (bouncePhase <= 0) {
-      bouncePhase = Math.abs(bouncePhase);
-      nextDirection = 1;
-    }
-    nextPhase = normalizeStandaloneScenePhase(bouncePhase);
-  } else {
-    nextPhase = normalizeStandaloneScenePhase(phase + step);
-  }
-
-  if (scene === "pulse") {
-    const wave = 0.5 + (Math.sin(nextPhase * Math.PI * 2) * 0.5);
-    const briFloor = Math.max(8, Math.round(bri * 0.35));
-    const briCeil = Math.max(briFloor, Math.round(source.bri || bri));
-    bri = Math.round(briFloor + ((briCeil - briFloor) * wave));
-    hue = Math.round(hueLow + (hueSpan * normalizeStandaloneScenePhase(nextPhase * 0.45)));
-    sat = Math.round(satHigh - (satSpan * (wave * 0.45)));
-    cctKelvin = Math.round(cctLow + (cctSpan * wave));
-  } else if (scene === "spark") {
-    const energy = getStandaloneReactiveEnergy();
-    const jumpChance = clampNumber((0.18 + (energy * 0.65)) * step * 2.4, 0, 1, 0.2);
-    if (Math.random() < jumpChance) {
-      hue = Math.round(hueLow + (Math.random() * hueSpan));
-      sat = Math.round(satLow + (Math.random() * satSpan));
-      cctKelvin = Math.round(cctLow + (Math.random() * cctSpan));
-    } else {
-      hue = Math.round(hueLow + (hueSpan * nextPhase));
-      sat = Math.round(satLow + (satSpan * nextPhase));
-      cctKelvin = Math.round(cctLow + (cctSpan * nextPhase));
-    }
-  } else {
-    hue = Math.round(hueLow + (hueSpan * nextPhase));
-    sat = Math.round(satLow + (satSpan * nextPhase));
-    cctKelvin = Math.round(cctLow + (cctSpan * nextPhase));
-  }
-
-  const patch = {
-    hue,
-    sat,
-    bri,
-    cctKelvin,
-    speedHz: Number(hz.toFixed(2)),
-    motionPhase: nextPhase,
-    motionDirection: nextDirection
-  };
-  if (colorMode === "cct") {
-    patch.sat = satLow;
-  }
-  return normalizeStandaloneState(patch, source, fixture?.brand);
-}
-
-function hsvToRgb(h, s, v = 100) {
-  const hue = ((Number(h) % 360) + 360) % 360;
-  const sat = clampNumber(s, 0, 100, 0) / 100;
-  const val = clampNumber(v, 0, 100, 100) / 100;
-  const c = val * sat;
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = val - c;
-
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  if (hue < 60) [r, g, b] = [c, x, 0];
-  else if (hue < 120) [r, g, b] = [x, c, 0];
-  else if (hue < 180) [r, g, b] = [0, c, x];
-  else if (hue < 240) [r, g, b] = [0, x, c];
-  else if (hue < 300) [r, g, b] = [x, 0, c];
-  else [r, g, b] = [c, 0, x];
-
-  return {
-    r: Math.round((r + m) * 255),
-    g: Math.round((g + m) * 255),
-    b: Math.round((b + m) * 255)
-  };
-}
+const standaloneRuntime = createStandaloneRuntime({
+  fixtureRegistry,
+  createWizAdapter,
+  axios,
+  hueHttpAgent,
+  parseBoolean: parseBooleanLoose,
+  normalizeStandaloneState,
+  nextStandaloneAnimatedState,
+  toHueTransitionTime,
+  toHueBrightness,
+  hsvToRgb,
+  listStandaloneFixtures,
+  getStandaloneFixtureById,
+  getStandalonePersistedState,
+  hasStandalonePersistedState,
+  persistStandaloneStateForFixture,
+  wait,
+  log: console
+});
 
 function getStandaloneWizAdapter(fixture) {
-  if (!fixture || fixture.brand !== "wiz") return null;
-  if (
-    typeof fixtureRegistry.isWizFixtureConfigured === "function" &&
-    !fixtureRegistry.isWizFixtureConfigured(fixture)
-  ) {
-    return null;
-  }
-  const id = String(fixture.id || "").trim();
-  if (!id) return null;
-
-  const existing = standaloneWizAdapters.get(id);
-  if (existing && existing.ip === fixture.ip) {
-    return existing.send;
-  }
-
-  if (existing) {
-    try {
-      existing.send.close?.();
-    } catch {}
-    standaloneWizAdapters.delete(id);
-  }
-
-  const send = createWizAdapter({ ip: fixture.ip });
-  standaloneWizAdapters.set(id, { id, ip: fixture.ip, send });
-  return send;
+  return standaloneRuntime.getStandaloneWizAdapter(fixture);
 }
 
 function closeStandaloneWizAdapter(id) {
-  const key = String(id || "").trim();
-  const existing = standaloneWizAdapters.get(key);
-  if (!existing) return;
-  try {
-    existing.send.close?.();
-  } catch {}
-  standaloneWizAdapters.delete(key);
+  return standaloneRuntime.closeStandaloneWizAdapter(id);
 }
 
 function stopStandaloneTimer(id) {
-  const key = String(id || "").trim();
-  const current = standaloneTimers.get(key);
-  if (current) {
-    clearInterval(current.handle);
-    standaloneTimers.delete(key);
-  }
+  return standaloneRuntime.stopStandaloneTimer(id);
 }
 
 function startStandaloneTimer(fixture, state) {
-  const id = String(fixture?.id || "").trim();
-  if (!id) return;
-  const engineEnabled = parseBoolean(fixture?.engineEnabled, false);
-  if (engineEnabled) {
-    stopStandaloneTimer(id);
-    return;
-  }
-  if (!state?.animate || state?.static || fixture.enabled === false) {
-    stopStandaloneTimer(id);
-    return;
-  }
-
-  const mode = String(state?.mode || "").trim().toLowerCase();
-  const intervalSeedHz = mode === "auto"
-    ? 8
-    : (
-      String(state?.speedMode || "").trim().toLowerCase() === "audio"
-        ? clampNumber(state?.speedHzMax, 0.2, 12, 3.2)
-        : clampNumber(state?.speedHz, 0.2, 12, 1.2)
-    );
-  const intervalMs = Math.round(
-    clampNumber(1000 / Math.max(0.2, Number(intervalSeedHz) || 1), 80, 2000, 833)
-  );
-  const existing = standaloneTimers.get(id);
-  if (existing && existing.intervalMs === intervalMs) {
-    return;
-  }
-  if (existing) {
-    clearInterval(existing.handle);
-    standaloneTimers.delete(id);
-  }
-
-  const handle = setInterval(async () => {
-    if (standaloneInFlight.has(id)) return;
-
-    const liveFixture = getStandaloneFixtureById(id);
-    if (!liveFixture || liveFixture.enabled === false) {
-      stopStandaloneTimer(id);
-      return;
-    }
-    const liveEngineEnabled = parseBoolean(liveFixture.engineEnabled, false);
-    if (liveEngineEnabled) {
-      stopStandaloneTimer(id);
-      return;
-    }
-
-    const current = standaloneStates.get(id);
-    if (!current || !current.animate || current.static) {
-      stopStandaloneTimer(id);
-      return;
-    }
-
-    const nextState = nextStandaloneAnimatedState(liveFixture, current, intervalMs);
-    standaloneStates.set(id, nextState);
-
-    standaloneInFlight.add(id);
-    try {
-      await sendStandaloneState(liveFixture, nextState);
-    } catch {}
-    standaloneInFlight.delete(id);
-  }, intervalMs);
-
-  standaloneTimers.set(id, { handle, intervalMs });
+  return standaloneRuntime.startStandaloneTimer(fixture, state);
 }
 
 function buildStandaloneSnapshot(fixture) {
-  const id = String(fixture?.id || "").trim();
-  const current = standaloneStates.get(id) || normalizeStandaloneState({}, null, fixture?.brand);
-  const target = fixture?.brand === "hue"
-    ? `${fixture.bridgeIp || "-"} / light ${fixture.lightId || "-"}`
-    : (fixture?.ip || "-");
-  const engineEnabled = parseBoolean(fixture?.engineEnabled, false);
-  const twitchEnabled = parseBoolean(fixture?.twitchEnabled, false);
-  const customEnabled = parseBoolean(fixture?.customEnabled, false);
-
-  return {
-    id,
-    brand: fixture.brand,
-    zone: fixture.zone || "",
-    enabled: fixture.enabled !== false,
-    controlMode: engineEnabled ? "engine" : "standalone",
-    engineBinding: fixture.engineBinding || (engineEnabled ? fixture.brand : "standalone"),
-    engineEnabled,
-    twitchEnabled,
-    customEnabled,
-    target,
-    supportsCct: fixture?.brand === "wiz" || fixture?.brand === "hue",
-    animating: standaloneTimers.has(id),
-    state: { ...current }
-  };
+  return standaloneRuntime.buildStandaloneSnapshot(fixture);
 }
 
 function buildStandaloneSnapshotList() {
-  syncStandaloneRuntime();
-  return listStandaloneFixtures().map(buildStandaloneSnapshot);
+  return standaloneRuntime.buildStandaloneSnapshotList();
 }
 
 function buildStandaloneSnapshotById(id) {
-  const fixtureId = String(id || "").trim();
-  if (!fixtureId) return null;
-  syncStandaloneRuntime();
-  const fixture = getStandaloneFixtureById(fixtureId);
-  if (!fixture) return null;
-  return buildStandaloneSnapshot(fixture);
+  return standaloneRuntime.buildStandaloneSnapshotById(id);
 }
 
 function syncStandaloneRuntime() {
-  const fixtures = listStandaloneFixtures();
-  const nextIds = new Set(fixtures.map(f => String(f.id || "").trim()).filter(Boolean));
-
-  for (const id of standaloneStates.keys()) {
-    if (!nextIds.has(id)) {
-      standaloneStates.delete(id);
-    }
-  }
-
-  for (const id of standaloneTimers.keys()) {
-    if (!nextIds.has(id)) {
-      stopStandaloneTimer(id);
-    }
-  }
-
-  for (const id of standaloneWizAdapters.keys()) {
-    if (!nextIds.has(id)) {
-      closeStandaloneWizAdapter(id);
-    }
-  }
-
-  for (const fixture of fixtures) {
-    const id = String(fixture.id || "").trim();
-    if (!id) continue;
-    const current = standaloneStates.get(id);
-    const persisted = current ? null : getStandalonePersistedState(id);
-    const next = normalizeStandaloneState({}, current || persisted, fixture.brand);
-    standaloneStates.set(id, next);
-
-    if (fixture.brand === "wiz" && fixture.enabled !== false) {
-      getStandaloneWizAdapter(fixture);
-    } else if (fixture.brand === "wiz" && fixture.enabled === false) {
-      closeStandaloneWizAdapter(id);
-    } else {
-      closeStandaloneWizAdapter(id);
-    }
-
-    if (fixture.enabled === false || !next.animate) {
-      stopStandaloneTimer(id);
-    } else {
-      startStandaloneTimer(fixture, next);
-    }
-  }
-}
-
-function kelvinToHueCt(kelvin) {
-  const tempK = clampNumber(kelvin, 1200, 9000, 3200);
-  const mired = Math.round(1000000 / Math.max(1, tempK));
-  return Math.max(153, Math.min(500, mired));
+  return standaloneRuntime.syncStandaloneRuntime();
 }
 
 async function sendStandaloneState(fixture, state) {
-  if (!fixture || !state) {
-    return { ok: false, error: "invalid fixture/state" };
-  }
-
-  if (fixture.brand === "hue") {
-    const isReady =
-      typeof fixtureRegistry.isHueFixtureConfigured === "function"
-        ? fixtureRegistry.isHueFixtureConfigured(fixture)
-        : Boolean(fixture.bridgeIp && fixture.username && fixture.lightId);
-    if (!isReady) {
-      return { ok: false, error: "missing hue bridgeIp/username/lightId" };
-    }
-
-    const hue360 = ((state.hue % 360) + 360) % 360;
-    const payload = {
-      on: Boolean(state.on),
-      transitiontime: toHueTransitionTime(state.transitionMs)
-    };
-
-    if (payload.on) {
-      payload.bri = toHueBrightness(state.bri);
-      if (String(state.colorMode || "").trim().toLowerCase() === "cct") {
-        payload.ct = kelvinToHueCt(state.cctKelvin);
-      } else {
-        payload.hue = Math.round((hue360 / 360) * 65535);
-        payload.sat = clampNumber(Math.round((state.sat / 100) * 254), 0, 254, 203);
-      }
-    }
-
-    try {
-      await axios.put(
-        `http://${fixture.bridgeIp}/api/${fixture.username}/lights/${fixture.lightId}/state`,
-        payload,
-        { timeout: 1800, httpAgent: hueHttpAgent }
-      );
-      return { ok: true, transport: "hue-rest" };
-    } catch (err) {
-      return { ok: false, error: err.message || String(err) };
-    }
-  }
-
-  if (fixture.brand === "wiz") {
-    const isReady =
-      typeof fixtureRegistry.isWizFixtureConfigured === "function"
-        ? fixtureRegistry.isWizFixtureConfigured(fixture)
-        : Boolean(fixture.ip);
-    if (!isReady) {
-      return { ok: false, error: "missing wiz ip" };
-    }
-
-    const send = getStandaloneWizAdapter(fixture);
-    if (!send) {
-      return { ok: false, error: "wiz fixture adapter unavailable" };
-    }
-    const colorMode = String(state.colorMode || "").trim().toLowerCase();
-    const wizState = {
-      on: Boolean(state.on),
-      dimming: state.on ? clampNumber(Math.round(state.bri), 1, 100, 70) : 1
-    };
-
-    if (state.on && colorMode === "cct") {
-      wizState.temp = clampNumber(Math.round(state.cctKelvin), 2200, 6500, 4000);
-    } else if (state.on) {
-      const rgb = hsvToRgb(state.hue, state.sat, 100);
-      wizState.r = rgb.r;
-      wizState.g = rgb.g;
-      wizState.b = rgb.b;
-    }
-    try {
-      send(wizState, { repeats: 1, repeatDelayMs: 16 });
-      return { ok: true, transport: "wiz-udp" };
-    } catch (err) {
-      return { ok: false, error: err.message || String(err) };
-    }
-  }
-
-  return { ok: false, error: "unsupported fixture brand" };
+  return standaloneRuntime.sendStandaloneState(fixture, state);
 }
 
 async function sendStandaloneStateWithRetry(fixture, state, options = {}) {
-  const attempts = Math.max(1, Math.min(3, Math.round(Number(options.attempts) || 1)));
-  const delayMs = Math.max(0, Math.round(Number(options.delayMs) || 0));
-  let last = { ok: false, error: "standalone send failed" };
-  for (let i = 0; i < attempts; i += 1) {
-    last = await sendStandaloneState(fixture, state);
-    if (last?.ok) {
-      return last;
-    }
-    if (i + 1 < attempts && delayMs > 0) {
-      await wait(delayMs);
-    }
-  }
-  return last;
+  return standaloneRuntime.sendStandaloneStateWithRetry(fixture, state, options);
 }
 
 async function applyStandaloneStateById(id, patch = {}) {
-  syncStandaloneRuntime();
-
-  const fixture = getStandaloneFixtureById(id);
-  if (!fixture) {
-    return { ok: false, status: 404, error: "standalone fixture not found" };
-  }
-  if (fixture.enabled === false) {
-    return { ok: false, status: 409, error: "fixture is disabled", fixture: buildStandaloneSnapshot(fixture) };
-  }
-
-  const fixtureId = String(fixture.id || "").trim();
-  const current = standaloneStates.get(fixtureId);
-  const next = normalizeStandaloneState(patch, current, fixture.brand);
-  standaloneStates.set(fixtureId, next);
-
-  const sent = await sendStandaloneState(fixture, next);
-  if (!sent.ok) {
-    return { ok: false, status: 502, error: sent.error || "standalone send failed" };
-  }
-
-  persistStandaloneStateForFixture(fixtureId, next);
-
-  if (next.animate && !next.static) startStandaloneTimer(fixture, next);
-  else stopStandaloneTimer(fixtureId);
-
-  return {
-    ok: true,
-    fixture: buildStandaloneSnapshot(fixture),
-    transport: sent.transport
-  };
+  return standaloneRuntime.applyStandaloneStateById(id, patch);
 }
 
 async function applyStandaloneRaveStopUpdates() {
-  syncStandaloneRuntime();
-  const fixtures = listStandaloneFixtures().filter(f => f && f.enabled !== false);
-  for (const fixture of fixtures) {
-    const fixtureId = String(fixture.id || "").trim();
-    if (!fixtureId) continue;
-    const current = standaloneStates.get(fixtureId);
-    if (!current || !current.updateOnRaveStop) continue;
-    const stopBrightness = clampNumber(current.raveStopBri, 1, 100, current.bri);
-    const sent = await sendStandaloneStateWithRetry(
-      fixture,
-      { ...current, bri: Math.round(stopBrightness) },
-      { attempts: 2, delayMs: 60 }
-    );
-    if (!sent.ok) {
-      console.warn(`[STANDALONE] rave-stop update skipped for ${fixtureId}: ${sent.error || "send failed"}`);
-    }
-  }
+  return standaloneRuntime.applyStandaloneRaveStopUpdates();
 }
 
-// ======================================================
+async function applyStandaloneStartupUpdates() {
+  return standaloneRuntime.applyStandaloneStartupUpdates();
+}
+
+async function applyStandaloneRaveStartUpdates() {
+  return standaloneRuntime.applyStandaloneRaveStartUpdates();
+}
+
+function getStandaloneStateById(id) {
+  return standaloneRuntime.getStateById(id);
+}
 // ENGINE + AUDIO
 // ======================================================
 let engine = null;
@@ -6259,25 +6693,6 @@ function getModsRuntimeSnapshot() {
     audioReactivityMap: getAudioReactivityMapSnapshot(),
     modsDebug: modLoader.getDebugDiagnostics?.({ includeEvents: false }) || null
   };
-}
-
-async function applyStandaloneStartupUpdates() {
-  syncStandaloneRuntime();
-  const fixtures = listStandaloneFixtures().filter(f => f && f.enabled !== false);
-  for (const fixture of fixtures) {
-    const fixtureId = String(fixture.id || "").trim();
-    if (!fixtureId || !hasStandalonePersistedState(fixtureId)) continue;
-    const current = standaloneStates.get(fixtureId);
-    if (!current) continue;
-    const sent = await sendStandaloneStateWithRetry(
-      fixture,
-      current,
-      { attempts: 2, delayMs: 60 }
-    );
-    if (!sent.ok) {
-      console.warn(`[STANDALONE] startup reapply skipped for ${fixtureId}: ${sent.error || "send failed"}`);
-    }
-  }
 }
 
 const modLoader = createModLoader({
@@ -6481,7 +6896,10 @@ function bootEngine(reason = "boot") {
                 tx: {
                   // UDP is lossy; repeat key beats/drops for better visual lock.
                   repeats: dropActive ? (veryHighRate ? 2 : 3) : beatActive ? (veryHighRate ? 1 : 2) : 1,
-                  repeatDelayMs: highRate ? 12 : 18
+                  repeatDelayMs: highRate ? 12 : 18,
+                  isDrop: dropActive,
+                  isBeat: beatActive,
+                  minIntervalMs: effectiveRateMs
                 }
               }
             );
@@ -6578,9 +6996,6 @@ async function initializeRuntime() {
 
   bootEngine("startup");
 }
-
-// initial boot
-initializeRuntime();
 
 // ======================================================
 // ROUTES
@@ -6776,333 +7191,35 @@ app.post("/rave/drop", (_, res) => {
   res.json({ ok: true, dropEnabled: true });
 });
 
-function clampRgb255(v) {
-  return Math.max(0, Math.min(255, Math.round(Number(v) || 0)));
-}
-
-function miredToKelvin(mired) {
-  const m = Number(mired);
-  if (!Number.isFinite(m) || m <= 0) return 3200;
-  return Math.max(1200, Math.min(9000, Math.round(1000000 / m)));
-}
-
-function kelvinToRgb(kelvin) {
-  let temp = Math.max(1000, Math.min(40000, Number(kelvin) || 3200)) / 100;
-  let red;
-  let green;
-  let blue;
-
-  if (temp <= 66) {
-    red = 255;
-    green = 99.4708025861 * Math.log(temp) - 161.1195681661;
-    blue = temp <= 19 ? 0 : (138.5177312231 * Math.log(temp - 10) - 305.0447927307);
-  } else {
-    red = 329.698727446 * Math.pow(temp - 60, -0.1332047592);
-    green = 288.1221695283 * Math.pow(temp - 60, -0.0755148492);
-    blue = 255;
-  }
-
-  return {
-    r: clampRgb255(red),
-    g: clampRgb255(green),
-    b: clampRgb255(blue)
-  };
-}
-
-function xyBriToRgb(x, y, bri = 180) {
-  const xx = Number(x);
-  const yy = Number(y);
-  if (!Number.isFinite(xx) || !Number.isFinite(yy) || yy <= 0.0001) {
-    return { r: 255, g: 255, b: 255 };
-  }
-
-  const z = 1.0 - xx - yy;
-  const Y = Math.max(0.05, Math.min(1, Number(bri) / 254));
-  const X = (Y / yy) * xx;
-  const Z = (Y / yy) * z;
-
-  let r = X * 1.656492 - Y * 0.354851 - Z * 0.255038;
-  let g = -X * 0.707196 + Y * 1.655397 + Z * 0.036152;
-  let b = X * 0.051713 - Y * 0.121364 + Z * 1.01153;
-
-  r = r <= 0.0031308 ? 12.92 * r : (1.055 * Math.pow(r, 1 / 2.4) - 0.055);
-  g = g <= 0.0031308 ? 12.92 * g : (1.055 * Math.pow(g, 1 / 2.4) - 0.055);
-  b = b <= 0.0031308 ? 12.92 * b : (1.055 * Math.pow(b, 1 / 2.4) - 0.055);
-
-  r = Math.max(0, r);
-  g = Math.max(0, g);
-  b = Math.max(0, b);
-
-  const maxChannel = Math.max(r, g, b, 1);
-  if (maxChannel > 1) {
-    r /= maxChannel;
-    g /= maxChannel;
-    b /= maxChannel;
-  }
-
-  return {
-    r: clampRgb255(r * 255),
-    g: clampRgb255(g * 255),
-    b: clampRgb255(b * 255)
-  };
-}
-
-function hueStateToWizState(hueState = {}) {
-  const bri = Math.max(1, Math.min(100, Math.round((Number(hueState.bri || 180) / 254) * 100)));
-  let rgb = { r: 255, g: 255, b: 255 };
-
-  if (Array.isArray(hueState.xy) && hueState.xy.length >= 2) {
-    rgb = xyBriToRgb(hueState.xy[0], hueState.xy[1], hueState.bri || 180);
-  } else if (Number.isFinite(Number(hueState.ct))) {
-    rgb = kelvinToRgb(miredToKelvin(hueState.ct));
-  }
-
-  return {
-    r: rgb.r,
-    g: rgb.g,
-    b: rgb.b,
-    dimming: bri
-  };
-}
-
-function sanitizeTwitchColorPrefix(value, fallback = "") {
-  const token = String(value || "").trim().toLowerCase();
-  if (!token) return "";
-  if (TWITCH_COLOR_PREFIX_RE.test(token)) return token;
-  return String(fallback || "").trim().toLowerCase();
-}
-
-function sanitizeTwitchColorTarget(value, fallback = "hue") {
-  const target = String(value || "").trim().toLowerCase();
-  if (TWITCH_COLOR_TARGETS.has(target)) return target;
-  const safeFallback = String(fallback || "hue").trim().toLowerCase();
-  return TWITCH_COLOR_TARGETS.has(safeFallback) ? safeFallback : "hue";
-}
-
-function sanitizeTwitchColorCommandText(value, fallback = "") {
-  const source = String(value || "").replace(/\s+/g, " ").trim();
-  if (!source) return String(fallback || "").replace(/\s+/g, " ").trim();
-  return source.slice(0, 96);
-}
-
-function sanitizeTwitchRaveOffGroupKey(value) {
-  const source = String(value || "").trim().toLowerCase();
-  if (!source) return "";
-  const [brandRaw, zoneRaw = ""] = source.split(":", 2);
-  const brand = brandRaw === "hue" || brandRaw === "wiz" ? brandRaw : "";
-  if (!brand) return "";
-  const zone = normalizeRouteZoneToken(zoneRaw, "");
-  if (!zone) return brand;
-  if (zone === "*" || zone === "all") return `${brand}:all`;
-  if (!/^[a-z0-9_-]{1,48}$/.test(zone)) return "";
-  return `${brand}:${zone}`;
-}
-
-function sanitizeTwitchRaveOffGroupMap(input = {}) {
-  const rawMap =
-    input && typeof input === "object" && !Array.isArray(input)
-      ? input
-      : {};
-  const safe = {};
-  const entries = Object.entries(rawMap)
-    .map(([key, value]) => [sanitizeTwitchRaveOffGroupKey(key), sanitizeTwitchColorCommandText(value, "")])
-    .filter(([key, value]) => key && value)
-    .sort((a, b) => a[0].localeCompare(b[0]));
-  for (const [key, value] of entries) safe[key] = value;
-  return safe;
-}
-
-function sanitizeTwitchRaveOffFixtureMap(input = {}) {
-  const rawMap =
-    input && typeof input === "object" && !Array.isArray(input)
-      ? input
-      : {};
-  const safe = {};
-  const entries = Object.entries(rawMap)
-    .map(([fixtureId, value]) => [String(fixtureId || "").trim(), sanitizeTwitchColorCommandText(value, "")])
-    .filter(([fixtureId, value]) => fixtureId && value)
-    .sort((a, b) => a[0].localeCompare(b[0]));
-  for (const [fixtureId, value] of entries) safe[fixtureId] = value;
-  return safe;
-}
-
-function sanitizeTwitchRaveOffConfig(input = {}, fallback = TWITCH_COLOR_CONFIG_DEFAULT.raveOff) {
-  const raw =
-    input && typeof input === "object" && !Array.isArray(input)
-      ? input
-      : {};
-  const base =
-    fallback && typeof fallback === "object" && !Array.isArray(fallback)
-      ? fallback
-      : TWITCH_COLOR_CONFIG_DEFAULT.raveOff;
-  return {
-    enabled: parseBoolean(raw.enabled, base.enabled === true),
-    defaultText: sanitizeTwitchColorCommandText(raw.defaultText, base.defaultText || ""),
-    groups: sanitizeTwitchRaveOffGroupMap(raw.groups || base.groups || {}),
-    fixtures: sanitizeTwitchRaveOffFixtureMap(raw.fixtures || base.fixtures || {})
-  };
-}
-
-function sanitizeTwitchFixturePrefixMap(input = {}) {
-  const rawMap = input && typeof input === "object" ? input : {};
-  const safeMap = {};
-  const seenPrefixes = new Set();
-  const entries = Object.entries(rawMap)
-    .map(([fixtureId, prefix]) => [String(fixtureId || "").trim(), prefix])
-    .filter(([fixtureId]) => fixtureId)
-    .sort((a, b) => a[0].localeCompare(b[0]));
-
-  for (const [fixtureId, prefix] of entries) {
-    const safePrefix = sanitizeTwitchColorPrefix(prefix, "");
-    if (!safePrefix) continue;
-    if (seenPrefixes.has(safePrefix)) continue;
-    safeMap[fixtureId] = safePrefix;
-    seenPrefixes.add(safePrefix);
-  }
-
-  return safeMap;
-}
-
-function sanitizeTwitchColorConfig(input = {}) {
-  const raw = input && typeof input === "object" ? input : {};
-  const rawPrefixes = raw.prefixes && typeof raw.prefixes === "object" ? raw.prefixes : {};
-  const rawFixturePrefixes =
-    raw.fixturePrefixes &&
-    typeof raw.fixturePrefixes === "object" &&
-    !Array.isArray(raw.fixturePrefixes)
-      ? raw.fixturePrefixes
-      : {};
-  const rawRaveOff =
-    raw.raveOff &&
-    typeof raw.raveOff === "object" &&
-    !Array.isArray(raw.raveOff)
-      ? raw.raveOff
-      : {};
-  const hasHue = Object.prototype.hasOwnProperty.call(rawPrefixes, "hue");
-  const hasWiz = Object.prototype.hasOwnProperty.call(rawPrefixes, "wiz");
-  const hasOther = Object.prototype.hasOwnProperty.call(rawPrefixes, "other");
-
-  const huePrefix = hasHue
-    ? sanitizeTwitchColorPrefix(rawPrefixes.hue, "")
-    : sanitizeTwitchColorPrefix(TWITCH_COLOR_CONFIG_DEFAULT.prefixes.hue, "hue");
-  const wizPrefix = hasWiz
-    ? sanitizeTwitchColorPrefix(rawPrefixes.wiz, "")
-    : sanitizeTwitchColorPrefix(TWITCH_COLOR_CONFIG_DEFAULT.prefixes.wiz, "wiz");
-  const otherPrefix = hasOther
-    ? sanitizeTwitchColorPrefix(rawPrefixes.other, "")
-    : sanitizeTwitchColorPrefix(TWITCH_COLOR_CONFIG_DEFAULT.prefixes.other, "");
-  const dedupedPrefixes = {
-    hue: "",
-    wiz: "",
-    other: ""
-  };
-  const seenBrandPrefixes = new Set();
-  for (const [brand, prefix] of [["hue", huePrefix], ["wiz", wizPrefix], ["other", otherPrefix]]) {
-    if (!prefix) continue;
-    if (seenBrandPrefixes.has(prefix)) continue;
-    dedupedPrefixes[brand] = prefix;
-    seenBrandPrefixes.add(prefix);
-  }
-
-  return {
-    version: 1,
-    defaultTarget: sanitizeTwitchColorTarget(raw.defaultTarget, TWITCH_COLOR_CONFIG_DEFAULT.defaultTarget),
-    prefixes: dedupedPrefixes,
-    fixturePrefixes: sanitizeTwitchFixturePrefixMap(rawFixturePrefixes),
-    raveOff: sanitizeTwitchRaveOffConfig(rawRaveOff, TWITCH_COLOR_CONFIG_DEFAULT.raveOff)
-  };
-}
-
-function readTwitchColorConfig() {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(TWITCH_COLOR_CONFIG_PATH, "utf8"));
-    return sanitizeTwitchColorConfig(parsed);
-  } catch {
-    return sanitizeTwitchColorConfig(TWITCH_COLOR_CONFIG_DEFAULT);
-  }
-}
-
-function writeTwitchColorConfig(config) {
-  const safe = sanitizeTwitchColorConfig(config);
-  fs.mkdirSync(path.dirname(TWITCH_COLOR_CONFIG_PATH), { recursive: true });
-  fs.writeFileSync(TWITCH_COLOR_CONFIG_PATH, `${JSON.stringify(safe, null, 2)}\n`, "utf8");
-  return safe;
-}
-
-const twitchColorConfigRuntime = readTwitchColorConfig();
+const twitchColorRuntime = createTwitchColorRuntime({
+  fs,
+  path,
+  configPath: TWITCH_COLOR_CONFIG_PATH,
+  configDefault: TWITCH_COLOR_CONFIG_DEFAULT,
+  colorTargets: TWITCH_COLOR_TARGETS,
+  prefixRegex: TWITCH_COLOR_PREFIX_RE,
+  parseBoolean,
+  normalizeRouteZoneToken
+});
+const {
+  sanitizeTwitchColorPrefix,
+  sanitizeTwitchColorTarget,
+  sanitizeTwitchColorCommandText,
+  sanitizeTwitchRaveOffGroupKey,
+  sanitizeTwitchRaveOffConfig,
+  getTwitchColorConfigSnapshot,
+  patchTwitchColorConfig,
+  parseColorTarget,
+  splitPrefixedColorText
+} = twitchColorRuntime;
+const twitchColorRuntimeSummary = twitchColorRuntime.getLoadSummary();
 console.log(
-  `[COLOR] twitch command config loaded (default=${twitchColorConfigRuntime.defaultTarget}, ` +
-  `prefixes=${JSON.stringify(twitchColorConfigRuntime.prefixes)}, ` +
-  `fixturePrefixes=${Object.keys(twitchColorConfigRuntime.fixturePrefixes || {}).length}, ` +
-  `raveOffEnabled=${twitchColorConfigRuntime.raveOff?.enabled === true})`
+  `[COLOR] twitch command config loaded (default=${twitchColorRuntimeSummary.defaultTarget}, ` +
+  `autoDefaultTarget=${twitchColorRuntimeSummary.autoDefaultTarget === true}, ` +
+  `prefixes=${JSON.stringify(twitchColorRuntimeSummary.prefixes)}, ` +
+  `fixturePrefixes=${Number(twitchColorRuntimeSummary.fixturePrefixCount || 0)}, ` +
+  `raveOffEnabled=${twitchColorRuntimeSummary.raveOffEnabled === true})`
 );
-
-function getTwitchColorConfigSnapshot() {
-  return {
-    version: twitchColorConfigRuntime.version,
-    defaultTarget: twitchColorConfigRuntime.defaultTarget,
-    prefixes: { ...twitchColorConfigRuntime.prefixes },
-    fixturePrefixes: { ...(twitchColorConfigRuntime.fixturePrefixes || {}) },
-    raveOff: {
-      ...(twitchColorConfigRuntime.raveOff || {}),
-      groups: { ...(twitchColorConfigRuntime.raveOff?.groups || {}) },
-      fixtures: { ...(twitchColorConfigRuntime.raveOff?.fixtures || {}) }
-    }
-  };
-}
-
-function patchTwitchColorConfig(patch = {}) {
-  const rawPatch = patch && typeof patch === "object" ? patch : {};
-  const hasFixturePrefixes =
-    rawPatch.fixturePrefixes &&
-    typeof rawPatch.fixturePrefixes === "object" &&
-    !Array.isArray(rawPatch.fixturePrefixes);
-  const hasRaveOffPatch =
-    rawPatch.raveOff &&
-    typeof rawPatch.raveOff === "object" &&
-    !Array.isArray(rawPatch.raveOff);
-  const raveOffPatch = hasRaveOffPatch ? rawPatch.raveOff : {};
-  const merged = {
-    ...twitchColorConfigRuntime,
-    ...rawPatch,
-    prefixes: {
-      ...twitchColorConfigRuntime.prefixes,
-      ...(rawPatch.prefixes && typeof rawPatch.prefixes === "object" ? rawPatch.prefixes : {})
-    },
-    fixturePrefixes: hasFixturePrefixes
-      ? { ...rawPatch.fixturePrefixes }
-      : { ...(twitchColorConfigRuntime.fixturePrefixes || {}) },
-    raveOff: hasRaveOffPatch
-      ? {
-        ...(twitchColorConfigRuntime.raveOff || {}),
-        ...raveOffPatch,
-        groups:
-          raveOffPatch.groups && typeof raveOffPatch.groups === "object" && !Array.isArray(raveOffPatch.groups)
-            ? { ...raveOffPatch.groups }
-            : { ...(twitchColorConfigRuntime.raveOff?.groups || {}) },
-        fixtures:
-          raveOffPatch.fixtures && typeof raveOffPatch.fixtures === "object" && !Array.isArray(raveOffPatch.fixtures)
-            ? { ...raveOffPatch.fixtures }
-            : { ...(twitchColorConfigRuntime.raveOff?.fixtures || {}) }
-      }
-      : {
-        ...(twitchColorConfigRuntime.raveOff || {}),
-        groups: { ...(twitchColorConfigRuntime.raveOff?.groups || {}) },
-        fixtures: { ...(twitchColorConfigRuntime.raveOff?.fixtures || {}) }
-      }
-  };
-  const next = writeTwitchColorConfig(merged);
-  twitchColorConfigRuntime.version = next.version;
-  twitchColorConfigRuntime.defaultTarget = next.defaultTarget;
-  twitchColorConfigRuntime.prefixes = { ...next.prefixes };
-  twitchColorConfigRuntime.fixturePrefixes = { ...next.fixturePrefixes };
-  twitchColorConfigRuntime.raveOff = {
-    ...next.raveOff,
-    groups: { ...(next.raveOff?.groups || {}) },
-    fixtures: { ...(next.raveOff?.fixtures || {}) }
-  };
-  return getTwitchColorConfigSnapshot();
-}
 
 const audioReactivityMapRuntime = readAudioReactivityMapConfig();
 const audioReactivityEnvelopeByTarget = {
@@ -7247,202 +7364,6 @@ function patchAudioReactivityMapConfig(patch = {}, options = {}) {
     );
   }
   return getAudioReactivityMapSnapshot();
-}
-
-function clamp01(value, fallback = 0) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(0, Math.min(1, n));
-}
-
-function getAudioTelemetryMotionProfile(telemetry = {}) {
-  const t = telemetry && typeof telemetry === "object" ? telemetry : {};
-  const rms = clamp01(t.audioSourceLevel, clamp01(t.rms, clamp01(t.level, 0)));
-  const energyValue = clamp01(t.energy, rms);
-  const low = clamp01(t.audioBandLow, rms);
-  const mid = clamp01(t.audioBandMid, rms);
-  const high = clamp01(t.audioBandHigh, rms);
-  const transient = clamp01(t.audioTransient ?? t.transient, 0);
-  const flux = clamp01(t.audioFlux, clamp01(t.spectralFlux, 0));
-  const beat = clamp01(t.beatConfidence, t.beat ? 0.65 : 0);
-  const percussionSupport = clamp01(
-    (low * 0.46) +
-    (transient * 0.32) +
-    (beat * 0.22),
-    0
-  );
-  const vocalBias = clamp01(
-    ((mid * 0.58) + (high * 0.28) - (percussionSupport * 0.62)) * 1.35,
-    0
-  );
-  const motion = clamp01(
-    Math.max(
-      energyValue,
-      rms * (0.66 + (percussionSupport * 0.22)),
-      transient * 0.9,
-      flux * 0.82,
-      beat * 0.72
-    ),
-    0
-  );
-  const quietMix = clamp01(((0.34 - motion) / 0.34) + (vocalBias * 0.2), 0);
-  const hushMix = clamp01(((0.24 - motion) / 0.24) + (vocalBias * 0.26), 0);
-  return {
-    motion,
-    quietMix,
-    hushMix,
-    percussionSupport,
-    vocalBias
-  };
-}
-
-function boostRgbSaturation(color = {}, amount = 0) {
-  const r = clampRgb255(color?.r);
-  const g = clampRgb255(color?.g);
-  const b = clampRgb255(color?.b);
-  const boost = clampNumber(amount, 0, 1, 0);
-  const maxChannel = Math.max(r, g, b);
-  const minChannel = Math.min(r, g, b);
-  if (boost <= 0 || maxChannel <= 0 || maxChannel - minChannel < 1) {
-    return { r, g, b };
-  }
-
-  const sat = (maxChannel - minChannel) / maxChannel;
-  const targetSat = clamp01(sat + ((1 - sat) * boost), sat);
-  const targetMin = maxChannel * (1 - targetSat);
-  const spread = maxChannel - minChannel;
-  const gain = spread > 0 ? (maxChannel - targetMin) / spread : 1;
-  const boosted = {
-    r: clampRgb255(maxChannel - ((maxChannel - r) * gain)),
-    g: clampRgb255(maxChannel - ((maxChannel - g) * gain)),
-    b: clampRgb255(maxChannel - ((maxChannel - b) * gain))
-  };
-  if (boost <= 0.5) return boosted;
-
-  const vivid = clampNumber((boost - 0.5) / 0.5, 0, 1, 0);
-  const luma =
-    boosted.r * 0.2126 +
-    boosted.g * 0.7152 +
-    boosted.b * 0.0722;
-  const chromaGain = 1 + (vivid * 1.28);
-  const valueGain = 1 + (vivid * 0.24);
-
-  return {
-    r: clampRgb255((luma + ((boosted.r - luma) * chromaGain)) * valueGain),
-    g: clampRgb255((luma + ((boosted.g - luma) * chromaGain)) * valueGain),
-    b: clampRgb255((luma + ((boosted.b - luma) * chromaGain)) * valueGain)
-  };
-}
-
-function rgbToHsv255(color = {}) {
-  const r = clampRgb255(color?.r) / 255;
-  const g = clampRgb255(color?.g) / 255;
-  const b = clampRgb255(color?.b) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  let h = 0;
-  if (delta > 0) {
-    if (max === r) h = ((g - b) / delta) % 6;
-    else if (max === g) h = ((b - r) / delta) + 2;
-    else h = ((r - g) / delta) + 4;
-    h *= 60;
-    if (h < 0) h += 360;
-  }
-  return {
-    h: clampNumber(h, 0, 360, 0),
-    s: max <= 0 ? 0 : clampNumber(delta / max, 0, 1, 0),
-    v: clampNumber(max, 0, 1, 0)
-  };
-}
-
-function hsvToRgb255(h, s = 1, v = 1) {
-  const hue = ((Number(h) || 0) % 360 + 360) % 360;
-  const sat = clampNumber(s, 0, 1, 1);
-  const val = clampNumber(v, 0, 1, 1);
-  const c = val * sat;
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = val - c;
-  let r1 = 0;
-  let g1 = 0;
-  let b1 = 0;
-  if (hue < 60) {
-    r1 = c; g1 = x; b1 = 0;
-  } else if (hue < 120) {
-    r1 = x; g1 = c; b1 = 0;
-  } else if (hue < 180) {
-    r1 = 0; g1 = c; b1 = x;
-  } else if (hue < 240) {
-    r1 = 0; g1 = x; b1 = c;
-  } else if (hue < 300) {
-    r1 = x; g1 = 0; b1 = c;
-  } else {
-    r1 = c; g1 = 0; b1 = x;
-  }
-  return {
-    r: clampRgb255((r1 + m) * 255),
-    g: clampRgb255((g1 + m) * 255),
-    b: clampRgb255((b1 + m) * 255)
-  };
-}
-
-function resolveAudioReactivitySourceLevel(source, telemetry = {}) {
-  const t = telemetry && typeof telemetry === "object" ? telemetry : {};
-  const rms = clamp01(t.audioSourceLevel, clamp01(t.rms, 0));
-  const energyValue = clamp01(t.energy, rms);
-  const low = clamp01(t.audioBandLow, rms);
-  const mid = clamp01(t.audioBandMid, rms);
-  const high = clamp01(t.audioBandHigh, rms);
-  const transient = clamp01(Number(t.audioTransient || 0) / 1.2, 0);
-  const peak = clamp01(Number(t.audioPeak || 0) / 1.5, 0);
-  const flux = clamp01(t.audioFlux, 0);
-  const beat = clamp01(t.beatConfidence, t.beat ? 0.65 : 0);
-  const percussionSupport = clamp01(
-    (low * 0.46) +
-    (transient * 0.34) +
-    (beat * 0.2),
-    0
-  );
-
-  switch (source) {
-    case "baseline":
-      return rms;
-    case "bass":
-      return low;
-    case "mids":
-      return mid;
-    case "highs":
-      return high;
-    case "peaks":
-      return peak;
-    case "transients":
-      return transient;
-    case "flux":
-      return flux;
-    case "drums":
-      return clamp01(low * 0.42 + transient * 0.3 + flux * 0.18 + beat * 0.1, 0);
-    case "vocals":
-      return clamp01(
-        (mid * 0.52 + high * 0.28 + flux * 0.08) *
-          (0.72 + ((1 - percussionSupport) * 0.28)),
-        0
-      );
-    case "beat":
-      return beat;
-    case "groove":
-      return clamp01(rms * 0.34 + low * 0.34 + mid * 0.2 + beat * 0.12, 0);
-    case "smart":
-    default:
-      return clamp01(
-        energyValue * 0.34 +
-        transient * 0.28 +
-        flux * 0.18 +
-        low * 0.16 +
-        mid * 0.02 +
-        beat * 0.02,
-        0
-      );
-  }
 }
 
 function getAudioReactivityDrive(target = "hue", telemetry = null) {
@@ -8071,10 +7992,6 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   return appendPaletteSignalToIntentOutput(next, telemetry, sceneName);
 }
 
-function parseColorTarget(raw, fallback = "both") {
-  return sanitizeTwitchColorTarget(raw, fallback);
-}
-
 const TWITCH_COLOR_BRIGHTNESS = Object.freeze({
   hueBriBright: 254,
   hueBriDim: 178,
@@ -8095,67 +8012,6 @@ function getTwitchColorCapabilities() {
     hue: true,
     wiz: true,
     other: hasOther
-  };
-}
-
-function splitPrefixedColorText(rawText, prefixes = {}, fixturePrefixes = {}) {
-  const source = String(rawText || "").trim();
-  if (!source) {
-    return { target: null, prefix: "", text: "", fixtureId: "" };
-  }
-
-  const fixtureCandidates = Object.entries(fixturePrefixes && typeof fixturePrefixes === "object" ? fixturePrefixes : {})
-    .map(([fixtureId, prefix]) => ({
-      target: null,
-      fixtureId: String(fixtureId || "").trim(),
-      prefix: sanitizeTwitchColorPrefix(prefix, ""),
-      scope: "fixture"
-    }))
-    .filter(entry => entry.fixtureId && entry.prefix);
-  const brandCandidates = [
-    { target: "hue", prefix: sanitizeTwitchColorPrefix(prefixes.hue, "") },
-    { target: "wiz", prefix: sanitizeTwitchColorPrefix(prefixes.wiz, "") },
-    { target: "other", prefix: sanitizeTwitchColorPrefix(prefixes.other, "") }
-  ]
-    .map(entry => ({ ...entry, fixtureId: "", scope: "brand" }))
-    .filter(entry => entry.prefix);
-  const candidates = [...fixtureCandidates, ...brandCandidates]
-    .filter(entry => entry.prefix)
-    .sort((a, b) => {
-      const byPrefixLength = b.prefix.length - a.prefix.length;
-      if (byPrefixLength !== 0) return byPrefixLength;
-      if (a.scope !== b.scope) return a.scope === "fixture" ? -1 : 1;
-      return a.scope === "fixture"
-        ? String(a.fixtureId).localeCompare(String(b.fixtureId))
-        : String(a.target).localeCompare(String(b.target));
-    });
-
-  const lower = source.toLowerCase();
-  for (const entry of candidates) {
-    const token = entry.prefix;
-    if (
-      lower === token ||
-      lower.startsWith(`${token} `) ||
-      lower.startsWith(`${token}:`) ||
-      lower.startsWith(`${token}=`) ||
-      lower.startsWith(`${token}-`)
-    ) {
-      let rest = source.slice(token.length).trim();
-      rest = rest.replace(/^[:=\-]+/, "").trim();
-      return {
-        target: entry.target,
-        prefix: token,
-        text: rest,
-        fixtureId: entry.fixtureId || ""
-      };
-    }
-  }
-
-  return {
-    target: null,
-    prefix: "",
-    text: source,
-    fixtureId: ""
   };
 }
 
@@ -8315,6 +8171,44 @@ function getColorRequestOptions(req) {
   };
 }
 
+function resolveAutoDefaultColorTarget(commandConfig = {}) {
+  const fallback = parseColorTarget(
+    commandConfig.defaultTarget,
+    TWITCH_COLOR_CONFIG_DEFAULT.defaultTarget
+  );
+  if (commandConfig.autoDefaultTarget === false) {
+    return fallback;
+  }
+
+  if (fallback !== "hue" && fallback !== "wiz") {
+    return fallback;
+  }
+
+  const fixtures = listColorCommandFixtures("", "");
+  let hasHue = false;
+  let hasWiz = false;
+  for (const fixture of fixtures) {
+    const brand = String(fixture?.brand || "").trim().toLowerCase();
+    if (brand === "hue") hasHue = true;
+    if (brand === "wiz") hasWiz = true;
+    if (hasHue && hasWiz) break;
+  }
+
+  if (fallback === "hue") {
+    if (hasHue) return "hue";
+    if (hasWiz) return "wiz";
+    return "hue";
+  }
+
+  if (fallback === "wiz") {
+    if (hasWiz) return "wiz";
+    if (hasHue) return "hue";
+    return "wiz";
+  }
+
+  return fallback;
+}
+
 function resolveZonesFromRoute(rawZone, brand, fallbackZone, listFn, options = {}) {
   const mode = String(options.mode || "engine").trim().toLowerCase();
   const canonicalFallback = getCanonicalZoneFallback(brand, fallbackZone || "custom");
@@ -8358,25 +8252,6 @@ async function sendHueStateToFixtures(fixtures = [], state = {}) {
   }
 }
 
-async function applyStandaloneRaveStartUpdates() {
-  syncStandaloneRuntime();
-  const fixtures = listStandaloneFixtures().filter(f => f && f.enabled !== false);
-  for (const fixture of fixtures) {
-    const fixtureId = String(fixture.id || "").trim();
-    if (!fixtureId) continue;
-    const current = standaloneStates.get(fixtureId);
-    if (!current || !current.updateOnRaveStart) continue;
-    const sent = await sendStandaloneStateWithRetry(
-      fixture,
-      current,
-      { attempts: 2, delayMs: 60 }
-    );
-    if (!sent.ok) {
-      console.warn(`[STANDALONE] rave-start update skipped for ${fixtureId}: ${sent.error || "send failed"}`);
-    }
-  }
-}
-
 function sendWizStateToFixtures(fixtures = [], wizState = {}) {
   for (const fixture of fixtures) {
     try {
@@ -8411,11 +8286,12 @@ async function applyColorText(rawText, options = {}) {
   const fixtureScopedTarget = !options.targetExplicit && prefixed.fixtureId
     ? resolveTwitchFixtureById(prefixed.fixtureId)
     : null;
+  const implicitDefaultTarget = resolveAutoDefaultColorTarget(commandConfig);
   const target = options.targetExplicit
-    ? parseColorTarget(options.target, commandConfig.defaultTarget)
+    ? parseColorTarget(options.target, implicitDefaultTarget)
     : fixtureScopedTarget
-      ? parseColorTarget(fixtureScopedTarget.brand, commandConfig.defaultTarget)
-    : parseColorTarget(prefixed.target || commandConfig.defaultTarget, commandConfig.defaultTarget);
+      ? parseColorTarget(fixtureScopedTarget.brand, implicitDefaultTarget)
+    : parseColorTarget(prefixed.target || implicitDefaultTarget, implicitDefaultTarget);
   const colorText = String(prefixed.text || "").trim();
 
   if (!colorText) {
@@ -8552,8 +8428,9 @@ function resolveTwitchRaveOffCommandForFixture(fixture, raveOffConfig = {}) {
 }
 
 async function applyTwitchRaveOffColorProfile() {
+  const colorConfigSnapshot = getTwitchColorConfigSnapshot();
   const config = sanitizeTwitchRaveOffConfig(
-    twitchColorConfigRuntime?.raveOff,
+    colorConfigSnapshot?.raveOff,
     TWITCH_COLOR_CONFIG_DEFAULT.raveOff
   );
   if (config.enabled !== true) {
@@ -8658,6 +8535,11 @@ function getCompatText(req) {
   ).trim();
 }
 
+function patchBrandKey(patch, rawValue) {
+  const normalized = normalizePaletteBrandKey(rawValue);
+  patch.brand = normalized || String(rawValue || "").trim().toLowerCase();
+}
+
 app.get("/obs/dock", (req, res) => {
   const compact = parseBoolean(req.query.compact, true);
   const dockUrl = compact ? "/?obsDock=1&compact=1" : "/?obsDock=1&compact=0";
@@ -8687,100 +8569,77 @@ app.get("/color/prefixes", (_, res) => {
 });
 
 app.post("/color/prefixes", (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const body = getRequestMap(req.body);
   const patch = {};
 
-  if (Object.prototype.hasOwnProperty.call(body, "defaultTarget")) {
+  if (hasOwn(body, "defaultTarget")) {
     patch.defaultTarget = body.defaultTarget;
+  }
+  if (hasOwn(body, "autoDefaultTarget")) {
+    patch.autoDefaultTarget = body.autoDefaultTarget;
+  }
+  if (hasOwn(body, "autoDefault")) {
+    patch.autoDefaultTarget = body.autoDefault;
   }
 
   if (body.prefixes && typeof body.prefixes === "object") {
     patch.prefixes = { ...body.prefixes };
   }
 
-  if (body.fixturePrefixes && typeof body.fixturePrefixes === "object" && !Array.isArray(body.fixturePrefixes)) {
+  if (isNonArrayObject(body.fixturePrefixes)) {
     patch.fixturePrefixes = { ...body.fixturePrefixes };
   }
 
-  if (body.raveOff && typeof body.raveOff === "object" && !Array.isArray(body.raveOff)) {
+  if (isNonArrayObject(body.raveOff)) {
     patch.raveOff = { ...body.raveOff };
   }
 
-  if (Object.prototype.hasOwnProperty.call(body, "huePrefix")) {
-    patch.prefixes = {
-      ...(patch.prefixes || {}),
-      hue: body.huePrefix
-    };
-  }
-
-  if (Object.prototype.hasOwnProperty.call(body, "wizPrefix")) {
-    patch.prefixes = {
-      ...(patch.prefixes || {}),
-      wiz: body.wizPrefix
-    };
-  }
-
-  if (Object.prototype.hasOwnProperty.call(body, "otherPrefix")) {
-    patch.prefixes = {
-      ...(patch.prefixes || {}),
-      other: body.otherPrefix
-    };
+  const prefixAliasMap = [
+    ["huePrefix", "hue"],
+    ["wizPrefix", "wiz"],
+    ["otherPrefix", "other"]
+  ];
+  for (const [bodyKey, prefixKey] of prefixAliasMap) {
+    if (hasOwn(body, bodyKey)) {
+      mergePatchObject(patch, "prefixes", { [prefixKey]: body[bodyKey] });
+    }
   }
 
   if (body.clearOther === true || body.reset === true) {
-    patch.prefixes = {
-      ...(patch.prefixes || {}),
-      other: ""
-    };
+    mergePatchObject(patch, "prefixes", { other: "" });
   }
 
   if (body.clearFixturePrefixes === true || body.reset === true) {
     patch.fixturePrefixes = {};
   }
 
-  if (Object.prototype.hasOwnProperty.call(body, "raveOffEnabled")) {
-    patch.raveOff = {
-      ...(patch.raveOff || {}),
-      enabled: body.raveOffEnabled
-    };
+  if (hasOwn(body, "raveOffEnabled")) {
+    mergePatchObject(patch, "raveOff", { enabled: body.raveOffEnabled });
   }
 
-  if (Object.prototype.hasOwnProperty.call(body, "raveOffDefaultText")) {
-    patch.raveOff = {
-      ...(patch.raveOff || {}),
-      defaultText: body.raveOffDefaultText
-    };
+  if (hasOwn(body, "raveOffDefaultText")) {
+    mergePatchObject(patch, "raveOff", { defaultText: body.raveOffDefaultText });
   }
 
-  if (body.raveOffGroups && typeof body.raveOffGroups === "object" && !Array.isArray(body.raveOffGroups)) {
-    patch.raveOff = {
-      ...(patch.raveOff || {}),
-      groups: { ...body.raveOffGroups }
-    };
+  if (isNonArrayObject(body.raveOffGroups)) {
+    mergePatchObject(patch, "raveOff", { groups: { ...body.raveOffGroups } });
   }
 
-  if (body.raveOffFixtures && typeof body.raveOffFixtures === "object" && !Array.isArray(body.raveOffFixtures)) {
-    patch.raveOff = {
-      ...(patch.raveOff || {}),
-      fixtures: { ...body.raveOffFixtures }
-    };
+  if (isNonArrayObject(body.raveOffFixtures)) {
+    mergePatchObject(patch, "raveOff", { fixtures: { ...body.raveOffFixtures } });
   }
 
   if (body.clearRaveOffGroups === true || body.reset === true) {
-    patch.raveOff = {
-      ...(patch.raveOff || {}),
-      groups: {}
-    };
+    mergePatchObject(patch, "raveOff", { groups: {} });
   }
 
   if (body.clearRaveOffFixtures === true || body.reset === true) {
-    patch.raveOff = {
-      ...(patch.raveOff || {}),
-      fixtures: {}
-    };
+    mergePatchObject(patch, "raveOff", { fixtures: {} });
   }
 
   if (body.reset === true) {
+    patch.defaultTarget = TWITCH_COLOR_CONFIG_DEFAULT.defaultTarget;
+    patch.autoDefaultTarget = TWITCH_COLOR_CONFIG_DEFAULT.autoDefaultTarget;
     patch.raveOff = {
       enabled: TWITCH_COLOR_CONFIG_DEFAULT.raveOff.enabled,
       defaultText: TWITCH_COLOR_CONFIG_DEFAULT.raveOff.defaultText,
@@ -8833,19 +8692,9 @@ function parsePaletteFamiliesInput(raw) {
 }
 
 function collectPalettePatch(req) {
-  const body = req.body && typeof req.body === "object" ? req.body : {};
-  const query = req.query && typeof req.query === "object" ? req.query : {};
+  const read = createRequestValueReader(req);
   const patch = {};
-  const read = key => {
-    if (Object.prototype.hasOwnProperty.call(body, key)) return body[key];
-    if (Object.prototype.hasOwnProperty.call(query, key)) return query[key];
-    return undefined;
-  };
-
-  const colorsPerFamilyRaw = read("colorsPerFamily");
-  if (colorsPerFamilyRaw !== undefined) {
-    patch.colorsPerFamily = Number(colorsPerFamilyRaw);
-  }
+  patchOptionalNumber(read, patch, "colorsPerFamily");
 
   const familiesRaw = read("families");
   const families = parsePaletteFamiliesInput(familiesRaw);
@@ -8853,69 +8702,31 @@ function collectPalettePatch(req) {
     patch.families = families;
   }
 
-  const disorderRaw = read("disorder");
-  if (disorderRaw !== undefined) {
-    const parsed = parseBoolean(disorderRaw, null);
-    if (parsed !== null) patch.disorder = parsed;
-  }
-
-  const disorderAggressionRaw = read("disorderAggression");
-  if (disorderAggressionRaw !== undefined) {
-    patch.disorderAggression = Number(disorderAggressionRaw);
-  }
-
-  const cycleModeRaw = read("cycleMode");
-  if (cycleModeRaw !== undefined) {
-    patch.cycleMode = String(cycleModeRaw || "").trim().toLowerCase();
-  }
-
-  const timedIntervalRaw = read("timedIntervalSec");
-  if (timedIntervalRaw !== undefined) {
-    patch.timedIntervalSec = Number(timedIntervalRaw);
-  }
-
-  const beatLockRaw = read("beatLock");
-  if (beatLockRaw !== undefined) {
-    const parsed = parseBoolean(beatLockRaw, null);
-    if (parsed !== null) patch.beatLock = parsed;
-  }
-
-  const beatLockGraceRaw = read("beatLockGraceSec");
-  if (beatLockGraceRaw !== undefined) {
-    patch.beatLockGraceSec = Number(beatLockGraceRaw);
-  }
-
-  const reactiveMarginRaw = read("reactiveMargin");
-  if (reactiveMarginRaw !== undefined) {
-    patch.reactiveMargin = Number(reactiveMarginRaw);
-  }
-
-  const spectrumMapModeRaw = read("spectrumMapMode");
-  if (spectrumMapModeRaw !== undefined) {
-    patch.spectrumMapMode = String(spectrumMapModeRaw || "").trim().toLowerCase();
-  }
+  patchOptionalBoolean(read, patch, "disorder");
+  patchOptionalNumber(read, patch, "disorderAggression");
+  patchOptionalLowerString(read, patch, "cycleMode");
+  patchOptionalNumber(read, patch, "timedIntervalSec");
+  patchOptionalBoolean(read, patch, "beatLock");
+  patchOptionalNumber(read, patch, "beatLockGraceSec");
+  patchOptionalNumber(read, patch, "reactiveMargin");
+  patchOptionalLowerString(read, patch, "brightnessMode");
+  patchOptionalNumber(read, patch, "brightnessFollowAmount");
+  patchOptionalNumber(read, patch, "vividness");
+  patchOptionalLowerString(read, patch, "spectrumMapMode");
 
   const spectrumFeatureMapRaw = read("spectrumFeatureMap");
   if (spectrumFeatureMapRaw !== undefined) {
     if (Array.isArray(spectrumFeatureMapRaw)) {
-      patch.spectrumFeatureMap = spectrumFeatureMapRaw
-        .map(item => String(item || "").trim().toLowerCase())
-        .filter(Boolean);
+      patch.spectrumFeatureMap = parseLowerTokenList(spectrumFeatureMapRaw);
     } else {
-      const asText = String(spectrumFeatureMapRaw || "").trim();
-      if (asText) {
-        patch.spectrumFeatureMap = asText
-          .split(",")
-          .map(item => String(item || "").trim().toLowerCase())
-          .filter(Boolean);
-      }
+      const parsedList = parseLowerTokenList(spectrumFeatureMapRaw);
+      if (parsedList.length) patch.spectrumFeatureMap = parsedList;
     }
   }
 
   const brandRaw = read("brand");
   if (brandRaw !== undefined) {
-    const normalized = normalizePaletteBrandKey(brandRaw);
-    patch.brand = normalized || String(brandRaw || "").trim().toLowerCase();
+    patchBrandKey(patch, brandRaw);
   }
 
   const fixtureIdRaw = read("fixtureId");
@@ -8923,24 +8734,14 @@ function collectPalettePatch(req) {
     patch.fixtureId = String(fixtureIdRaw || "").trim();
   }
 
-  const clearOverrideRaw = read("clearOverride");
-  if (clearOverrideRaw !== undefined) {
-    const parsed = parseBoolean(clearOverrideRaw, null);
-    if (parsed !== null) patch.clearOverride = parsed;
-  }
+  patchOptionalBoolean(read, patch, "clearOverride");
 
   return patch;
 }
 
 function collectFixtureMetricPatch(req) {
-  const body = req.body && typeof req.body === "object" ? req.body : {};
-  const query = req.query && typeof req.query === "object" ? req.query : {};
+  const read = createRequestValueReader(req);
   const patch = {};
-  const read = key => {
-    if (Object.prototype.hasOwnProperty.call(body, key)) return body[key];
-    if (Object.prototype.hasOwnProperty.call(query, key)) return query[key];
-    return undefined;
-  };
 
   const modeRaw = read("mode");
   if (modeRaw !== undefined) {
@@ -9020,39 +8821,25 @@ function collectFixtureMetricPatch(req) {
   }
 
   const brandRaw = read("brand");
-  if (brandRaw !== undefined) {
-    const normalized = normalizePaletteBrandKey(brandRaw);
-    patch.brand = normalized || String(brandRaw || "").trim().toLowerCase();
-  }
+  if (brandRaw !== undefined) patchBrandKey(patch, brandRaw);
 
   const fixtureIdRaw = read("fixtureId");
   if (fixtureIdRaw !== undefined) {
     patch.fixtureId = String(fixtureIdRaw || "").trim();
   }
 
-  const clearOverrideRaw = read("clearOverride");
-  if (clearOverrideRaw !== undefined) {
-    const parsed = parseBoolean(clearOverrideRaw, null);
-    if (parsed !== null) patch.clearOverride = parsed;
-  }
+  patchOptionalBoolean(read, patch, "clearOverride");
 
   return patch;
 }
 
 function collectFixtureRoutingClearPatch(req) {
-  const body = req.body && typeof req.body === "object" ? req.body : {};
-  const query = req.query && typeof req.query === "object" ? req.query : {};
+  const read = createRequestValueReader(req);
   const patch = {};
-  const read = key => {
-    if (Object.prototype.hasOwnProperty.call(body, key)) return body[key];
-    if (Object.prototype.hasOwnProperty.call(query, key)) return query[key];
-    return undefined;
-  };
 
   const brandRaw = read("brand");
   if (brandRaw !== undefined) {
-    const normalized = normalizePaletteBrandKey(brandRaw);
-    patch.brand = normalized || String(brandRaw || "").trim().toLowerCase();
+    patchBrandKey(patch, brandRaw);
   }
 
   const fixtureIdRaw = read("fixtureId");
@@ -9076,21 +8863,49 @@ function buildPaletteRuntimeSnapshot(configOverride = null) {
     beatLock: PALETTE_CONFIG_DEFAULT.beatLock,
     beatLockGraceSec: PALETTE_CONFIG_DEFAULT.beatLockGraceSec,
     reactiveMargin: PALETTE_CONFIG_DEFAULT.reactiveMargin,
+    brightnessMode: PALETTE_CONFIG_DEFAULT.brightnessMode,
+    brightnessFollowAmount: PALETTE_CONFIG_DEFAULT.brightnessFollowAmount,
+    vividness: PALETTE_CONFIG_DEFAULT.vividness,
     spectrumMapMode: PALETTE_CONFIG_DEFAULT.spectrumMapMode,
     spectrumFeatureMap: PALETTE_CONFIG_DEFAULT.spectrumFeatureMap.slice()
   };
+  const sourceConfig = configOverride || engine.getPaletteConfig?.() || defaultConfig;
+  const normalizedGlobalConfig = normalizePaletteConfigSnapshot(
+    sourceConfig,
+    defaultConfig
+  );
+  const sourceBrands = (
+    sourceConfig &&
+    typeof sourceConfig === "object" &&
+    sourceConfig.brands &&
+    typeof sourceConfig.brands === "object"
+  )
+    ? sourceConfig.brands
+    : {};
+  const normalizedBrandOverrides = {};
+  for (const brand of PALETTE_SUPPORTED_BRANDS) {
+    const override = sourceBrands[brand];
+    normalizedBrandOverrides[brand] = (
+      override &&
+      typeof override === "object" &&
+      !Array.isArray(override)
+    )
+      ? normalizePaletteConfigSnapshot(override, normalizedGlobalConfig)
+      : null;
+  }
   return {
     ok: true,
-    config: normalizePaletteConfigSnapshot(
-      configOverride || engine.getPaletteConfig?.() || defaultConfig,
-      defaultConfig
-    ),
+    config: {
+      ...normalizedGlobalConfig,
+      brands: normalizedBrandOverrides
+    },
     catalog: engine.getPaletteCatalog?.() || [],
     options: {
       colorsPerFamily: PALETTE_COLOR_COUNT_OPTIONS.slice(),
       families: PALETTE_FAMILY_ORDER.slice(),
       brands: PALETTE_SUPPORTED_BRANDS.slice(),
       cycleModes: PALETTE_CYCLE_MODE_ORDER.slice(),
+      brightnessModes: PALETTE_BRIGHTNESS_MODE_ORDER.slice(),
       spectrumMapModes: PALETTE_SPECTRUM_MAP_MODE_ORDER.slice(),
       audioFeatures: PALETTE_AUDIO_FEATURE_KEYS.slice(),
       timedIntervalSec: {
@@ -9107,6 +8922,15 @@ function buildPaletteRuntimeSnapshot(configOverride = null) {
         min: PALETTE_REACTIVE_MARGIN_MIN,
         max: PALETTE_REACTIVE_MARGIN_MAX,
         default: PALETTE_CONFIG_DEFAULT.reactiveMargin
+      },
+      brightnessFollowAmount: {
+        min: PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MIN,
+        max: PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MAX,
+        default: PALETTE_CONFIG_DEFAULT.brightnessFollowAmount
+      },
+      vividness: {
+        levels: PALETTE_VIVIDNESS_LEVEL_OPTIONS.slice(),
+        default: PALETTE_CONFIG_DEFAULT.vividness
       }
     },
     metricRouting: buildFixtureMetricRoutingSnapshot(fixtures),
@@ -9179,341 +9003,13 @@ app.post("/rave/scene/auto", (_, res) => {
 /* ======================================================
    MIDI CONTROL
    ====================================================== */
-function getMidiSnapshot() {
-  if (!midiManager || typeof midiManager.getStatus !== "function") {
-    return {
-      ok: false,
-      moduleAvailable: false,
-      moduleError: "midi manager unavailable",
-      connected: false,
-      activePortIndex: null,
-      activePortName: "",
-      ports: [],
-      portCount: 0,
-      config: {
-        enabled: false,
-        deviceIndex: null,
-        deviceMatch: "",
-        velocityThreshold: 1,
-        bindings: {}
-      },
-      actions: [],
-      learn: { target: null, startedAt: 0, expiresAt: 0 },
-      lastMessage: null,
-      lastAction: "",
-      lastActionAt: "",
-      reason: "midi manager unavailable"
-    };
-  }
-  return midiManager.getStatus();
-}
-
-app.get("/midi/status", (_, res) => {
-  res.json(getMidiSnapshot());
+registerMidiRoutes(app, {
+  getMidiManager: () => midiManager,
+  getRequestMap
 });
 
-app.post("/midi/refresh", (_, res) => {
-  if (midiManager && typeof midiManager.refresh === "function") {
-    return res.json(midiManager.refresh());
-  }
-  return res.status(503).json(getMidiSnapshot());
-});
-
-app.post("/midi/config", (req, res) => {
-  if (!midiManager || typeof midiManager.applyConfig !== "function") {
-    return res.status(503).json(getMidiSnapshot());
-  }
-  const patch = req.body && typeof req.body === "object" ? req.body : {};
-  return res.json(midiManager.applyConfig(patch));
-});
-
-app.post("/midi/learn/cancel", (_, res) => {
-  if (!midiManager || typeof midiManager.cancelLearn !== "function") {
-    return res.status(503).json(getMidiSnapshot());
-  }
-  return res.json(midiManager.cancelLearn());
-});
-
-app.post("/midi/learn/:action", (req, res) => {
-  if (!midiManager || typeof midiManager.startLearn !== "function") {
-    return res.status(503).json(getMidiSnapshot());
-  }
-  let action = String(req.params.action || "").trim().toLowerCase();
-  if (action === "overclock") action = "overclock_toggle";
-  const result = midiManager.startLearn(action);
-  if (!result.ok) {
-    return res.status(400).json({
-      ...result.status,
-      ok: false,
-      error: "invalid midi learn action",
-      requested: action
-    });
-  }
-  return res.json(result.status);
-});
-
-app.post("/midi/bindings/reset", (_, res) => {
-  if (!midiManager || typeof midiManager.resetBindings !== "function") {
-    return res.status(503).json(getMidiSnapshot());
-  }
-  return res.json(midiManager.resetBindings());
-});
-
-app.post("/midi/bindings/:action", (req, res) => {
-  if (!midiManager || typeof midiManager.setBinding !== "function") {
-    return res.status(503).json(getMidiSnapshot());
-  }
-  const action = String(req.params.action || "").trim().toLowerCase();
-  const binding = req.body && typeof req.body === "object" ? req.body : {};
-  const result = midiManager.setBinding(action, binding);
-  if (!result.ok) {
-    return res.status(400).json({
-      ...result.status,
-      ok: false,
-      error: "invalid midi binding",
-      requested: action
-    });
-  }
-  return res.json(result.status);
-});
-
-app.delete("/midi/bindings/:action", (req, res) => {
-  if (!midiManager || typeof midiManager.clearBinding !== "function") {
-    return res.status(503).json(getMidiSnapshot());
-  }
-  const action = String(req.params.action || "").trim().toLowerCase();
-  const result = midiManager.clearBinding(action);
-  if (!result.ok) {
-    return res.status(400).json({
-      ...result.status,
-      ok: false,
-      error: "binding not found",
-      requested: action
-    });
-  }
-  return res.json(result.status);
-});
-
-app.post("/midi/trigger/:action", (req, res) => {
-  if (!midiManager || typeof midiManager.triggerAction !== "function") {
-    return res.status(503).json(getMidiSnapshot());
-  }
-  const action = String(req.params.action || "").trim().toLowerCase();
-  const result = midiManager.triggerAction(action);
-  if (!result.ok) {
-    return res.status(400).json({
-      ...result.status,
-      ok: false,
-      error: "invalid midi trigger action",
-      requested: action
-    });
-  }
-  return res.json(result.status);
-});
-
-const UNSAFE_OVERCLOCK_TIERS = Object.freeze({
-  "20": { hz: 20, tier: "turbo20", level: 8, name: "DEV 20Hz" },
-  "30": { hz: 30, tier: "turbo30", level: 9, name: "DEV 30Hz" },
-  "40": { hz: 40, tier: "turbo40", level: 10, name: "DEV 40Hz" },
-  "50": { hz: 50, tier: "turbo50", level: 11, name: "DEV 50Hz" },
-  "60": { hz: 60, tier: "turbo60", level: 12, name: "DEV 60Hz" }
-});
-
-const UNSAFE_OVERCLOCK_BY_TIER = Object.freeze(
-  Object.values(UNSAFE_OVERCLOCK_TIERS).reduce((acc, item) => {
-    acc[item.tier] = item;
-    acc[`x${item.hz}`] = item;
-    acc[`dev${item.hz}`] = item;
-    acc[`unsafe${item.hz}`] = item;
-    acc[`destructive${item.hz}`] = item;
-    return acc;
-  }, {})
-);
-
-function hasUnsafeOverclockAck(req) {
-  const raw = String(
-    req.query.unsafe ??
-    req.query.confirm ??
-    req.query.ack ??
-    req.body?.unsafe ??
-    req.body?.confirm ??
-    req.body?.ack ??
-    ""
-  ).trim().toLowerCase();
-
-  return (
-    raw === "1" ||
-    raw === "true" ||
-    raw === "yes" ||
-    raw === "on" ||
-    raw === "unsafe"
-  );
-}
-
-function unsafeOverclockRejected(res, requested = "") {
-  res.status(400).json({
-    ok: false,
-    error: "unsafe acknowledgement required",
-    requested: String(requested || ""),
-    requiredQuery: "unsafe=true",
-    warning: "Destructive overclock tiers can cause unstable or unpredictable behavior."
-  });
-}
-
-function applyUnsafeOverclockHzRoute(req, res, rawHz) {
-  const key = String(rawHz || "").trim();
-  const spec = UNSAFE_OVERCLOCK_TIERS[key];
-  if (!spec) {
-    res.status(400).json({
-      ok: false,
-      error: "invalid dev overclock hz",
-      allowedHz: Object.keys(UNSAFE_OVERCLOCK_TIERS).map(v => Number(v))
-    });
-    return;
-  }
-  if (!hasUnsafeOverclockAck(req)) {
-    unsafeOverclockRejected(res, spec.tier);
-    return;
-  }
-
-  engine.setOverclock?.(spec.tier);
-  console.warn(`[RAVE] UNSAFE overclock ${spec.name} enabled`);
-  res.json({
-    ok: true,
-    unsafe: true,
-    tier: spec.tier,
-    hz: spec.hz,
-    level: spec.level
-  });
-}
-
-/* ======================================================
-   OVERCLOCK — NEW SEMANTIC ROUTES
-   ====================================================== */
-app.post("/rave/overclock/on", (_, res) => {
-  engine.setOverclock?.("fast");
-  console.log("[RAVE] overclock SLOW 4Hz");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/off", (_, res) => {
-  engine.setOverclock?.(0);
-  console.log("[RAVE] overclock SLOW 2Hz");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/turbo/on", (_, res) => {
-  engine.setOverclock?.("turbo6");
-  console.log("[RAVE] overclock TURBO 6Hz");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/turbo/off", (_, res) => {
-  engine.setOverclock?.("fast");
-  console.log("[RAVE] overclock TURBO OFF -> FAST");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/ultra/on", (_, res) => {
-  engine.setOverclock?.("turbo8");
-  console.log("[RAVE] overclock ULTRA 8Hz");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/extreme/on", (_, res) => {
-  engine.setOverclock?.("turbo10");
-  console.log("[RAVE] overclock EXTREME 10Hz");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/insane/on", (_, res) => {
-  engine.setOverclock?.("turbo12");
-  console.log("[RAVE] overclock INSANE 12Hz");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/hyper/on", (_, res) => {
-  engine.setOverclock?.("turbo14");
-  console.log("[RAVE] overclock HYPER 14Hz");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/ludicrous/on", (_, res) => {
-  engine.setOverclock?.("turbo16");
-  console.log("[RAVE] overclock LUDICROUS 16Hz");
-  res.sendStatus(200);
-});
-
-app.post("/rave/overclock/dev/:hz/on", (req, res) => {
-  applyUnsafeOverclockHzRoute(req, res, req.params.hz);
-});
-
-app.post("/rave/overclock/dev/hz", (req, res) => {
-  const value = req.query.value ?? req.query.hz ?? req.body?.value ?? req.body?.hz;
-  applyUnsafeOverclockHzRoute(req, res, value);
-});
-
-app.get("/rave/overclock/tiers", (_, res) => {
-  const safe = [
-    { level: 0, hz: 2, tier: "normal", label: "SLOW 2Hz" },
-    { level: 1, hz: 4, tier: "fast", label: "SLOW 4Hz" },
-    { level: 2, hz: 6, tier: "turbo6", label: "DEFAULT 6Hz" },
-    { level: 3, hz: 8, tier: "turbo8", label: "ULTRA 8Hz" },
-    { level: 4, hz: 10, tier: "turbo10", label: "EXTREME 10Hz" },
-    { level: 5, hz: 12, tier: "turbo12", label: "INSANE 12Hz" },
-    { level: 6, hz: 14, tier: "turbo14", label: "HYPER 14Hz" },
-    { level: 7, hz: 16, tier: "turbo16", label: "LUDICROUS 16Hz" }
-  ];
-  const unsafe = Object.values(UNSAFE_OVERCLOCK_TIERS).map(item => ({
-    level: item.level,
-    hz: item.hz,
-    tier: item.tier,
-    label: item.name,
-    unsafe: true,
-    route: `/rave/overclock/dev/${item.hz}/on?unsafe=true`
-  }));
-
-  res.json({
-    ok: true,
-    safe,
-    unsafe,
-    warning: "Unsafe tiers are manual-only and require explicit acknowledgement."
-  });
-});
-
-/* ======================================================
-   GENERIC OVERCLOCK
-   ====================================================== */
-app.post("/rave/overclock", (req, res) => {
-  const enabled = req.query.enabled === "true";
-  const tier = String(req.query.tier || "").toLowerCase();
-  const unsafeTier = UNSAFE_OVERCLOCK_BY_TIER[tier];
-
-  if (!enabled) {
-    engine.setOverclock?.(0);
-  } else if (unsafeTier) {
-    if (!hasUnsafeOverclockAck(req)) {
-      unsafeOverclockRejected(res, tier);
-      return;
-    }
-    engine.setOverclock?.(unsafeTier.tier);
-  } else if (tier === "turbo16" || tier === "x16" || tier === "ludicrous") {
-    engine.setOverclock?.("turbo16");
-  } else if (tier === "turbo14" || tier === "x14" || tier === "hyper") {
-    engine.setOverclock?.("turbo14");
-  } else if (tier === "turbo12" || tier === "x12" || tier === "insane") {
-    engine.setOverclock?.("turbo12");
-  } else if (tier === "turbo10" || tier === "x10" || tier === "extreme") {
-    engine.setOverclock?.("turbo10");
-  } else if (tier === "turbo8" || tier === "x8" || tier === "ultra") {
-    engine.setOverclock?.("turbo8");
-  } else if (tier === "turbo6" || tier === "turbo" || tier === "x6" || tier === "default") {
-    engine.setOverclock?.("turbo6");
-  } else {
-    engine.setOverclock?.("fast");
-  }
-
-  res.sendStatus(200);
+registerRaveOverclockRoutes(app, {
+  getEngine: () => engine
 });
 
 app.post("/rave/panic", async (_, res) => {
@@ -9593,25 +9089,27 @@ app.get("/rave/flow/intensity", (_, res) => {
   });
 });
 
-function setWizSceneSyncRoute(req, res, enabledFallback = null) {
-  const raw = req.query.enabled
-    ?? req.query.value
+function readEnabledFlagRaw(req, fallback = undefined) {
+  return req.query.enabled
     ?? req.query.on
+    ?? req.query.value
     ?? req.body?.enabled
-    ?? req.body?.value
     ?? req.body?.on
-    ?? enabledFallback;
+    ?? req.body?.value
+    ?? fallback;
+}
 
+function parseEnabledFlagForRoute(req, res, { fallback = undefined, requireInput = false } = {}) {
+  const raw = readEnabledFlagRaw(req, fallback);
   const hasInput = raw !== null && raw !== undefined && String(raw).trim() !== "";
-  if (!hasInput) {
+  if (!hasInput && requireInput) {
     res.status(400).json({
       ok: false,
       error: "missing enabled flag",
       allowed: ["true", "false"]
     });
-    return;
+    return null;
   }
-
   const enabled = parseBoolean(raw, null);
   if (enabled === null) {
     res.status(400).json({
@@ -9619,73 +9117,19 @@ function setWizSceneSyncRoute(req, res, enabledFallback = null) {
       error: "invalid enabled flag",
       allowed: ["true", "false"]
     });
-    return;
+    return null;
   }
-
-  engine.setWizSceneSync?.(enabled);
-  const next = getWizSceneSyncEnabled();
-  console.log(
-    next
-      ? "[RAVE] WiZ scene sync enabled (Hue-linked scenes)"
-      : "[RAVE] WiZ standalone scene mode enabled"
-  );
-  res.json({
-    ok: true,
-    enabled: Boolean(next),
-    strategy: next ? "linked" : "standalone",
-    enforced: false,
-    requested: Boolean(enabled)
-  });
+  return Boolean(enabled);
 }
 
-function getWizSceneSyncEnabled() {
-  return Boolean(engine.getWizSceneSync?.() ?? engine.getTelemetry?.()?.wizSceneSync ?? false);
-}
-
-app.post("/rave/wiz/sync", (req, res) => setWizSceneSyncRoute(req, res));
-app.post("/rave/wiz/sync/on", (req, res) => setWizSceneSyncRoute(req, res, true));
-app.post("/rave/wiz/sync/off", (req, res) => setWizSceneSyncRoute(req, res, false));
-app.get("/rave/wiz/sync", (_, res) => {
-  const enabled = getWizSceneSyncEnabled();
-  res.json({
-    ok: true,
-    enabled,
-    strategy: enabled ? "linked" : "standalone",
-    enforced: false
-  });
-});
-
-// Generic alias for future multi-brand scene-link expansion.
-app.post("/rave/scene/sync", (req, res) => setWizSceneSyncRoute(req, res));
-app.post("/rave/scene/sync/on", (req, res) => setWizSceneSyncRoute(req, res, true));
-app.post("/rave/scene/sync/off", (req, res) => setWizSceneSyncRoute(req, res, false));
-app.get("/rave/scene/sync", (_, res) => {
-  const enabled = getWizSceneSyncEnabled();
-  res.json({
-    ok: true,
-    enabled,
-    strategy: enabled ? "linked" : "standalone",
-    enforced: false,
-    brands: ["hue", "wiz"]
-  });
+registerRaveSceneSyncRoutes(app, {
+  getEngine: () => engine,
+  parseEnabledFlagForRoute
 });
 
 app.post("/rave/meta/auto", (req, res) => {
-  const raw = String(
-    req.query.enabled ?? req.query.on ?? req.query.value ?? ""
-  ).toLowerCase().trim();
-
-  let enabled;
-  if (raw === "1" || raw === "true" || raw === "on" || raw === "yes") enabled = true;
-  else if (raw === "0" || raw === "false" || raw === "off" || raw === "no") enabled = false;
-  else {
-    res.status(400).json({
-      ok: false,
-      error: "invalid enabled flag",
-      allowed: ["true", "false"]
-    });
-    return;
-  }
+  const enabled = parseEnabledFlagForRoute(req, res);
+  if (enabled === null) return;
 
   const next = engine.setMetaAutoEnabled?.(enabled);
   console.log(`[RAVE] meta auto ${next ? "ON" : "OFF"}`);
@@ -9793,7 +9237,7 @@ function applyMetaAutoTempoTrackerCandidates(options = {}) {
   const opts = options && typeof options === "object" ? options : {};
   const force = Boolean(opts.force);
   const currentAutoEnabled = audioReactivityMapRuntime.metaAutoTempoTrackersAuto === true;
-  const autoEnabled = Object.prototype.hasOwnProperty.call(opts, "autoEnabled")
+  const autoEnabled = hasOwn(opts, "autoEnabled")
     ? Boolean(opts.autoEnabled)
     : currentAutoEnabled;
   const current = getMetaAutoTempoTrackersRuntimeSnapshot();
@@ -9847,12 +9291,13 @@ function applyMetaAutoTempoTrackerCandidates(options = {}) {
 }
 
 function parseMetaAutoTempoTrackerPatchFromRequest(req) {
+  const bodyRoot = getRequestMap(req.body);
   const autoRaw = req.query.auto
     ?? req.query.autoEnabled
-    ?? req.body?.auto
-    ?? req.body?.autoEnabled;
+    ?? bodyRoot.auto
+    ?? bodyRoot.autoEnabled;
   const autoEnabled = parseBoolean(autoRaw, null);
-  const modeRaw = String(req.query.mode ?? req.body?.mode ?? "").trim().toLowerCase();
+  const modeRaw = String(req.query.mode ?? bodyRoot.mode ?? "").trim().toLowerCase();
   if (modeRaw) {
     if (!META_AUTO_TEMPO_TRACKER_KEYS.includes(modeRaw)) {
       return { ok: false, error: "invalid mode", allowedModes: META_AUTO_TEMPO_TRACKER_KEYS };
@@ -9860,9 +9305,9 @@ function parseMetaAutoTempoTrackerPatchFromRequest(req) {
     const rawEnabled = req.query.enabled
       ?? req.query.on
       ?? req.query.value
-      ?? req.body?.enabled
-      ?? req.body?.on
-      ?? req.body?.value;
+      ?? bodyRoot.enabled
+      ?? bodyRoot.on
+      ?? bodyRoot.value;
     const enabled = parseBoolean(rawEnabled, null);
     if (enabled === null) {
       return { ok: false, error: "invalid enabled flag", allowed: ["true", "false"] };
@@ -9874,10 +9319,7 @@ function parseMetaAutoTempoTrackerPatchFromRequest(req) {
     };
   }
 
-  const bodyRoot = req.body && typeof req.body === "object" && !Array.isArray(req.body)
-    ? req.body
-    : {};
-  const bodyTrackers = bodyRoot.trackers && typeof bodyRoot.trackers === "object" && !Array.isArray(bodyRoot.trackers)
+  const bodyTrackers = isNonArrayObject(bodyRoot.trackers)
     ? bodyRoot.trackers
     : bodyRoot;
   const patch = {};
@@ -9973,21 +9415,8 @@ app.get("/rave/meta/auto/hz-trackers/auto", (_, res) => {
 });
 
 app.post("/rave/meta/auto/hz-trackers/auto", (req, res) => {
-  const raw = req.query.enabled
-    ?? req.query.on
-    ?? req.query.value
-    ?? req.body?.enabled
-    ?? req.body?.on
-    ?? req.body?.value;
-  const enabled = parseBoolean(raw, null);
-  if (enabled === null) {
-    res.status(400).json({
-      ok: false,
-      error: "invalid enabled flag",
-      allowed: ["true", "false"]
-    });
-    return;
-  }
+  const enabled = parseEnabledFlagForRoute(req, res);
+  if (enabled === null) return;
 
   let nextEnabled = Boolean(enabled);
   let safeTrackers = getMetaAutoTempoTrackersRuntimeSnapshot();
@@ -10073,31 +9502,8 @@ app.get("/rave/meta/auto/hue-wiz-baseline-blend", (_, res) => {
 });
 
 app.post("/rave/meta/auto/hue-wiz-baseline-blend", (req, res) => {
-  const raw = req.query.enabled
-    ?? req.query.on
-    ?? req.query.value
-    ?? req.body?.enabled
-    ?? req.body?.on
-    ?? req.body?.value;
-  const hasInput = raw !== null && raw !== undefined && String(raw).trim() !== "";
-  if (!hasInput) {
-    res.status(400).json({
-      ok: false,
-      error: "missing enabled flag",
-      allowed: ["true", "false"]
-    });
-    return;
-  }
-
-  const enabled = parseBoolean(raw, null);
-  if (enabled === null) {
-    res.status(400).json({
-      ok: false,
-      error: "invalid enabled flag",
-      allowed: ["true", "false"]
-    });
-    return;
-  }
+  const enabled = parseEnabledFlagForRoute(req, res, { requireInput: true });
+  if (enabled === null) return;
 
   const trackers = getMetaAutoTempoTrackersRuntimeSnapshot();
   const mergedTrackers = sanitizeMetaAutoTempoTrackersConfig(
@@ -10125,32 +9531,11 @@ app.post("/rave/meta/auto/hue-wiz-baseline-blend", (req, res) => {
 });
 
 function setOverclockAutoRoute(req, res, enabledFallback = null) {
-  const raw = req.query.enabled
-    ?? req.query.on
-    ?? req.query.value
-    ?? req.body?.enabled
-    ?? req.body?.on
-    ?? req.body?.value
-    ?? enabledFallback;
-  const hasInput = raw !== null && raw !== undefined && String(raw).trim() !== "";
-  if (!hasInput) {
-    res.status(400).json({
-      ok: false,
-      error: "missing enabled flag",
-      allowed: ["true", "false"]
-    });
-    return;
-  }
-
-  const enabled = parseBoolean(raw, null);
-  if (enabled === null) {
-    res.status(400).json({
-      ok: false,
-      error: "invalid enabled flag",
-      allowed: ["true", "false"]
-    });
-    return;
-  }
+  const enabled = parseEnabledFlagForRoute(req, res, {
+    fallback: enabledFallback,
+    requireInput: true
+  });
+  if (enabled === null) return;
 
   const next = engine.setOverclockAutoEnabled?.(enabled);
   const telemetry = engine.getTelemetry?.() || {};
@@ -10169,17 +9554,17 @@ app.post("/rave/overclock/auto", (req, res) => setOverclockAutoRoute(req, res));
 app.post("/rave/overclock/auto/on", (req, res) => setOverclockAutoRoute(req, res, true));
 app.post("/rave/overclock/auto/off", (req, res) => setOverclockAutoRoute(req, res, false));
 
-app.post("/rave/meta/auto/on", (_, res) => {
-  const next = engine.setMetaAutoEnabled?.(true);
-  console.log("[RAVE] meta auto ON");
-  res.json({ ok: true, enabled: Boolean(next) });
-});
-
-app.post("/rave/meta/auto/off", (_, res) => {
-  const next = engine.setMetaAutoEnabled?.(false);
-  console.log("[RAVE] meta auto OFF");
-  res.json({ ok: true, enabled: Boolean(next) });
-});
+const META_AUTO_TOGGLE_ROUTES = Object.freeze([
+  { path: "/rave/meta/auto/on", enabled: true, log: "[RAVE] meta auto ON" },
+  { path: "/rave/meta/auto/off", enabled: false, log: "[RAVE] meta auto OFF" }
+]);
+for (const route of META_AUTO_TOGGLE_ROUTES) {
+  app.post(route.path, (_, res) => {
+    const next = engine.setMetaAutoEnabled?.(route.enabled);
+    console.log(route.log);
+    res.json({ ok: true, enabled: Boolean(next) });
+  });
+}
 
 app.get("/rave/telemetry", (_, res) => {
   const telemetry = engine.getTelemetry();
@@ -11376,14 +10761,19 @@ app.get("/audio/devices", audioDevicesRateLimit, (_, res) => {
   }
 });
 
-app.get("/audio/apps", audioAppsRateLimit, async (_, res) => {
+app.get("/audio/apps", audioAppsRateLimit, async (req, res) => {
   if (!audio?.listRunningApps) {
     res.status(503).json({ ok: false, error: "audio app scan unavailable" });
     return;
   }
 
   try {
-    const result = await audio.listRunningApps();
+    const includeAudioHints = parseBooleanLoose(req?.query?.includeAudioHints, false) === true;
+    const audioOnly = parseBooleanLoose(req?.query?.audioOnly, false) === true;
+    const result = await audio.listRunningApps({
+      includeAudioHints,
+      audioOnly
+    });
     if (!result?.ok) {
       res.status(500).json({
         ok: false,
@@ -11396,6 +10786,9 @@ app.get("/audio/apps", audioAppsRateLimit, async (_, res) => {
       ok: true,
       apps: Array.isArray(result.apps) ? result.apps : [],
       scannedAt: Number(result.scannedAt || Date.now()),
+      audioHints: result.audioHints && typeof result.audioHints === "object"
+        ? result.audioHints
+        : null,
       telemetry: audio.getTelemetry?.() || null
     });
   } catch (err) {
@@ -11403,6 +10796,20 @@ app.get("/audio/apps", audioAppsRateLimit, async (_, res) => {
       ok: false,
       error: err.message || String(err),
       apps: []
+    });
+  }
+});
+
+app.get("/audio/optional-tools/status", audioAppsRateLimit, (_, res) => {
+  try {
+    res.json({
+      ok: true,
+      status: resolveOptionalAudioToolsStatus()
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
     });
   }
 });
@@ -11442,314 +10849,39 @@ app.post("/audio/ffmpeg/app-isolation/scan", audioAppScanRateLimit, async (_, re
   }
 });
 
-app.get("/fixtures", fixturesReadRateLimit, (_, res) => {
-  refreshWizAdapters();
-  syncStandaloneRuntime();
-  const fixtures = fixtureRegistry.getFixtures();
-  prunePaletteFixtureOverrides(fixtures);
-  pruneFixtureMetricRoutingOverrides(fixtures);
-  pruneConnectivityCache(fixtures);
-  for (const fixture of fixtures) {
-    queueFixtureConnectivityProbe(fixture, { force: false, logChanges: true }).catch(() => {});
-  }
-  const connectivity = getConnectivitySnapshotForFixtures(fixtures);
-  res.json({
-    fixtures,
-    routes: fixtureRegistry.getIntentRoutes(),
-    summary: fixtureRegistry.summary(),
-    standalone: buildStandaloneSnapshotList(),
-    connectivity,
-    connectivitySummary: summarizeConnectivityResults(connectivity)
-  });
+registerFixturesRoutes(app, {
+  fixturesReadRateLimit,
+  fixtureRegistry,
+  refreshWizAdapters,
+  syncStandaloneRuntime,
+  prunePaletteFixtureOverrides,
+  pruneFixtureMetricRoutingOverrides,
+  pruneConnectivityCache,
+  queueFixtureConnectivityProbe,
+  getConnectivitySnapshotForFixtures,
+  summarizeConnectivityResults,
+  buildStandaloneSnapshotList,
+  buildFixtureModeInteroperabilityReport,
+  setHueTransportMode,
+  getHueTransportDesired: () => hueTransport.desired,
+  fixtureConnectivityCache,
+  fixtureConnectivityInFlight
 });
 
-app.get("/fixtures/connectivity", fixturesConnectivityRateLimit, (req, res) => {
-  const fixtureId = String(req.query.id || "").trim();
-  const brand = String(req.query.brand || "").trim().toLowerCase();
-  const force = String(req.query.force || "").trim() === "1";
-  const timeoutMs = Math.max(300, Math.min(5000, Number(req.query.timeoutMs) || 1200));
-
-  const allFixtures = fixtureRegistry.getFixtures();
-  pruneConnectivityCache(allFixtures);
-  const fixtures = allFixtures.filter(fixture => {
-    if (fixtureId && String(fixture?.id || "").trim() !== fixtureId) return false;
-    if (brand && String(fixture?.brand || "").trim().toLowerCase() !== brand) return false;
-    return true;
-  });
-
-  if (!fixtures.length) {
-    res.status(404).json({ ok: false, error: "no fixtures matched" });
-    return;
-  }
-
-  const task = force
-    ? Promise.all(fixtures.map(fixture => queueFixtureConnectivityProbe(fixture, { force: true, timeoutMs, logChanges: true })))
-    : Promise.resolve(getConnectivitySnapshotForFixtures(fixtures));
-
-  task
-    .then(results => {
-      const normalized = (results || []).filter(Boolean);
-      res.json({
-        ok: true,
-        results: normalized,
-        summary: summarizeConnectivityResults(normalized)
-      });
-    })
-    .catch(err => {
-      res.status(500).json({
-        ok: false,
-        error: err.message || String(err)
-      });
-    });
+registerFixturesConnectivityRoutes(app, {
+  fixturesConnectivityRateLimit,
+  fixtureRegistry,
+  pruneConnectivityCache,
+  queueFixtureConnectivityProbe,
+  getConnectivitySnapshotForFixtures,
+  summarizeConnectivityResults
 });
 
-app.post("/fixtures/connectivity/test", fixturesConnectivityRateLimit, async (req, res) => {
-  const payload = req.body && typeof req.body === "object" ? req.body : {};
-  const fixtureId = String(payload.id || "").trim();
-  const brand = String(payload.brand || "").trim().toLowerCase();
-  const timeoutMs = Math.max(300, Math.min(5000, Number(payload.timeoutMs) || 1200));
-
-  const allFixtures = fixtureRegistry.getFixtures();
-  pruneConnectivityCache(allFixtures);
-  const fixtures = allFixtures.filter(fixture => {
-    if (fixtureId && String(fixture?.id || "").trim() !== fixtureId) return false;
-    if (brand && String(fixture?.brand || "").trim().toLowerCase() !== brand) return false;
-    return true;
-  });
-
-  if (!fixtures.length) {
-    res.status(404).json({ ok: false, error: "no fixtures matched" });
-    return;
-  }
-
-  const results = await Promise.all(
-    fixtures.map(fixture => queueFixtureConnectivityProbe(fixture, { force: true, timeoutMs, logChanges: true }))
-  );
-
-  const normalized = results.filter(Boolean);
-  res.json({
-    ok: true,
-    results: normalized,
-    summary: summarizeConnectivityResults(normalized)
-  });
-});
-
-app.get("/fixtures/standalone", (_, res) => {
-  res.json({
-    ok: true,
-    fixtures: buildStandaloneSnapshotList()
-  });
-});
-
-app.get("/fixtures/standalone/custom", (_, res) => {
-  const fixtures = buildStandaloneSnapshotList().filter(entry => entry?.customEnabled === true);
-  res.json({
-    ok: true,
-    total: fixtures.length,
-    fixtures
-  });
-});
-
-app.get("/fixtures/standalone/fixture/:id", (req, res) => {
-  const id = String(req.params.id || "").trim();
-  if (!id) {
-    res.status(400).json({ ok: false, error: "missing fixture id" });
-    return;
-  }
-  const fixture = buildStandaloneSnapshotById(id);
-  if (!fixture) {
-    res.status(404).json({ ok: false, error: "standalone fixture not found", id });
-    return;
-  }
-  res.json({ ok: true, fixture });
-});
-
-app.post("/fixtures/standalone/state", standaloneStateRateLimit, async (req, res) => {
-  const payload = req.body && typeof req.body === "object" ? req.body : {};
-  const id = String(payload.id || "").trim();
-  if (!id) {
-    res.status(400).json({ ok: false, error: "missing fixture id" });
-    return;
-  }
-
-  const patchSource = payload.state && typeof payload.state === "object"
-    ? payload.state
-    : payload;
-  const patch = { ...patchSource };
-  delete patch.id;
-
-  const result = await applyStandaloneStateById(id, patch);
-  const status = Number(result.status) || (result.ok ? 200 : 400);
-  res.status(status).json(result);
-});
-
-app.post("/fixtures/standalone/state/batch", standaloneStateRateLimit, async (req, res) => {
-  const payload = req.body && typeof req.body === "object" ? req.body : {};
-  const rawUpdates = Array.isArray(payload.updates) ? payload.updates : null;
-  let updates = [];
-
-  if (rawUpdates) {
-    updates = rawUpdates
-      .map(item => {
-        const id = String(item?.id || "").trim();
-        const statePatch = item?.state && typeof item.state === "object"
-          ? item.state
-          : (item && typeof item === "object" ? item : {});
-        return { id, state: statePatch };
-      })
-      .filter(item => item.id);
-  } else {
-    const ids = Array.isArray(payload.ids)
-      ? payload.ids.map(item => String(item || "").trim()).filter(Boolean)
-      : [];
-    const statePatch = payload.state && typeof payload.state === "object"
-      ? payload.state
-      : {};
-    updates = ids.map(id => ({ id, state: statePatch }));
-  }
-
-  if (!updates.length) {
-    res.status(400).json({
-      ok: false,
-      error: "missing updates",
-      expected: {
-        updates: [{ id: "fixture-id", state: {} }],
-        or: { ids: ["fixture-id"], state: {} }
-      }
-    });
-    return;
-  }
-
-  const results = await Promise.all(
-    updates.map(async item => {
-      const result = await applyStandaloneStateById(item.id, item.state || {});
-      return { id: item.id, ...result };
-    })
-  );
-
-  const failed = results.filter(result => result?.ok !== true);
-  res.status(failed.length ? 207 : 200).json({
-    ok: failed.length === 0,
-    total: results.length,
-    failed: failed.length,
-    results
-  });
-});
-
-app.get("/fixtures/config", (_, res) => {
-  res.json({
-    ok: true,
-    config: fixtureRegistry.getConfig()
-  });
-});
-
-app.get("/fixtures/modes/verify", (req, res) => {
-  const verbose = String(req.query.verbose || "").trim() === "1";
-  const report = buildFixtureModeInteroperabilityReport({ verbose });
-  res.status(report.ok ? 200 : 409).json(report);
-});
-
-app.post("/fixtures/fixture", async (req, res) => {
-  const payload = req.body && typeof req.body === "object" ? req.body : {};
-  const replaceId = String(payload.replaceId ?? payload.originalId ?? "").trim();
-  const fixturePayload = { ...payload };
-  delete fixturePayload.replaceId;
-  delete fixturePayload.originalId;
-  const result = fixtureRegistry.upsertFixture(fixturePayload, { replaceId });
-  if (!result.ok) {
-    res.status(400).json(result);
-    return;
-  }
-
-  refreshWizAdapters();
-  syncStandaloneRuntime();
-  queueFixtureConnectivityProbe(result.fixture, { force: true, logChanges: true }).catch(() => {});
-  await setHueTransportMode(hueTransport.desired);
-  res.json({
-    ok: true,
-    fixture: result.fixture,
-    summary: fixtureRegistry.summary()
-  });
-});
-
-app.delete("/fixtures/fixture", async (req, res) => {
-  const id = req.query.id || (req.body && req.body.id);
-  const fixtureId = String(id || "").trim();
-  const result = fixtureRegistry.removeFixture(id);
-  if (!result.ok) {
-    res.status(404).json(result);
-    return;
-  }
-
-  if (fixtureId) {
-    fixtureConnectivityCache.delete(fixtureId);
-    fixtureConnectivityInFlight.delete(fixtureId);
-  }
-  refreshWizAdapters();
-  syncStandaloneRuntime();
-  await setHueTransportMode(hueTransport.desired);
-  res.json({
-    ok: true,
-    summary: fixtureRegistry.summary()
-  });
-});
-
-// Fallback for clients/environments where DELETE is blocked.
-app.post("/fixtures/fixture/delete", async (req, res) => {
-  const id = (req.body && req.body.id) || req.query.id;
-  const fixtureId = String(id || "").trim();
-  const result = fixtureRegistry.removeFixture(id);
-  if (!result.ok) {
-    res.status(404).json(result);
-    return;
-  }
-
-  if (fixtureId) {
-    fixtureConnectivityCache.delete(fixtureId);
-    fixtureConnectivityInFlight.delete(fixtureId);
-  }
-  refreshWizAdapters();
-  syncStandaloneRuntime();
-  await setHueTransportMode(hueTransport.desired);
-  res.json({
-    ok: true,
-    summary: fixtureRegistry.summary()
-  });
-});
-
-app.post("/fixtures/route", async (req, res) => {
-  const payload = req.body && typeof req.body === "object" ? req.body : {};
-  const result = fixtureRegistry.setIntentRoute(payload.intent, payload.zone);
-  if (!result.ok) {
-    res.status(400).json(result);
-    return;
-  }
-
-  refreshWizAdapters();
-  syncStandaloneRuntime();
-  await setHueTransportMode(hueTransport.desired);
-  res.json({
-    ok: true,
-    route: { intent: result.intent, zone: result.zone },
-    routes: fixtureRegistry.getIntentRoutes(),
-    summary: fixtureRegistry.summary()
-  });
-});
-
-app.post("/fixtures/reload", async (_, res) => {
-  const ok = fixtureRegistry.reload();
-  refreshWizAdapters();
-  syncStandaloneRuntime();
-  const fixtures = fixtureRegistry.getFixtures();
-  pruneConnectivityCache(fixtures);
-  for (const fixture of fixtures) {
-    queueFixtureConnectivityProbe(fixture, { force: false, logChanges: true }).catch(() => {});
-  }
-  await setHueTransportMode(hueTransport.desired);
-  res.status(ok ? 200 : 500).json({
-    ok,
-    summary: fixtureRegistry.summary()
-  });
+registerStandaloneRoutes(app, {
+  standaloneStateRateLimit,
+  buildStandaloneSnapshotList,
+  buildStandaloneSnapshotById,
+  applyStandaloneStateById
 });
 
 function getSystemConfigSnapshot() {
@@ -11766,17 +10898,16 @@ function getSystemConfigSnapshot() {
 }
 
 function patchSystemConfig(patch = {}) {
-  const rawPatch = patch && typeof patch === "object" ? patch : {};
+  const rawPatch = getRequestMap(patch);
   const merged = {
     ...getSystemConfigSnapshot()
   };
-  if (Object.prototype.hasOwnProperty.call(rawPatch, "autoLaunchBrowser")) {
-    merged.autoLaunchBrowser = rawPatch.autoLaunchBrowser;
+  for (const key of ["autoLaunchBrowser", "browserLaunchDelayMs", "hueTransportPreference"]) {
+    if (hasOwn(rawPatch, key)) {
+      merged[key] = rawPatch[key];
+    }
   }
-  if (Object.prototype.hasOwnProperty.call(rawPatch, "browserLaunchDelayMs")) {
-    merged.browserLaunchDelayMs = rawPatch.browserLaunchDelayMs;
-  }
-  if (Object.prototype.hasOwnProperty.call(rawPatch, "unsafeExposeSensitiveLogs")) {
+  if (hasOwn(rawPatch, "unsafeExposeSensitiveLogs")) {
     const requested = parseBooleanLoose(rawPatch.unsafeExposeSensitiveLogs, merged.unsafeExposeSensitiveLogs);
     const enablingUnsafe = requested === true && merged.unsafeExposeSensitiveLogs !== true;
     if (enablingUnsafe) {
@@ -11792,98 +10923,26 @@ function patchSystemConfig(patch = {}) {
     }
     merged.unsafeExposeSensitiveLogs = requested;
   }
-  if (Object.prototype.hasOwnProperty.call(rawPatch, "hueTransportPreference")) {
-    merged.hueTransportPreference = rawPatch.hueTransportPreference;
-  }
 
   systemConfigRuntime = writeSystemConfig(merged);
   setUnsafeExposeSensitiveLogsRuntime(Boolean(systemConfigRuntime?.unsafeExposeSensitiveLogs));
   return { ok: true, config: getSystemConfigSnapshot() };
 }
 
-app.get("/system/config", (_, res) => {
-  res.json({
-    ok: true,
-    config: getSystemConfigSnapshot()
-  });
-});
-
-app.post("/system/config", async (req, res) => {
-  if (!isLoopbackRequest(req)) {
-    res.status(403).json({
-      ok: false,
-      error: "forbidden",
-      detail: "system config updates are allowed only from local loopback requests"
-    });
-    return;
-  }
-
-  const payload = req.body && typeof req.body === "object" ? req.body : {};
-  const patched = patchSystemConfig(payload);
-  if (!patched.ok) {
-    res.status(Number(patched.status) || 400).json({
-      ok: false,
-      error: patched.error || "invalid_system_config_patch",
-      detail: patched.detail || "invalid system config update"
-    });
-    return;
-  }
-
-  let transport = {
-    desired: hueTransport.desired,
-    active: hueTransport.active,
-    fallbackReason: hueTransport.fallbackReason
-  };
-  try {
-    const preferredHueMode = getPreferredHueTransportMode();
-    transport = await settleWithTimeout(
-      setHueTransportMode(preferredHueMode),
-      preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT
-        ? HUE_ENT_MODE_SWITCH_TIMEOUT_MS
-        : HUE_REST_MODE_SWITCH_TIMEOUT_MS,
-      () => ({
-        desired: hueTransport.desired,
-        active: hueTransport.active,
-        fallbackReason: preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT
-          ? "entertainment switch timeout"
-          : "rest switch timeout"
-      })
-    );
-    if (preferredHueMode === HUE_TRANSPORT.ENTERTAINMENT && transport.active !== HUE_TRANSPORT.ENTERTAINMENT) {
-      scheduleHueEntertainmentRecovery("system_config");
-    }
-  } catch (err) {
-    console.warn("[SYSTEM] hue transport preference apply failed:", err?.message || err);
-  }
-
-  res.json({
-    ok: true,
-    config: patched.config,
-    transport
-  });
-});
-
-app.post("/system/stop", (req, res) => {
-  if (!isLoopbackRequest(req)) {
-    res.status(403).json({
-      ok: false,
-      error: "forbidden",
-      detail: "system stop is allowed only from local loopback requests"
-    });
-    return;
-  }
-
-  res.json({
-    ok: true,
-    message: "shutdown requested"
-  });
-
-  setTimeout(() => {
-    shutdown("api_stop", 0).catch(err => {
-      console.error("[SYS] api stop failed:", err.message || err);
-      process.exit(1);
-    });
-  }, 120);
+registerSystemRoutes(app, {
+  isLoopbackRequest,
+  getRequestMap,
+  patchSystemConfig,
+  getSystemConfigSnapshot,
+  getHueTransport: () => hueTransport,
+  getPreferredHueTransportMode,
+  setHueTransportMode,
+  settleWithTimeout,
+  HUE_TRANSPORT,
+  HUE_ENT_MODE_SWITCH_TIMEOUT_MS,
+  HUE_REST_MODE_SWITCH_TIMEOUT_MS,
+  scheduleHueEntertainmentRecovery,
+  shutdown
 });
 
 let httpServer = null;
@@ -12133,12 +11192,7 @@ async function shutdown(reason = "signal", exitCode = 0) {
     } catch {}
 
     try {
-      for (const id of standaloneTimers.keys()) {
-        stopStandaloneTimer(id);
-      }
-      for (const id of standaloneWizAdapters.keys()) {
-        closeStandaloneWizAdapter(id);
-      }
+      standaloneRuntime.shutdown();
       for (const entry of wizAdapters.values()) {
         try {
           entry.send.close?.();
@@ -12221,6 +11275,11 @@ process.on("exit", () => {
   removePidFile();
 });
 
+// initial boot after full runtime declaration
+initializeRuntime().catch(err => {
+  console.error("[SYS] runtime initialization failed:", err.message || err);
+});
+
 // ======================================================
 httpServer = app.listen(PORT, HOST, () => {
   writePidFile();
@@ -12228,3 +11287,4 @@ httpServer = app.listen(PORT, HOST, () => {
   console.log(`Hue bridge running on ${getBridgeBaseUrl()}`);
   scheduleBrowserAutoLaunch();
 });
+

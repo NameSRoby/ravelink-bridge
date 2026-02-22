@@ -100,11 +100,15 @@ test("palette + fixture metric routing endpoints stay consistent", { concurrency
       brand: "hue",
       families: ["blue", "purple"],
       colorsPerFamily: 3,
-      disorder: false
+      disorder: false,
+      brightnessMode: "test",
+      brightnessFollowAmount: 1.4
     })
   });
   assert.equal(palettePatch.response.status, 200);
   assert.equal(Boolean(palettePatch.data?.ok), true);
+  assert.equal(palettePatch.data?.config?.brands?.hue?.brightnessMode, "test");
+  assert.equal(Number(palettePatch.data?.config?.brands?.hue?.brightnessFollowAmount), 1.4);
 
   const metricPatch = await requestJson(`${BASE_URL}/rave/fixture-metrics`, {
     method: "POST",
@@ -152,6 +156,41 @@ test("mutating command GET routes stay disabled (except legacy /color compatibil
   assert.equal(color.data?.error, "missing color text");
 });
 
+test("color prefixes patch remains backward compatible", { concurrency: false }, async () => {
+  const patch = await requestJson(`${BASE_URL}/color/prefixes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      huePrefix: "h",
+      wizPrefix: "w",
+      otherPrefix: "x",
+      raveOffEnabled: false,
+      raveOffDefaultText: "cyan"
+    })
+  });
+  assert.equal(patch.response.status, 200);
+  assert.equal(Boolean(patch.data?.ok), true);
+  assert.equal(patch.data?.config?.prefixes?.hue, "h");
+  assert.equal(patch.data?.config?.prefixes?.wiz, "w");
+  assert.equal(patch.data?.config?.prefixes?.other, "x");
+  assert.equal(Boolean(patch.data?.config?.raveOff?.enabled), false);
+  assert.equal(patch.data?.config?.raveOff?.defaultText, "cyan");
+
+  const reset = await requestJson(`${BASE_URL}/color/prefixes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reset: true })
+  });
+  assert.equal(reset.response.status, 200);
+  assert.equal(Boolean(reset.data?.ok), true);
+  assert.equal(reset.data?.config?.prefixes?.other, "");
+  assert.deepEqual(reset.data?.config?.fixturePrefixes || {}, {});
+  assert.equal(Boolean(reset.data?.config?.raveOff?.enabled), true);
+  assert.equal(reset.data?.config?.raveOff?.defaultText, "random");
+  assert.deepEqual(reset.data?.config?.raveOff?.groups || {}, {});
+  assert.deepEqual(reset.data?.config?.raveOff?.fixtures || {}, {});
+});
+
 test("audio config supports strict app isolation + custom check interval", { concurrency: false }, async () => {
   const patch = await requestJson(`${BASE_URL}/audio/config`, {
     method: "POST",
@@ -175,4 +214,42 @@ test("audio config supports strict app isolation + custom check interval", { con
   assert.equal(Boolean(readBack.data?.ok), true);
   assert.equal(Boolean(readBack.data?.config?.ffmpegAppIsolationStrict), true);
   assert.equal(Number(readBack.data?.config?.ffmpegAppIsolationCheckMs), 120000);
+});
+
+test("overclock routing supports safe tiers and enforces unsafe ack", { concurrency: false }, async () => {
+  const safeTier = await requestJson(`${BASE_URL}/rave/overclock?enabled=true&tier=turbo8`, {
+    method: "POST"
+  });
+  assert.equal(safeTier.response.status, 200);
+
+  const unsafeNoAck = await requestJson(`${BASE_URL}/rave/overclock?enabled=true&tier=dev20`, {
+    method: "POST"
+  });
+  assert.equal(unsafeNoAck.response.status, 400);
+  assert.equal(unsafeNoAck.data?.error, "unsafe acknowledgement required");
+
+  const unsafeAck = await requestJson(`${BASE_URL}/rave/overclock?enabled=true&tier=dev20&unsafe=true`, {
+    method: "POST"
+  });
+  assert.equal(unsafeAck.response.status, 200);
+});
+
+test("enabled-flag control routes keep consistent validation", { concurrency: false }, async () => {
+  const metaOn = await requestJson(`${BASE_URL}/rave/meta/auto?enabled=true`, {
+    method: "POST"
+  });
+  assert.equal(metaOn.response.status, 200);
+  assert.equal(Boolean(metaOn.data?.ok), true);
+
+  const wizSyncMissing = await requestJson(`${BASE_URL}/rave/wiz/sync`, {
+    method: "POST"
+  });
+  assert.equal(wizSyncMissing.response.status, 400);
+  assert.equal(wizSyncMissing.data?.error, "missing enabled flag");
+
+  const wizSyncOn = await requestJson(`${BASE_URL}/rave/wiz/sync/on`, {
+    method: "POST"
+  });
+  assert.equal(wizSyncOn.response.status, 200);
+  assert.equal(Boolean(wizSyncOn.data?.ok), true);
 });
