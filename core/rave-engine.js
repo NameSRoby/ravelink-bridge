@@ -6747,7 +6747,13 @@ module.exports = function createRaveEngine(controls) {
   // Legacy brightness floor tuned for full range without premature "near-black" dips.
   const BRIGHTNESS_TIER_MIN = 0.026;
   const WIZ_BRIGHTNESS_TIER_MIN = 0.003;
-  const WIZ_COLOR_SHIFT_SLOWDOWN = 50.0;
+  const WIZ_COLOR_SHIFT_SLOWDOWN = 100.0;
+  const WIZ_COLOR_SLOW_BASELINE = 6.0;
+  const WIZ_COLOR_SLOW_MIN_SCALE = Math.max(1, WIZ_COLOR_SHIFT_SLOWDOWN / WIZ_COLOR_SLOW_BASELINE);
+  const WIZ_FLOW_HUE_STEP_MIN = 0.012 / WIZ_COLOR_SLOW_MIN_SCALE;
+  const WIZ_FLOW_HUE_STEP_MAX = 0.09 / WIZ_COLOR_SLOW_MIN_SCALE;
+  const WIZ_FLOW_COLOR_ALPHA_MIN = 0.00045 / WIZ_COLOR_SLOW_MIN_SCALE;
+  const WIZ_FLOW_COLOR_ALPHA_MAX = 0.0022 / WIZ_COLOR_SLOW_MIN_SCALE;
   const BRIGHTNESS_TIER_LOW = 0.34;
   const BRIGHTNESS_TIER_MEDIUM = 0.68;
   const BRIGHTNESS_TIER_HIGH = 1.00;
@@ -9232,8 +9238,8 @@ function getModeSwitchBias() {
           (signal.motion * 0.018) +
           (signal.wizBeatPulse * 0.014)
         ) / WIZ_COLOR_SHIFT_SLOWDOWN,
-        0.012,
-        0.09
+        WIZ_FLOW_HUE_STEP_MIN,
+        WIZ_FLOW_HUE_STEP_MAX
       );
       const hueDelta = shortestHueDeltaCircularDeg(wizFlowHueEma, targetHue);
       const hue = normalizeManualPaletteHueDeg(
@@ -9267,8 +9273,8 @@ function getModeSwitchBias() {
           (signal.motion * 0.00035) +
           (signal.wizBeatPulse * 0.0003)
         ) / WIZ_COLOR_SHIFT_SLOWDOWN,
-        0.00045,
-        0.0022
+        WIZ_FLOW_COLOR_ALPHA_MIN,
+        WIZ_FLOW_COLOR_ALPHA_MAX
       );
       color = blendColor(wizFlowColorEma, targetColor, flowColorAlpha);
       wizFlowColorEma = color;
