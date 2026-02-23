@@ -15,21 +15,27 @@
       "enabled": true,
       "amount": 1,
       "sources": [
-        "smart"
+        "smart",
+        "transients",
+        "drums"
       ]
     },
     "wiz": {
       "enabled": true,
       "amount": 1,
       "sources": [
-        "smart"
+        "smart",
+        "transients",
+        "drums"
       ]
     },
     "other": {
       "enabled": true,
       "amount": 1,
       "sources": [
-        "smart"
+        "smart",
+        "transients",
+        "drums"
       ]
     }
   }

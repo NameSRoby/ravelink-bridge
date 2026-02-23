@@ -31,6 +31,7 @@ module.exports = function registerRavePaletteMetricRoutes(app, deps = {}) {
   const hasOwn = (source, key) => Object.prototype.hasOwnProperty.call(source, key);
   const PALETTE_PATCH_ALLOWED = Object.freeze([
     "colorsPerFamily",
+    "familyColorCounts",
     "families",
     "disorder",
     "disorderAggression",

@@ -6,7 +6,7 @@ module.exports = function createStandaloneRuntime(deps = {}) {
     fixtureRegistry,
     createWizAdapter,
     axios,
-    hueHttpAgent,
+    getHueHttpsAgentForFixture,
     parseBoolean,
     normalizeStandaloneState,
     nextStandaloneAnimatedState,
@@ -268,10 +268,19 @@ module.exports = function createStandaloneRuntime(deps = {}) {
       }
 
       try {
+        const requestOptions = {
+          timeout: 1800
+        };
+        if (typeof getHueHttpsAgentForFixture === "function") {
+          const httpsAgent = getHueHttpsAgentForFixture(fixture);
+          if (httpsAgent) {
+            requestOptions.httpsAgent = httpsAgent;
+          }
+        }
         await axios.put(
-          `http://${fixture.bridgeIp}/api/${fixture.username}/lights/${fixture.lightId}/state`,
+          `https://${fixture.bridgeIp}/api/${fixture.username}/lights/${fixture.lightId}/state`,
           payload,
-          { timeout: 1800, httpAgent: hueHttpAgent }
+          requestOptions
         );
         return { ok: true, transport: "hue-rest" };
       } catch (err) {

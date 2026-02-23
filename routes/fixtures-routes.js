@@ -127,18 +127,10 @@ module.exports = function registerFixturesRoutes(app, deps = {}) {
   });
 
   app.post("/fixtures/route", async (req, res) => {
-    const payload = req.body && typeof req.body === "object" ? req.body : {};
-    const result = fixtureRegistry.setIntentRoute(payload.intent, payload.zone);
-    if (!result.ok) {
-      res.status(400).json(result);
-      return;
-    }
-
-    applyFixtureRefresh();
-    await setHueToDesiredMode();
-    res.json({
-      ok: true,
-      route: { intent: result.intent, zone: result.zone },
+    res.status(410).json({
+      ok: false,
+      error: "deprecated_route_api",
+      detail: "/fixtures/route is deprecated. Intent routes are now derived automatically from fixture mode flags.",
       routes: fixtureRegistry.getIntentRoutes(),
       summary: fixtureRegistry.summary()
     });

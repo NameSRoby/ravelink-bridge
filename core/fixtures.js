@@ -6,7 +6,7 @@
 // [TITLE] - Transport Readiness Guards (Hue/WiZ)
 // [TITLE] - Config Load/Persist + Backup Rotation
 // [TITLE] - Registry Query APIs
-// [TITLE] - Mutation APIs (upsert/remove/route)
+// [TITLE] - Mutation APIs (upsert/remove)
 // [TITLE] - Module Exports
 
 /**
@@ -25,12 +25,6 @@ const { parseBooleanLoose } = require("./utils/booleans");
 const CONFIG_PATH = path.join(__dirname, "fixtures.config.json");
 const BACKUP_DIR = path.join(__dirname, "backups", "fixtures");
 const MAX_BACKUPS = 40;
-const ALLOWED_INTENTS = new Set([
-  "HUE_STATE",
-  "WIZ_PULSE",
-  "TWITCH_HUE",
-  "TWITCH_WIZ"
-]);
 const BUILTIN_BRANDS = new Set(["hue", "wiz"]);
 const ALLOWED_CONTROL_MODES = new Set(["engine", "standalone"]);
 const MOD_BRAND_RE = /^[a-z][a-z0-9_-]{1,31}$/;
@@ -309,12 +303,8 @@ function normalizeFixtureModeFlags(input = {}) {
     customEnabled = false;
   }
 
-  if (engineEnabled || twitchEnabled || customEnabled) {
-    return { engineEnabled, twitchEnabled, customEnabled };
-  }
-
-  // Avoid creating an unreachable fixture with no active routing modes.
-  return { engineEnabled: false, twitchEnabled: false, customEnabled: true };
+  // Allow fully idle fixtures to be stored with all route modes disabled.
+  return { engineEnabled, twitchEnabled, customEnabled };
 }
 
 function normalizeRequestedEngineBinding(value) {
@@ -342,10 +332,6 @@ function validateFixtureCoupling({
 
   if (requestedBinding && requestedBinding !== "standalone" && requestedBinding !== brand) {
     return "invalid engine binding";
-  }
-
-  if (!engineEnabled && !twitchEnabled && !customEnabled) {
-    return "at least one mode must be enabled (engine/twitch/custom)";
   }
 
   if (engineEnabled && customEnabled) {
@@ -862,22 +848,6 @@ function removeFixture(id) {
   return { ok: true };
 }
 
-function setIntentRoute(intent, zone) {
-  const key = String(intent || "").trim();
-  void zone;
-
-  if (!ALLOWED_INTENTS.has(key)) {
-    return { ok: false, error: "unsupported intent route" };
-  }
-
-  return {
-    ok: true,
-    intent: key,
-    zone: String(registry.intentRoutes[key] || "none"),
-    derived: true
-  };
-}
-
 // [TITLE] Section: Module Exports
 init();
 
@@ -898,7 +868,6 @@ module.exports = {
   isFixtureConfiguredForTransport,
   isEngineCoupledFixture,
   resolveZone,
-  setIntentRoute,
   upsertFixture,
   removeFixture,
   reload,

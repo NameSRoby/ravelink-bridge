@@ -9,8 +9,7 @@ module.exports = function registerRaveSceneSyncRoutes(app, deps = {}) {
     : null;
 
   function getWizSceneSyncEnabled() {
-    const engine = getEngine();
-    return Boolean(engine?.getWizSceneSync?.() ?? engine?.getTelemetry?.()?.wizSceneSync ?? false);
+    return false;
   }
 
   function setWizSceneSyncRoute(req, res, enabledFallback = null) {
@@ -25,29 +24,24 @@ module.exports = function registerRaveSceneSyncRoutes(app, deps = {}) {
     if (enabled === null) return;
 
     const engine = getEngine();
-    engine?.setWizSceneSync?.(enabled);
+    engine?.setWizSceneSync?.(false);
     const next = getWizSceneSyncEnabled();
-    console.log(
-      next
-        ? "[RAVE] WiZ scene sync enabled (Hue-linked scenes)"
-        : "[RAVE] WiZ standalone scene mode enabled"
-    );
+    console.log("[RAVE] WiZ scene sync request ignored; standalone mode is enforced");
     res.json({
       ok: true,
       enabled: Boolean(next),
-      strategy: next ? "linked" : "standalone",
-      enforced: false,
+      strategy: "standalone",
+      enforced: true,
       requested: Boolean(enabled)
     });
   }
 
   function buildSceneSyncStatusResponse(includeBrands = false) {
-    const enabled = getWizSceneSyncEnabled();
     const payload = {
       ok: true,
-      enabled,
-      strategy: enabled ? "linked" : "standalone",
-      enforced: false
+      enabled: false,
+      strategy: "standalone",
+      enforced: true
     };
     if (includeBrands) payload.brands = ["hue", "wiz"];
     return payload;

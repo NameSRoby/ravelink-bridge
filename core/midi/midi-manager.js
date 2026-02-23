@@ -11,23 +11,17 @@ try {
 
 const midiLearn = require("./midi-learn");
 const { normalizeMidiActionAlias } = require("./action-normalizer");
-const PALETTE_FAMILIES = Object.freeze(["red", "green", "blue"]);
-const PALETTE_FAMILY_ALIASES = Object.freeze({
-  purple: "red",
-  magenta: "red",
-  pink: "red",
-  yellow: "green",
-  amber: "green",
-  lime: "green",
-  cyan: "blue",
-  aqua: "blue",
-  teal: "blue"
-});
+const {
+  PALETTE_FAMILY_ORDER,
+  PALETTE_FAMILY_ALIASES,
+  PALETTE_PRESETS: SHARED_PALETTE_PRESETS
+} = require("../palette/family-spec");
+const PALETTE_FAMILIES = PALETTE_FAMILY_ORDER;
 const PALETTE_PRESETS = Object.freeze({
-  palette_preset_all_1: Object.freeze({ families: Object.freeze(["red", "green", "blue"]), colorsPerFamily: 1 }),
-  palette_preset_all_3: Object.freeze({ families: Object.freeze(["red", "green", "blue"]), colorsPerFamily: 3 }),
-  palette_preset_duo_cool: Object.freeze({ families: Object.freeze(["green", "blue"]) }),
-  palette_preset_duo_warm: Object.freeze({ families: Object.freeze(["red", "green"]) })
+  palette_preset_all_1: SHARED_PALETTE_PRESETS.all_1,
+  palette_preset_all_3: SHARED_PALETTE_PRESETS.all_3,
+  palette_preset_duo_cool: SHARED_PALETTE_PRESETS.duo_cool,
+  palette_preset_duo_warm: SHARED_PALETTE_PRESETS.duo_warm
 });
 const FLOW_INTENSITY_STEP = 0.1;
 const FLOW_INTENSITY_DEFAULT = 1;
@@ -236,9 +230,11 @@ module.exports = function createMidiManager(engine) {
       const patch = {};
       if (Array.isArray(preset.families)) patch.families = [...preset.families];
       if (Number.isFinite(Number(preset.colorsPerFamily))) patch.colorsPerFamily = Number(preset.colorsPerFamily);
+      if (preset.familyColorCounts && typeof preset.familyColorCounts === "object") {
+        patch.familyColorCounts = { ...preset.familyColorCounts };
+      }
       return setPaletteConfig(patch);
     };
-    const setWizSceneSync = enabled => Boolean(engine?.setWizSceneSync?.(Boolean(enabled)));
 
     switch (key) {
       case "drop":
@@ -352,15 +348,6 @@ module.exports = function createMidiManager(engine) {
       case "flow_intensity_reset":
         return Boolean(engine?.setFlowIntensity?.(FLOW_INTENSITY_DEFAULT));
 
-      case "wiz_scene_sync_toggle":
-        return setWizSceneSync(!Boolean(engine?.getWizSceneSync?.()));
-
-      case "wiz_scene_sync_on":
-        return setWizSceneSync(true);
-
-      case "wiz_scene_sync_off":
-        return setWizSceneSync(false);
-
       case "palette_ordered":
         return setPaletteConfig({ disorder: false });
 
@@ -386,6 +373,7 @@ module.exports = function createMidiManager(engine) {
       case "palette_family_purple":
       case "palette_family_red":
       case "palette_family_green":
+      case "palette_family_cyan":
       case "palette_family_yellow":
         return togglePaletteFamily(key.replace("palette_family_", ""));
 

@@ -7,39 +7,33 @@
   },
   "fixtures": [
     {
-      "id": "hue-main-1",
+      "id": "hue-923d75-1",
       "brand": "hue",
       "zone": "hue",
       "enabled": true,
+      "controlMode": "engine",
+      "engineBinding": "hue",
       "engineEnabled": true,
       "twitchEnabled": true,
       "customEnabled": false,
-      "bridgeIp": "192.168.x.x",
-      "username": "replace_with_hue_username",
-      "bridgeId": "replace_with_bridge_id",
-      "clientKey": "replace_with_client_key",
-      "entertainmentAreaId": "replace_with_entertainment_area",
+      "bridgeIp": "192.168.1.131",
+      "username": "9rAdkApZayoSe-wGYl1vXcVApPWmlHvFSRk7RzLd",
+      "bridgeId": "ECB5FAFFFE923D75",
+      "clientKey": "8AFEC73D078E8CCF6FD16FE1999D9D5A",
+      "entertainmentAreaId": "Gaming desk",
       "lightId": 1
     },
     {
-      "id": "wiz-main-1",
+      "id": "1",
       "brand": "wiz",
-      "zone": "wiz",
+      "zone": "background",
       "enabled": true,
+      "controlMode": "engine",
+      "engineBinding": "wiz",
       "engineEnabled": true,
       "twitchEnabled": true,
       "customEnabled": false,
-      "ip": "192.168.x.x"
-    },
-    {
-      "id": "wiz-custom-1",
-      "brand": "wiz",
-      "zone": "custom",
-      "enabled": true,
-      "engineEnabled": false,
-      "twitchEnabled": true,
-      "customEnabled": true,
-      "ip": "192.168.x.x"
+      "ip": "192.168.1.158"
     }
   ]
 }

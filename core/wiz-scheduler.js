@@ -23,13 +23,13 @@ module.exports = function createWizScheduler() {
     forcedHeartbeat: 0
   };
 
-  const MIN_INTERVAL = 90; // ms
+  const MIN_INTERVAL = 102; // ms
   const MAX_SILENCE_MS = 700; // force periodic refresh to avoid long static stalls
   const DELTA = {
-    r: 4,
-    g: 4,
-    b: 4,
-    dimming: 1
+    r: 7,
+    g: 7,
+    b: 7,
+    dimming: 3
   };
 
   function remember(state, now) {
@@ -42,7 +42,7 @@ module.exports = function createWizScheduler() {
 
   function shouldSend(state, options = {}) {
     const now = Date.now();
-    const minIntervalMs = Math.max(30, Number(options.minIntervalMs || MIN_INTERVAL));
+    const minIntervalMs = Math.max(36, Number(options.minIntervalMs || MIN_INTERVAL));
     const maxSilenceMs = Math.max(
       minIntervalMs,
       Number(options.maxSilenceMs || MAX_SILENCE_MS)

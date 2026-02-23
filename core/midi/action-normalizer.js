@@ -12,7 +12,14 @@ const ACTION_ALIAS_MAP = Object.freeze({
   palette_all_1: "palette_preset_all_1",
   palette_all_3: "palette_preset_all_3",
   palette_duo_cool: "palette_preset_duo_cool",
-  palette_duo_warm: "palette_preset_duo_warm"
+  palette_duo_warm: "palette_preset_duo_warm",
+  palette_family_amber: "palette_family_yellow",
+  palette_family_lime: "palette_family_yellow",
+  palette_family_aqua: "palette_family_cyan",
+  palette_family_teal: "palette_family_cyan",
+  palette_family_purple: "palette_family_red",
+  palette_family_magenta: "palette_family_red",
+  palette_family_pink: "palette_family_red"
 });
 
 function normalizeMidiActionAlias(action) {
@@ -25,4 +32,3 @@ module.exports = {
   ACTION_ALIAS_MAP,
   normalizeMidiActionAlias
 };
-

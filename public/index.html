@@ -389,15 +389,15 @@ body.obsDockMode .onboardGate{
 }
 
 .panel{
-  margin:12px;
-  padding:16px;
+  margin:10px;
+  padding:14px;
   background:linear-gradient(180deg,#0f1226,#070710);
   border-radius:18px;
   border:1px solid #1b2542;
 }
 
 h3{
-  margin:18px 0 8px;
+  margin:14px 0 6px;
   font-size:13px;
   letter-spacing:2px;
   opacity:.85;
@@ -408,14 +408,14 @@ button{
   border:none;
   border-radius:clamp(10px,1.1vw,14px);
   color:var(--text);
-  padding:clamp(9px,1.2vw,12px) clamp(10px,1.5vw,14px);
-  min-height:clamp(40px,5.2vh,48px);
-  font-size:clamp(11px,1.05vw,14px);
+  padding:clamp(8px,1vw,11px) clamp(10px,1.3vw,13px);
+  min-height:clamp(36px,4.4vh,44px);
+  font-size:clamp(11px,.95vw,13px);
   line-height:1.14;
   white-space:normal;
   cursor:pointer;
   font-weight:600;
-  letter-spacing:.5px;
+  letter-spacing:.45px;
 }
 
 button.active{
@@ -438,11 +438,11 @@ button:disabled{
   cursor:not-allowed;
 }
 
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-.grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
 .liveProfileRow{
   display:grid;
   grid-template-columns:minmax(140px,1.2fr) minmax(140px,1fr) repeat(4,minmax(92px,auto));
@@ -499,16 +499,12 @@ button:disabled{
   margin-top:0;
 }
 
-.sceneSyncGrid{
-  margin-top:2px;
-}
-
 .grid2 + .grid2,
 .grid3 + .grid3,
 .grid4 + .grid4,
 .grid5 + .grid5,
 .grid6 + .grid6{
-  margin-top:8px;
+  margin-top:6px;
 }
 
 .advancedSubTitle{
@@ -562,6 +558,40 @@ button:disabled{
   }
 }
 
+.priorityGrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  gap:10px;
+  margin-top:4px;
+}
+
+.priorityCard{
+  border:1px solid #1b2c4f;
+  border-radius:11px;
+  background:linear-gradient(180deg,#0c162f,#091225);
+  padding:10px;
+}
+
+.priorityCard > h3:first-child{
+  margin-top:0;
+}
+
+.priorityCard .grid3,
+.priorityCard .grid4,
+.priorityCard .grid5{
+  gap:8px;
+}
+
+.priorityCard .hint:last-child{
+  margin-bottom:0;
+}
+
+@media (max-width:860px){
+  .priorityGrid{
+    grid-template-columns:1fr;
+  }
+}
+
 .tabs{
   margin:12px 12px 0;
   display:flex;
@@ -603,9 +633,9 @@ button:disabled{
 }
 
 .cluster{
-  margin-top:14px;
-  padding:12px;
-  border-radius:14px;
+  margin-top:12px;
+  padding:10px;
+  border-radius:12px;
   border:1px solid #1c2746;
   background:linear-gradient(180deg,#0f1527,#0b0e18);
 }
@@ -628,7 +658,7 @@ button:disabled{
 }
 
 .clusterBody{
-  margin-top:10px;
+  margin-top:8px;
 }
 
 .cluster.collapsed .clusterBody{
@@ -949,9 +979,9 @@ textarea{
 }
 
 .subcluster{
-  margin-top:12px;
-  padding:10px;
-  border-radius:12px;
+  margin-top:10px;
+  padding:8px;
+  border-radius:11px;
   border:1px solid #1c2746;
   background:linear-gradient(180deg,#0d1323,#090d17);
 }
@@ -963,10 +993,10 @@ textarea{
 }
 
 .liveMainCluster .subcluster{
-  margin-top:14px;
+  margin-top:10px;
 }
 
-.slider{margin:12px 0}
+.slider{margin:10px 0}
 .slider label{
   display:flex;
   justify-content:space-between;
@@ -1206,8 +1236,43 @@ canvas{width:100%;height:160px}
   color:#f3f7ff;
 }
 
-.paletteFamilyGrid button{
+.paletteFamilyGrid{
+  margin-top:6px;
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:6px;
+}
+
+.paletteFamilyCard{
+  border:1px solid #1a2645;
+  border-radius:10px;
+  background:#061124;
+  padding:6px;
+  display:grid;
+  gap:6px;
+}
+
+.paletteFamilyCard button{
   font-size:12px;
+}
+
+.paletteFamilyCountRow{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:6px;
+  align-items:center;
+}
+
+.paletteFamilyCountRow span{
+  font-size:10px;
+  letter-spacing:.8px;
+  color:#9eb0db;
+}
+
+.paletteFamilyCountRow select{
+  width:100%;
+  min-width:0;
+  font-size:11px;
 }
 
 .paletteBrandMenus{
@@ -1319,6 +1384,21 @@ canvas{width:100%;height:160px}
   gap:6px;
 }
 
+.paletteBrandFamilyControl{
+  border:1px solid #1a2645;
+  border-radius:10px;
+  background:#061124;
+  padding:6px;
+  display:grid;
+  gap:6px;
+}
+
+.paletteBrandFamilyControl select{
+  width:100%;
+  min-width:0;
+  font-size:11px;
+}
+
 .paletteBrandOrderGrid{
   margin-top:6px;
   display:grid;
@@ -1400,6 +1480,97 @@ canvas{width:100%;height:160px}
   display:none;
 }
 
+.palettePresetStack{
+  margin-top:6px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:6px;
+  align-items:start;
+}
+
+.palettePresetMenu{
+  border:1px solid #182544;
+  border-radius:10px;
+  background:#050d1d;
+  overflow:hidden;
+}
+
+.palettePresetMenu > summary{
+  list-style:none;
+  cursor:pointer;
+  padding:6px 9px;
+  font-size:10px;
+  letter-spacing:1px;
+  color:#c7d6ff;
+  background:#081325;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.palettePresetMenu > summary::-webkit-details-marker{
+  display:none;
+}
+
+.palettePresetMenu > summary::after{
+  content:"+";
+  color:#94a9da;
+  font-weight:700;
+  font-size:11px;
+}
+
+.palettePresetMenu[open] > summary::after{
+  content:"-";
+}
+
+.palettePresetGrid{
+  padding:6px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+  gap:6px;
+}
+
+.palettePresetGrid button{
+  font-size:10px;
+  letter-spacing:.8px;
+  min-height:30px;
+  padding:6px 8px;
+}
+
+.paletteQuickSetMenu{
+  margin-top:2px;
+}
+
+.paletteQuickSetGrid{
+  grid-template-columns:repeat(auto-fit,minmax(90px,1fr));
+}
+
+.paletteBrandQuickSet{
+  margin-top:6px;
+  border:1px solid #182544;
+  border-radius:10px;
+  background:#050d1d;
+  overflow:hidden;
+}
+
+.paletteBrandQuickSet > summary{
+  list-style:none;
+  cursor:pointer;
+  padding:6px 9px;
+  font-size:10px;
+  letter-spacing:1px;
+  color:#c7d6ff;
+  background:#081325;
+}
+
+.paletteBrandQuickSet > summary::-webkit-details-marker{
+  display:none;
+}
+
+.paletteBrandQuickSetBody{
+  padding:8px;
+}
+
 .paletteSpectrumGrid{
   margin-top:6px;
   display:grid;
@@ -1411,9 +1582,188 @@ canvas{width:100%;height:160px}
   width:100%;
 }
 
+.paletteRoutingPanel{
+  padding:7px;
+}
+
+.paletteRoutingPanel .clusterBody{
+  margin-top:6px;
+}
+
+.paletteRoutingPanel h3{
+  margin:9px 0 4px;
+}
+
+.paletteRoutingPanel .hint{
+  margin:4px 0 0;
+}
+
+.paletteRoutingPanel .advancedSubTitle{
+  margin:0 0 5px;
+}
+
+.paletteRoutingPanel .compactButtonRow{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(170px,240px));
+  gap:6px;
+  justify-content:start;
+}
+
+.paletteRoutingPanel .compactButtonRow > button{
+  min-height:34px;
+  padding:7px 10px;
+}
+
+.paletteRoutingPanel .paletteScopeRow{
+  margin:6px 0 7px;
+}
+
+.paletteGlobalCompactLayout{
+  margin-top:6px;
+  display:grid;
+  grid-template-columns:repeat(12,minmax(0,1fr));
+  gap:8px;
+  align-items:start;
+}
+
+.paletteGlobalCard{
+  border:1px solid #182544;
+  border-radius:10px;
+  background:#060f20;
+  padding:8px;
+  min-width:0;
+}
+
+.paletteGlobalCard--counts{
+  grid-column:span 6;
+}
+
+.paletteGlobalCard--families{
+  grid-column:span 6;
+}
+
+.paletteGlobalCard--sequence{
+  grid-column:span 4;
+}
+
+.paletteGlobalCard--engine{
+  grid-column:span 8;
+}
+
+.paletteRoutingPanel .palettePresetStack{
+  margin-top:4px;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:6px;
+}
+
+.paletteRoutingPanel .palettePresetMenu > summary{
+  padding:5px 8px;
+}
+
+.paletteRoutingPanel .palettePresetGrid{
+  padding:5px;
+  gap:5px;
+}
+
+.paletteRoutingPanel .palettePresetGrid button{
+  min-height:28px;
+  padding:5px 7px;
+}
+
+.paletteRoutingPanel .paletteFamilyGrid{
+  margin-top:4px;
+  gap:5px;
+}
+
+.paletteRoutingPanel .paletteFamilyCard{
+  padding:5px;
+  gap:5px;
+}
+
+.paletteRoutingPanel .paletteFamilyCard button{
+  min-height:32px;
+}
+
+.paletteRoutingPanel .paletteFamilyCountRow{
+  gap:5px;
+}
+
+.paletteRoutingPanel .paletteFamilyCountRow select{
+  min-height:30px;
+}
+
+.paletteRoutingPanel .paletteCycleGrid{
+  margin-top:4px;
+  gap:5px;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+}
+
+.paletteRoutingPanel .paletteControlWrap{
+  margin-top:5px;
+}
+
+.paletteRoutingPanel .slider{
+  margin:6px 0;
+}
+
+.paletteRoutingPanel .paletteCustomPanel{
+  margin-top:6px;
+  border:1px solid #182544;
+  border-radius:10px;
+  background:#060f20;
+  padding:8px;
+}
+
+.paletteRoutingPanel .paletteCustomBrandTabs{
+  margin:6px 0 8px;
+}
+
+.paletteRoutingPanel .paletteBrandMenus{
+  margin-top:6px;
+  gap:8px;
+}
+
+@media (max-width:1280px){
+  .paletteGlobalCard--counts,
+  .paletteGlobalCard--families{
+    grid-column:span 12;
+  }
+  .paletteGlobalCard--sequence{
+    grid-column:span 5;
+  }
+  .paletteGlobalCard--engine{
+    grid-column:span 7;
+  }
+}
+
 @media (max-width:980px){
   .paletteSpectrumGrid{
     grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .paletteGlobalCompactLayout{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .paletteGlobalCard--counts,
+  .paletteGlobalCard--families,
+  .paletteGlobalCard--sequence,
+  .paletteGlobalCard--engine{
+    grid-column:span 2;
+  }
+  .paletteRoutingPanel .compactButtonRow{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .paletteFamilyGrid,
+  .paletteBrandFamilyGrid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media (max-width:700px){
+  .paletteRoutingPanel .compactButtonRow{
+    grid-template-columns:1fr;
+  }
+  .palettePresetGrid{
+    grid-template-columns:1fr;
   }
 }
 
@@ -2399,67 +2749,75 @@ tr:last-child td{
         <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide priority live controls.">COLLAPSE</button>
       </div>
       <div class="clusterBody">
-        <h3>ADAPTIVE META <span class="infoTip" title="Meta Auto infers live audio style and controls profile/reactivity/Hz. Choosing manual PROFILE, AUDIO REACTIVITY, PALETTES, or OVERCLOCK automatically turns Meta Auto off.">?</span></h3>
-        <p class="hint">Use this when you want automation to drive behavior. Keep it OFF if you are manually shaping scene, palette, and rate.</p>
-        <p class="advancedSubTitle">META STATE</p>
-        <div class="metaAutoPrimaryRow">
-          <button id="metaAutoOnBtn" type="button">META AUTO ON</button>
-          <button id="metaAutoOffBtn" type="button">META AUTO OFF</button>
-        </div>
-        <p class="advancedSubTitle">DOMINANT FACTOR MODE</p>
-        <div class="metaAutoModeRow">
-          <button id="metaAutoTrackerAutoBtn" type="button">DOMINANT MODE: AUTO OFF</button>
-          <button id="metaAutoTrackerCandidatesBtn" type="button">BUILD CANDIDATES</button>
-        </div>
-        <p class="advancedSubTitle">ALLOWED FACTORS</p>
-        <div class="metaAutoFactorGrid">
-          <button id="metaAutoHueWizBaselineBlendBtn" type="button">BASE+DRUMS OFF</button>
-          <button id="metaAutoTrackerPeaksBtn" type="button">PEAKS OFF</button>
-          <button id="metaAutoTrackerTransientsBtn" type="button">TRANSIENTS OFF</button>
-          <button id="metaAutoTrackerFluxBtn" type="button">FLUX OFF</button>
-        </div>
-        <p id="metaAutoHueWizBaselineBlendStat" class="hint metaAutoBiasStat">META H/W DOMINANT FACTORS: NONE (Meta Auto only; hard toggles control candidate factors).</p>
+        <div class="priorityGrid">
+          <section class="priorityCard">
+            <h3>ADAPTIVE META <span class="infoTip" title="Meta Auto infers live audio style and controls profile/reactivity/Hz. Choosing manual PROFILE, AUDIO REACTIVITY, PALETTES, or OVERCLOCK automatically turns Meta Auto off.">?</span></h3>
+            <p class="hint">Use this when you want automation to drive behavior. Keep it OFF if you are manually shaping scene, palette, and rate.</p>
+            <p class="advancedSubTitle">META STATE</p>
+            <div class="metaAutoPrimaryRow">
+              <button id="metaAutoOnBtn" type="button">META AUTO ON</button>
+              <button id="metaAutoOffBtn" type="button">META AUTO OFF</button>
+            </div>
+            <p class="advancedSubTitle">DOMINANT FACTOR MODE</p>
+            <div class="metaAutoModeRow">
+              <button id="metaAutoTrackerAutoBtn" type="button">DOMINANT MODE: AUTO OFF</button>
+              <button id="metaAutoTrackerCandidatesBtn" type="button">BUILD CANDIDATES</button>
+            </div>
+            <p class="advancedSubTitle">ALLOWED FACTORS</p>
+            <div class="metaAutoFactorGrid">
+              <button id="metaAutoHueWizBaselineBlendBtn" type="button">BASE+DRUMS OFF</button>
+              <button id="metaAutoTrackerPeaksBtn" type="button">PEAKS OFF</button>
+              <button id="metaAutoTrackerTransientsBtn" type="button">TRANSIENTS OFF</button>
+              <button id="metaAutoTrackerFluxBtn" type="button">FLUX OFF</button>
+            </div>
+            <p id="metaAutoHueWizBaselineBlendStat" class="hint metaAutoBiasStat">META H/W DOMINANT FACTORS: NONE (Meta Auto only; hard toggles control candidate factors).</p>
+          </section>
 
-        <h3>OVERCLOCK <span class="infoTip" title="Higher Hz increases visual motion and network load. Use Entertainment mode for highest stable rates.">?</span></h3>
-        <div class="grid4">
-          <button id="ocOffBtn" type="button">SLOW 2HZ</button>
-          <button id="ocOnBtn" type="button">SLOW 4HZ</button>
-          <button id="ocTurboBtn" type="button" class="warn">DEFAULT 6HZ</button>
-          <button id="ocAutoBtn" type="button">AUTO HZ (NO META)</button>
-          <button id="ocUltraBtn" type="button" class="warn">ULTRA 8HZ</button>
-          <button id="ocExtremeBtn" type="button" class="warn">EXTREME 10HZ</button>
-          <button id="ocInsaneBtn" type="button" class="bad">INSANE 12HZ</button>
-          <button id="ocHyperBtn" type="button" class="bad">HYPER 14HZ</button>
-          <button id="ocLudicrousBtn" type="button" class="bad">LUDICROUS 16HZ</button>
-        </div>
-        <div id="ocDevCluster" class="hidden">
-          <h3>UNSAFE DEV OVERCLOCK <span class="infoTip" title="Manual-only destructive rates. Never auto-mapped by profile/palette/scene and may break output stability.">?</span></h3>
-          <div class="grid5">
-            <button id="ocDev20Btn" type="button" class="bad">DEV 20HZ</button>
-            <button id="ocDev30Btn" type="button" class="bad">DEV 30HZ</button>
-            <button id="ocDev40Btn" type="button" class="bad">DEV 40HZ</button>
-            <button id="ocDev50Btn" type="button" class="bad">DEV 50HZ</button>
-            <button id="ocDev60Btn" type="button" class="bad">DEV 60HZ</button>
-          </div>
-          <p class="hint">Severe warning: these rates are intentionally destructive and unpredictable. Use only on isolated test rigs.</p>
-        </div>
-        <p class="hint">
-          Practical rate guidance: Hue REST is usually best at 2-6Hz. Use Hue Entertainment for 8-16Hz.
-          WiZ can often run faster, but weak Wi-Fi can still cause skips.
-        </p>
+          <section class="priorityCard">
+            <h3>OVERCLOCK <span class="infoTip" title="Higher Hz increases visual motion and network load. Use Entertainment mode for highest stable rates.">?</span></h3>
+            <div class="grid4">
+              <button id="ocOffBtn" type="button">SLOW 2HZ</button>
+              <button id="ocOnBtn" type="button">SLOW 4HZ</button>
+              <button id="ocTurboBtn" type="button" class="warn">DEFAULT 6HZ</button>
+              <button id="ocAutoBtn" type="button">AUTO HZ (NO META)</button>
+              <button id="ocUltraBtn" type="button" class="warn">ULTRA 8HZ</button>
+              <button id="ocExtremeBtn" type="button" class="warn">EXTREME 10HZ</button>
+              <button id="ocInsaneBtn" type="button" class="bad">INSANE 12HZ</button>
+              <button id="ocHyperBtn" type="button" class="bad">HYPER 14HZ</button>
+              <button id="ocLudicrousBtn" type="button" class="bad">LUDICROUS 16HZ</button>
+            </div>
+            <div id="ocDevCluster" class="hidden">
+              <h3>UNSAFE DEV OVERCLOCK <span class="infoTip" title="Manual-only destructive rates. Never auto-mapped by profile/palette/scene and may break output stability.">?</span></h3>
+              <div class="grid5">
+                <button id="ocDev20Btn" type="button" class="bad">DEV 20HZ</button>
+                <button id="ocDev30Btn" type="button" class="bad">DEV 30HZ</button>
+                <button id="ocDev40Btn" type="button" class="bad">DEV 40HZ</button>
+                <button id="ocDev50Btn" type="button" class="bad">DEV 50HZ</button>
+                <button id="ocDev60Btn" type="button" class="bad">DEV 60HZ</button>
+              </div>
+              <p class="hint">Severe warning: these rates are intentionally destructive and unpredictable. Use only on isolated test rigs.</p>
+            </div>
+            <p class="hint">
+              Practical rate guidance: Hue REST is usually best at 2-6Hz. Use Hue Entertainment for 8-16Hz.
+              WiZ can often run faster, but weak Wi-Fi can still cause skips.
+            </p>
+          </section>
 
-        <h3>AUTO SWITCH PROFILE <span class="infoTip" title="REACTIVE changes behavior/scenes quickly, BALANCED is moderate, CINEMATIC holds longer and transitions slowly.">?</span></h3>
-        <div class="grid3">
-          <button type="button" data-auto-profile="reactive">REACTIVE</button>
-          <button type="button" data-auto-profile="balanced">BALANCED</button>
-          <button type="button" data-auto-profile="cinematic">CINEMATIC</button>
-        </div>
+          <section class="priorityCard">
+            <h3>AUTO SWITCH PROFILE <span class="infoTip" title="REACTIVE changes behavior/scenes quickly, BALANCED is moderate, CINEMATIC holds longer and transitions slowly.">?</span></h3>
+            <div class="grid3">
+              <button type="button" data-auto-profile="reactive">REACTIVE</button>
+              <button type="button" data-auto-profile="balanced">BALANCED</button>
+              <button type="button" data-auto-profile="cinematic">CINEMATIC</button>
+            </div>
 
-        <h3>AUDIO REACTIVITY <span class="infoTip" title="BALANCED is neutral. AGGRESSIVE boosts sensitivity and pulse triggers. PRECISION is stricter and calmer.">?</span></h3>
-        <div class="grid3">
-          <button type="button" data-audio-reactivity="balanced">BALANCED</button>
-          <button type="button" data-audio-reactivity="aggressive">AGGRESSIVE</button>
-          <button type="button" data-audio-reactivity="precision">PRECISION</button>
+            <h3>AUDIO REACTIVITY <span class="infoTip" title="BALANCED is neutral. AGGRESSIVE boosts sensitivity and pulse triggers. PRECISION is stricter and calmer.">?</span></h3>
+            <div class="grid3">
+              <button type="button" data-audio-reactivity="balanced">BALANCED</button>
+              <button type="button" data-audio-reactivity="aggressive">AGGRESSIVE</button>
+              <button type="button" data-audio-reactivity="precision">PRECISION</button>
+            </div>
+          </section>
         </div>
       </div>
     </div>
@@ -2478,12 +2836,8 @@ tr:last-child td{
             <button type="button" data-scene="flow">FLOW</button>
             <button type="button" data-scene="pulse_strobe">PULSE</button>
           </div>
-          <div class="grid2 sceneSyncGrid">
-            <button id="sceneSyncOnBtn" type="button">SYNC HUE + WIZ</button>
-            <button id="sceneSyncOffBtn" type="button">WIZ STANDALONE</button>
-          </div>
         </div>
-        <p id="sceneSyncStat" class="hint">SCENE LINK: HUE + WIZ SYNCED</p>
+        <p id="sceneSyncStat" class="hint">WIZ SCENE MODE: STANDALONE (ENFORCED)</p>
         <div class="slider">
           <label>
             <span>FLOW INTENSITY</span>
@@ -2498,196 +2852,283 @@ tr:last-child td{
       </div>
     </div>
 
-    <div class="subcluster collapsible" data-collapsible-key="livePaletteRouting" data-collapsed-default-mobile="1">
+    <div class="subcluster collapsible paletteRoutingPanel" data-collapsible-key="livePaletteRouting" data-collapsed-default-mobile="1">
       <div class="clusterHeaderRow">
         <h3>PALETTE + FIXTURE ROUTING</h3>
         <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide palette and fixture-routing controls.">COLLAPSE</button>
       </div>
       <div class="clusterBody">
-        <h3>COLOR PALETTE SEQUENCER <span class="infoTip" title="Manual color sequencing only. Pick 1/3/5/8/12 colors per spectrum family (RED/GREEN/BLUE). ORDER keeps family handoffs spectrally smooth; DISORDER adds chaos.">?</span></h3>
+        <h3>COLOR PALETTE SEQUENCER <span class="infoTip" title="Manual color sequencing only. Pick 1/3/5/8/12 colors globally, then override each palette family (RED/YELLOW/GREEN/CYAN/BLUE) with its own count. ORDER keeps family handoffs spectrally smooth; DISORDER adds chaos.">?</span></h3>
         <p class="advancedSubTitle">EDIT SCOPE</p>
-        <div class="paletteScopeRow">
+        <div class="paletteScopeRow compactButtonRow">
           <button id="paletteScopeGlobalBtn" type="button">GLOBAL SETTINGS</button>
           <button id="paletteScopeCustomBtn" type="button">CUSTOM PER FIXTURE</button>
         </div>
-        <p class="hint">Custom mode enables Hue/WiZ fixture tabs and per-fixture overrides. While custom mode is active, global controls are grayed out.</p>
+        <p class="hint">Custom mode enables Hue/WiZ fixture tabs and per-fixture overrides. While custom mode is active, global controls are hidden.</p>
         <p id="paletteModeNotice" class="paletteModeNotice"></p>
 
         <div id="paletteGlobalPanel" class="paletteGlobalPanel">
-        <div class="grid5">
-          <button type="button" data-palette-count="1">1 COLOR/FAMILY</button>
-          <button type="button" data-palette-count="3">3 COLORS/FAMILY</button>
-          <button type="button" data-palette-count="5">5 COLORS/FAMILY</button>
-          <button type="button" data-palette-count="8">8 COLORS/FAMILY</button>
-          <button type="button" data-palette-count="12">12 COLORS/FAMILY</button>
-        </div>
-        <p class="advancedSubTitle">VIVIDNESS</p>
-        <div class="grid5">
-          <button type="button" data-palette-vividness="0">SOFT</button>
-          <button type="button" data-palette-vividness="1">BALANCED</button>
-          <button type="button" data-palette-vividness="2">HIGH</button>
-          <button type="button" data-palette-vividness="3">ULTRA</button>
-          <button type="button" data-palette-vividness="4">MAX</button>
-        </div>
-        <p class="hint">Higher vividness increases saturation/contrast while keeping family identity.</p>
+          <div class="paletteGlobalCompactLayout">
+            <section class="paletteGlobalCard paletteGlobalCard--counts">
+              <p class="advancedSubTitle">UNIFORM COUNT QUICK SET</p>
+              <details class="palettePresetMenu paletteQuickSetMenu">
+                <summary>SET ALL FAMILIES TO SAME COUNT</summary>
+                <div class="palettePresetGrid paletteQuickSetGrid">
+                  <button type="button" data-palette-count="1">1 COLOR</button>
+                  <button type="button" data-palette-count="3">3 COLORS</button>
+                  <button type="button" data-palette-count="5">5 COLORS</button>
+                  <button type="button" data-palette-count="8">8 COLORS</button>
+                  <button type="button" data-palette-count="12">12 COLORS</button>
+                </div>
+              </details>
+              <p class="advancedSubTitle">VIVIDNESS</p>
+              <div class="grid5">
+                <button type="button" data-palette-vividness="0">SOFT</button>
+                <button type="button" data-palette-vividness="1">BALANCED</button>
+                <button type="button" data-palette-vividness="2">HIGH</button>
+                <button type="button" data-palette-vividness="3">ULTRA</button>
+                <button type="button" data-palette-vividness="4">MAX</button>
+              </div>
+              <p class="hint">Higher vividness increases saturation/contrast while keeping family identity.</p>
 
-        <p class="advancedSubTitle">QUICK PRESETS</p>
-        <div class="grid4">
-          <button type="button" data-palette-preset="all_1">ALL COLORS x1</button>
-          <button type="button" data-palette-preset="all_3">ALL COLORS x3</button>
-          <button type="button" data-palette-preset="duo_cool">DUO COOL</button>
-          <button type="button" data-palette-preset="duo_warm">DUO WARM</button>
-        </div>
-        <p class="hint">Use ORDERED/DISORDER below to control how presets play out.</p>
+              <p class="advancedSubTitle">QUICK PRESETS</p>
+              <div class="palettePresetStack">
+                <details class="palettePresetMenu">
+                  <summary>UNIFORM BASE</summary>
+                  <div class="palettePresetGrid">
+                    <button type="button" data-palette-preset="all_1">ALL COLORS x1</button>
+                    <button type="button" data-palette-preset="all_3">ALL COLORS x3</button>
+                  </div>
+                </details>
+                <details class="palettePresetMenu">
+                  <summary>SPLIT BRIDGES</summary>
+                  <div class="palettePresetGrid">
+                    <button type="button" data-palette-preset="duo_warm">WARM BRIDGE</button>
+                    <button type="button" data-palette-preset="duo_cool">COOL BRIDGE</button>
+                  </div>
+                </details>
+              </div>
+              <p class="hint">Use ORDERED/DISORDER below to control how presets play out.</p>
+            </section>
 
-        <p class="advancedSubTitle">FAMILIES</p>
-        <div id="paletteFamilyGrid" class="grid3 paletteFamilyGrid">
-          <button type="button" data-palette-family="red">RED</button>
-          <button type="button" data-palette-family="green">GREEN</button>
-          <button type="button" data-palette-family="blue">BLUE</button>
-        </div>
+            <section class="paletteGlobalCard paletteGlobalCard--families">
+              <p class="advancedSubTitle">FAMILIES + PER-PALETTE COUNT</p>
+              <div id="paletteFamilyGrid" class="paletteFamilyGrid">
+                <div class="paletteFamilyCard" data-palette-family-card="red">
+                  <button type="button" data-palette-family="red">RED</button>
+                  <div class="paletteFamilyCountRow">
+                    <span>COUNT</span>
+                    <select data-palette-family-count="red" title="Set RED family color count.">
+                      <option value="1">1</option>
+                      <option value="3" selected>3</option>
+                      <option value="5">5</option>
+                      <option value="8">8</option>
+                      <option value="12">12</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="paletteFamilyCard" data-palette-family-card="yellow">
+                  <button type="button" data-palette-family="yellow">YELLOW</button>
+                  <div class="paletteFamilyCountRow">
+                    <span>COUNT</span>
+                    <select data-palette-family-count="yellow" title="Set YELLOW family color count.">
+                      <option value="1">1</option>
+                      <option value="3" selected>3</option>
+                      <option value="5">5</option>
+                      <option value="8">8</option>
+                      <option value="12">12</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="paletteFamilyCard" data-palette-family-card="green">
+                  <button type="button" data-palette-family="green">GREEN</button>
+                  <div class="paletteFamilyCountRow">
+                    <span>COUNT</span>
+                    <select data-palette-family-count="green" title="Set GREEN family color count.">
+                      <option value="1">1</option>
+                      <option value="3" selected>3</option>
+                      <option value="5">5</option>
+                      <option value="8">8</option>
+                      <option value="12">12</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="paletteFamilyCard" data-palette-family-card="cyan">
+                  <button type="button" data-palette-family="cyan">CYAN</button>
+                  <div class="paletteFamilyCountRow">
+                    <span>COUNT</span>
+                    <select data-palette-family-count="cyan" title="Set CYAN family color count.">
+                      <option value="1">1</option>
+                      <option value="3" selected>3</option>
+                      <option value="5">5</option>
+                      <option value="8">8</option>
+                      <option value="12">12</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="paletteFamilyCard" data-palette-family-card="blue">
+                  <button type="button" data-palette-family="blue">BLUE</button>
+                  <div class="paletteFamilyCountRow">
+                    <span>COUNT</span>
+                    <select data-palette-family-count="blue" title="Set BLUE family color count.">
+                      <option value="1">1</option>
+                      <option value="3" selected>3</option>
+                      <option value="5">5</option>
+                      <option value="8">8</option>
+                      <option value="12">12</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <p class="hint">Click a family to include/exclude it. Use each family dropdown to set that palette's color count.</p>
+            </section>
 
-        <p class="advancedSubTitle">SEQUENCE ORDER</p>
-        <div class="grid2">
-          <button type="button" data-palette-disorder="false">ORDERED</button>
-          <button type="button" data-palette-disorder="true">DISORDER</button>
-        </div>
-        <div class="slider">
-          <label>
-            <span>DISORDER AGGRESSION</span>
-            <span class="sliderInlineControls">
-              <span id="paletteDisorderAggressionVal" class="sliderValue">35%</span>
-              <button id="paletteDisorderAggressionResetBtn" type="button" class="sliderInlineResetBtn">RESET</button>
-            </span>
-          </label>
-          <input id="paletteDisorderAggression" type="range" min="0" max="100" step="1" value="35">
-        </div>
-        <p class="hint">Higher aggression increases out-of-order jumps between both colors and families.</p>
+            <section class="paletteGlobalCard paletteGlobalCard--sequence">
+              <p class="advancedSubTitle">SEQUENCE ORDER</p>
+              <div class="compactButtonRow">
+                <button type="button" data-palette-disorder="false">ORDERED</button>
+                <button type="button" data-palette-disorder="true">DISORDER</button>
+              </div>
+              <div class="slider">
+                <label>
+                  <span>DISORDER AGGRESSION</span>
+                  <span class="sliderInlineControls">
+                    <span id="paletteDisorderAggressionVal" class="sliderValue">35%</span>
+                    <button id="paletteDisorderAggressionResetBtn" type="button" class="sliderInlineResetBtn">RESET</button>
+                  </span>
+                </label>
+                <input id="paletteDisorderAggression" type="range" min="0" max="100" step="1" value="35">
+              </div>
+              <p class="hint">Higher aggression increases out-of-order jumps between both colors and families.</p>
+            </section>
 
-        <p class="advancedSubTitle">COLOR ENGINE MODE</p>
-        <div class="paletteCycleGrid">
-          <button type="button" data-palette-cycle-mode="on_trigger" title="Advance to the next palette group on beat/drop triggers. Colors inside the active group continue to move.">ON TRIGGER</button>
-          <button type="button" data-palette-cycle-mode="timed_cycle" title="Advance to the next palette group every interval. Colors inside the active group continue to move between advances.">TIMED CYCLE</button>
-          <button type="button" data-palette-cycle-mode="reactive_shift" title="Advance to the next palette group when tempo/progression changes pass margin. Colors inside the active group continue to move.">REACTIVE SHIFT</button>
-          <button type="button" data-palette-cycle-mode="spectrum_mapper" title="Choose active palette group from mapped audio features (lows/mids/highs/etc). Colors still move inside the selected group.">SPECTRUM MAPPER</button>
-        </div>
+            <section class="paletteGlobalCard paletteGlobalCard--engine">
+              <p class="advancedSubTitle">COLOR ENGINE MODE</p>
+              <div class="paletteCycleGrid">
+                <button type="button" data-palette-cycle-mode="on_trigger" title="Advance to the next palette group on beat/drop triggers. Colors inside the active group continue to move.">ON TRIGGER</button>
+                <button type="button" data-palette-cycle-mode="timed_cycle" title="Advance to the next palette group every interval. Colors inside the active group continue to move between advances.">TIMED CYCLE</button>
+                <button type="button" data-palette-cycle-mode="reactive_shift" title="Advance to the next palette group when tempo/progression changes pass margin. Colors inside the active group continue to move.">REACTIVE SHIFT</button>
+                <button type="button" data-palette-cycle-mode="spectrum_mapper" title="Choose active palette group from mapped audio features (lows/mids/highs/etc). Colors still move inside the selected group.">SPECTRUM MAPPER</button>
+              </div>
 
-        <div id="paletteTimedControls" class="paletteControlWrap hidden">
-          <div class="slider">
-            <label>
-              <span>CYCLE INTERVAL</span>
-              <span id="paletteTimedIntervalSecVal" class="sliderValue">5s</span>
-            </label>
-            <input id="paletteTimedIntervalSec" type="range" min="2" max="60" step="1" value="5">
+              <div id="paletteTimedControls" class="paletteControlWrap hidden">
+                <div class="slider">
+                  <label>
+                    <span>CYCLE INTERVAL</span>
+                    <span id="paletteTimedIntervalSecVal" class="sliderValue">5s</span>
+                  </label>
+                  <input id="paletteTimedIntervalSec" type="range" min="2" max="60" step="1" value="5">
+                </div>
+                <p class="advancedSubTitle">BEAT LOCK</p>
+                <div class="compactButtonRow">
+                  <button type="button" data-palette-beat-lock="false">OFF</button>
+                  <button type="button" data-palette-beat-lock="true">ON</button>
+                </div>
+                <div class="slider">
+                  <label>
+                    <span>BEAT LOCK GRACE</span>
+                    <span id="paletteBeatLockGraceSecVal" class="sliderValue">+2s</span>
+                  </label>
+                  <input id="paletteBeatLockGraceSec" type="range" min="0" max="8" step="1" value="2">
+                </div>
+              </div>
+
+              <div id="paletteReactiveControls" class="paletteControlWrap hidden">
+                <div class="slider">
+                  <label>
+                    <span>CHANGE MARGIN</span>
+                    <span id="paletteReactiveMarginVal" class="sliderValue">28</span>
+                  </label>
+                  <input id="paletteReactiveMargin" type="range" min="5" max="100" step="1" value="28">
+                </div>
+              </div>
+
+              <p class="advancedSubTitle">BRIGHTNESS ENGINE (RAVE TEST)</p>
+              <div class="compactButtonRow">
+                <button type="button" data-palette-brightness-mode="legacy">LEGACY</button>
+                <button type="button" data-palette-brightness-mode="test">TEST FOLLOW</button>
+              </div>
+              <div id="paletteBrightnessFollowWrap" class="slider hidden">
+                <label>
+                  <span>FOLLOW AMOUNT</span>
+                  <span id="paletteBrightnessFollowAmountVal" class="sliderValue">1.00x</span>
+                </label>
+                <input id="paletteBrightnessFollowAmount" type="range" min="0" max="200" step="1" value="100">
+              </div>
+              <p class="hint">LEGACY keeps current brightness behavior. TEST links brightness to palette color motion + audio dynamics.</p>
+
+              <div id="paletteSpectrumControls" class="paletteControlWrap hidden">
+                <p class="hint">Spectrum Mapper picks the active palette group from audio features. Color motion inside that group still follows ORDER/DISORDER.</p>
+                <p class="advancedSubTitle">MAP MODE</p>
+                <div class="compactButtonRow">
+                  <button type="button" data-palette-spectrum-mode="auto">AUTO ASSIGN</button>
+                  <button type="button" data-palette-spectrum-mode="manual">MANUAL ASSIGN</button>
+                </div>
+                <div class="paletteSpectrumGrid">
+                  <select data-palette-spectrum-feature-slot="0">
+                    <option value="lows">SLOT 1: LOWS</option>
+                    <option value="mids">SLOT 1: MIDS</option>
+                    <option value="highs">SLOT 1: HIGHS</option>
+                    <option value="rms">SLOT 1: RMS</option>
+                    <option value="energy">SLOT 1: ENERGY</option>
+                    <option value="flux">SLOT 1: FLUX</option>
+                    <option value="peaks">SLOT 1: PEAKS</option>
+                    <option value="transients">SLOT 1: TRANSIENTS</option>
+                    <option value="beat">SLOT 1: BEAT</option>
+                  </select>
+                  <select data-palette-spectrum-feature-slot="1">
+                    <option value="lows">SLOT 2: LOWS</option>
+                    <option value="mids">SLOT 2: MIDS</option>
+                    <option value="highs">SLOT 2: HIGHS</option>
+                    <option value="rms">SLOT 2: RMS</option>
+                    <option value="energy">SLOT 2: ENERGY</option>
+                    <option value="flux">SLOT 2: FLUX</option>
+                    <option value="peaks">SLOT 2: PEAKS</option>
+                    <option value="transients">SLOT 2: TRANSIENTS</option>
+                    <option value="beat">SLOT 2: BEAT</option>
+                  </select>
+                  <select data-palette-spectrum-feature-slot="2">
+                    <option value="lows">SLOT 3: LOWS</option>
+                    <option value="mids">SLOT 3: MIDS</option>
+                    <option value="highs">SLOT 3: HIGHS</option>
+                    <option value="rms">SLOT 3: RMS</option>
+                    <option value="energy">SLOT 3: ENERGY</option>
+                    <option value="flux">SLOT 3: FLUX</option>
+                    <option value="peaks">SLOT 3: PEAKS</option>
+                    <option value="transients">SLOT 3: TRANSIENTS</option>
+                    <option value="beat">SLOT 3: BEAT</option>
+                  </select>
+                  <select data-palette-spectrum-feature-slot="3">
+                    <option value="lows">SLOT 4: LOWS</option>
+                    <option value="mids">SLOT 4: MIDS</option>
+                    <option value="highs">SLOT 4: HIGHS</option>
+                    <option value="rms">SLOT 4: RMS</option>
+                    <option value="energy">SLOT 4: ENERGY</option>
+                    <option value="flux">SLOT 4: FLUX</option>
+                    <option value="peaks">SLOT 4: PEAKS</option>
+                    <option value="transients">SLOT 4: TRANSIENTS</option>
+                    <option value="beat">SLOT 4: BEAT</option>
+                  </select>
+                  <select data-palette-spectrum-feature-slot="4">
+                    <option value="lows">SLOT 5: LOWS</option>
+                    <option value="mids">SLOT 5: MIDS</option>
+                    <option value="highs">SLOT 5: HIGHS</option>
+                    <option value="rms">SLOT 5: RMS</option>
+                    <option value="energy">SLOT 5: ENERGY</option>
+                    <option value="flux">SLOT 5: FLUX</option>
+                    <option value="peaks">SLOT 5: PEAKS</option>
+                    <option value="transients">SLOT 5: TRANSIENTS</option>
+                    <option value="beat">SLOT 5: BEAT</option>
+                  </select>
+                </div>
+              </div>
+            </section>
           </div>
-          <p class="advancedSubTitle">BEAT LOCK</p>
-          <div class="grid2">
-            <button type="button" data-palette-beat-lock="false">OFF</button>
-            <button type="button" data-palette-beat-lock="true">ON</button>
-          </div>
-          <div class="slider">
-            <label>
-              <span>BEAT LOCK GRACE</span>
-              <span id="paletteBeatLockGraceSecVal" class="sliderValue">+2s</span>
-            </label>
-            <input id="paletteBeatLockGraceSec" type="range" min="0" max="8" step="1" value="2">
-          </div>
-        </div>
-
-        <div id="paletteReactiveControls" class="paletteControlWrap hidden">
-          <div class="slider">
-            <label>
-              <span>CHANGE MARGIN</span>
-              <span id="paletteReactiveMarginVal" class="sliderValue">28</span>
-            </label>
-            <input id="paletteReactiveMargin" type="range" min="5" max="100" step="1" value="28">
-          </div>
-        </div>
-
-        <p class="advancedSubTitle">BRIGHTNESS ENGINE (RAVE TEST)</p>
-        <div class="grid2">
-          <button type="button" data-palette-brightness-mode="legacy">LEGACY</button>
-          <button type="button" data-palette-brightness-mode="test">TEST FOLLOW</button>
-        </div>
-        <div id="paletteBrightnessFollowWrap" class="slider hidden">
-          <label>
-            <span>FOLLOW AMOUNT</span>
-            <span id="paletteBrightnessFollowAmountVal" class="sliderValue">1.00x</span>
-          </label>
-          <input id="paletteBrightnessFollowAmount" type="range" min="0" max="200" step="1" value="100">
-        </div>
-        <p class="hint">LEGACY keeps current brightness behavior. TEST links brightness to palette color motion + audio dynamics.</p>
-
-        <div id="paletteSpectrumControls" class="paletteControlWrap hidden">
-          <p class="hint">Spectrum Mapper picks the active palette group from audio features. Color motion inside that group still follows ORDER/DISORDER.</p>
-          <p class="advancedSubTitle">MAP MODE</p>
-          <div class="grid2">
-            <button type="button" data-palette-spectrum-mode="auto">AUTO ASSIGN</button>
-            <button type="button" data-palette-spectrum-mode="manual">MANUAL ASSIGN</button>
-          </div>
-          <div class="paletteSpectrumGrid">
-            <select data-palette-spectrum-feature-slot="0">
-              <option value="lows">SLOT 1: LOWS</option>
-              <option value="mids">SLOT 1: MIDS</option>
-              <option value="highs">SLOT 1: HIGHS</option>
-              <option value="rms">SLOT 1: RMS</option>
-              <option value="energy">SLOT 1: ENERGY</option>
-              <option value="flux">SLOT 1: FLUX</option>
-              <option value="peaks">SLOT 1: PEAKS</option>
-              <option value="transients">SLOT 1: TRANSIENTS</option>
-              <option value="beat">SLOT 1: BEAT</option>
-            </select>
-            <select data-palette-spectrum-feature-slot="1">
-              <option value="lows">SLOT 2: LOWS</option>
-              <option value="mids">SLOT 2: MIDS</option>
-              <option value="highs">SLOT 2: HIGHS</option>
-              <option value="rms">SLOT 2: RMS</option>
-              <option value="energy">SLOT 2: ENERGY</option>
-              <option value="flux">SLOT 2: FLUX</option>
-              <option value="peaks">SLOT 2: PEAKS</option>
-              <option value="transients">SLOT 2: TRANSIENTS</option>
-              <option value="beat">SLOT 2: BEAT</option>
-            </select>
-            <select data-palette-spectrum-feature-slot="2">
-              <option value="lows">SLOT 3: LOWS</option>
-              <option value="mids">SLOT 3: MIDS</option>
-              <option value="highs">SLOT 3: HIGHS</option>
-              <option value="rms">SLOT 3: RMS</option>
-              <option value="energy">SLOT 3: ENERGY</option>
-              <option value="flux">SLOT 3: FLUX</option>
-              <option value="peaks">SLOT 3: PEAKS</option>
-              <option value="transients">SLOT 3: TRANSIENTS</option>
-              <option value="beat">SLOT 3: BEAT</option>
-            </select>
-            <select data-palette-spectrum-feature-slot="3">
-              <option value="lows">SLOT 4: LOWS</option>
-              <option value="mids">SLOT 4: MIDS</option>
-              <option value="highs">SLOT 4: HIGHS</option>
-              <option value="rms">SLOT 4: RMS</option>
-              <option value="energy">SLOT 4: ENERGY</option>
-              <option value="flux">SLOT 4: FLUX</option>
-              <option value="peaks">SLOT 4: PEAKS</option>
-              <option value="transients">SLOT 4: TRANSIENTS</option>
-              <option value="beat">SLOT 4: BEAT</option>
-            </select>
-            <select data-palette-spectrum-feature-slot="4">
-              <option value="lows">SLOT 5: LOWS</option>
-              <option value="mids">SLOT 5: MIDS</option>
-              <option value="highs">SLOT 5: HIGHS</option>
-              <option value="rms">SLOT 5: RMS</option>
-              <option value="energy">SLOT 5: ENERGY</option>
-              <option value="flux">SLOT 5: FLUX</option>
-              <option value="peaks">SLOT 5: PEAKS</option>
-              <option value="transients">SLOT 5: TRANSIENTS</option>
-              <option value="beat">SLOT 5: BEAT</option>
-            </select>
-          </div>
-        </div>
         </div>
 
         <div id="paletteCustomPanel" class="paletteCustomPanel hidden">
         <p class="advancedSubTitle">FIXTURE TYPE</p>
-        <div id="paletteCustomBrandTabs" class="paletteCustomBrandTabs">
+        <div id="paletteCustomBrandTabs" class="paletteCustomBrandTabs compactButtonRow">
           <button type="button" data-palette-custom-brand="hue">HUE</button>
           <button type="button" data-palette-custom-brand="wiz">WIZ</button>
         </div>
@@ -4298,9 +4739,8 @@ const ui = {
   audioReactivityPreset: "balanced",
   audioQuickProfile: "balanced",
   flowIntensity: 1,
-  wizSceneSync: true,
-  sceneSyncStrategy: "linked",
-  sceneSyncActiveBrands: [],
+  wizSceneSync: false,
+  sceneSyncStrategy: "standalone",
   flowIntensityInputUntil: 0,
   metaAutoEnabled: false,
   metaAutoReason: "off",
@@ -4327,6 +4767,13 @@ const ui = {
   activeTab: "live",
   paletteColorsPerFamily: 3,
   paletteFamilies: ["red", "green", "blue"],
+  paletteFamilyColorCounts: {
+    red: 3,
+    yellow: 3,
+    green: 3,
+    cyan: 3,
+    blue: 3
+  },
   paletteDisorder: false,
   paletteDisorderAggression: 0.35,
   paletteCycleMode: "on_trigger",
@@ -4348,6 +4795,7 @@ const ui = {
   fixtureMetricConfig: { mode: "manual", metric: "baseline", metaAutoFlip: false, harmonySize: 1, maxHz: null },
   fixtureMetricBrandOverrides: { hue: null, wiz: null },
   fixtureMetricFixtureOverrides: {},
+  paletteCatalog: [],
   paletteBrandFixtures: { hue: [], wiz: [] },
   paletteFixtureSelectionByBrand: readPaletteFixtureSelectionBootstrap(),
   overclock: true,
@@ -4489,6 +4937,7 @@ const AUDIO_SIMPLE_MODE_KEY = "ravelink_audio_simple_mode_v1";
 const AUDIO_OPTIONAL_TOOLS_DISMISS_KEY = "ravelink_audio_optional_tools_dismissed_v1";
 const LIVE_PROFILE_STORE_KEY = "ravelink_live_profiles_v1";
 const LIVE_PROFILE_LAST_KEY = "ravelink_live_profile_last_v1";
+const LIVE_PROFILE_LAST_APPLIED_KEY = "ravelink_live_profile_last_applied_v1";
 const DEV_OVERCLOCK_COMICAL_TEXT = "I AM REALLY REALLY REALLY REALLY REALLY REALLY REALLY SURE";
 const UNSAFE_LOG_ACK_PHRASE = "I_UNDERSTAND_SENSITIVE_LOG_RISK";
 const UI_STORAGE_RESET_KEYS = Object.freeze([
@@ -4515,6 +4964,7 @@ const UI_STORAGE_RESET_KEYS = Object.freeze([
   AUDIO_OPTIONAL_TOOLS_DISMISS_KEY,
   LIVE_PROFILE_STORE_KEY,
   LIVE_PROFILE_LAST_KEY,
+  LIVE_PROFILE_LAST_APPLIED_KEY,
   PALETTE_FIXTURE_SELECTION_KEY
 ]);
 const UI_STORAGE_RESET_PREFIXES = Object.freeze([
@@ -4673,8 +5123,6 @@ const el = {
   ocDev50Btn: document.getElementById("ocDev50Btn"),
   ocDev60Btn: document.getElementById("ocDev60Btn"),
   sceneAutoBtn: document.getElementById("sceneAutoBtn"),
-  sceneSyncOnBtn: document.getElementById("sceneSyncOnBtn"),
-  sceneSyncOffBtn: document.getElementById("sceneSyncOffBtn"),
   sceneSyncStat: document.getElementById("sceneSyncStat"),
   themeCogBtn: document.getElementById("themeCogBtn"),
   themePanel: document.getElementById("themePanel"),
@@ -5090,6 +5538,10 @@ const getPaletteFamilyButtons = () =>
   el.paletteFamilyGrid
     ? Array.from(el.paletteFamilyGrid.querySelectorAll("[data-palette-family]"))
     : [];
+const getPaletteFamilyCountSelectors = () =>
+  el.paletteFamilyGrid
+    ? Array.from(el.paletteFamilyGrid.querySelectorAll("[data-palette-family-count]"))
+    : [];
 const themePresetButtons = Array.from(document.querySelectorAll("[data-theme-preset]"));
 const MOD_BRAND_RE = /^[a-z][a-z0-9_-]{1,31}$/;
 const FIXTURE_MOD_CUSTOM_BRAND_VALUE = "__mod_custom__";
@@ -5317,9 +5769,6 @@ const MIDI_ACTION_LABELS = Object.freeze({
   flow_intensity_up: "FLOW INTENSITY +",
   flow_intensity_down: "FLOW INTENSITY -",
   flow_intensity_reset: "FLOW INTENSITY RESET",
-  wiz_scene_sync_toggle: "WIZ SCENE SYNC TOGGLE",
-  wiz_scene_sync_on: "WIZ SCENE SYNC ON",
-  wiz_scene_sync_off: "WIZ SCENE SYNC OFF",
   palette_ordered: "PALETTE ORDERED",
   palette_disorder: "PALETTE DISORDER",
   palette_colors_1: "PALETTE 1 COLOR",
@@ -5328,14 +5777,15 @@ const MIDI_ACTION_LABELS = Object.freeze({
   palette_colors_8: "PALETTE 8 COLORS",
   palette_colors_12: "PALETTE 12 COLORS",
   palette_family_red: "PALETTE RED",
+  palette_family_yellow: "PALETTE YELLOW",
   palette_family_green: "PALETTE GREEN",
+  palette_family_cyan: "PALETTE CYAN",
   palette_family_blue: "PALETTE BLUE",
-  palette_family_purple: "PALETTE RED TONE",
-  palette_family_yellow: "PALETTE GREEN TONE",
+  palette_family_purple: "PALETTE RED TONE (ALIAS)",
   palette_preset_all_1: "PALETTE PRESET ALL x1",
   palette_preset_all_3: "PALETTE PRESET ALL x3",
-  palette_preset_duo_cool: "PALETTE PRESET DUO COOL",
-  palette_preset_duo_warm: "PALETTE PRESET DUO WARM"
+  palette_preset_duo_cool: "PALETTE PRESET COOL BRIDGE",
+  palette_preset_duo_warm: "PALETTE PRESET WARM BRIDGE"
 });
 const MIDI_FALLBACK_ACTIONS = Object.freeze(Object.keys(MIDI_ACTION_LABELS));
 
@@ -5453,9 +5903,7 @@ function applyUiTooltips() {
   setNodeTitle(el.masterInlineResetBtn, "Reset MASTER to default.");
   setNodeTitle(el.flowIntensity, "Flow animation intensity multiplier for flow behavior.");
   setNodeTitle(el.flowResetBtn, "Reset FLOW INTENSITY back to default (1.00x).");
-  setNodeTitle(el.sceneSyncOnBtn, "Link WiZ scene selection to Hue scene behavior by default.");
-  setNodeTitle(el.sceneSyncOffBtn, "Run WiZ scene selection independently from Hue.");
-  setNodeTitle(el.sceneSyncStat, "Current Hue/WiZ scene link strategy.");
+  setNodeTitle(el.sceneSyncStat, "WiZ scene selection is enforced standalone.");
   setNodeTitle(el.dropIntensity, "How hard drop events hit visuals.");
   setNodeTitle(el.dropInlineResetBtn, "Reset DROP IMPACT to default.");
   setNodeTitle(el.reactorResetBtn, "Reset both MASTER and DROP IMPACT to defaults.");
@@ -5713,6 +6161,28 @@ function normalizeLiveProfileSnapshot(raw = {}, fallback = LIVE_PROFILE_DEFAULT)
   };
 }
 
+function buildDefaultLiveProfileEntry(existing = null) {
+  const safeExisting = existing && typeof existing === "object" ? existing : {};
+  const savedAt = Number(safeExisting.savedAt);
+  return {
+    savedAt: Number.isFinite(savedAt) && savedAt > 0 ? savedAt : Date.now(),
+    snapshot: normalizeLiveProfileSnapshot(
+      safeExisting.snapshot || LIVE_PROFILE_DEFAULT,
+      LIVE_PROFILE_DEFAULT
+    )
+  };
+}
+
+function ensureLiveProfileStoreDefault(store = null) {
+  const source = store && typeof store === "object" ? store : { version: 1, profiles: {} };
+  const rawProfiles = source.profiles && typeof source.profiles === "object" && !Array.isArray(source.profiles)
+    ? source.profiles
+    : {};
+  const profiles = { ...rawProfiles };
+  profiles.default = buildDefaultLiveProfileEntry(profiles.default);
+  return { version: 1, profiles };
+}
+
 function readLiveProfileStore() {
   const empty = { version: 1, profiles: {} };
   try {
@@ -5738,9 +6208,9 @@ function readLiveProfileStore() {
       };
       if (Object.keys(profiles).length >= 24) break;
     }
-    return { version: 1, profiles };
+    return ensureLiveProfileStoreDefault({ version: 1, profiles });
   } catch {
-    return empty;
+    return ensureLiveProfileStoreDefault(empty);
   }
 }
 
@@ -5759,7 +6229,7 @@ function writeLiveProfileStore(store) {
     };
     if (Object.keys(profiles).length >= 24) break;
   }
-  const safe = { version: 1, profiles };
+  const safe = ensureLiveProfileStoreDefault({ version: 1, profiles });
   localStorage.setItem(LIVE_PROFILE_STORE_KEY, JSON.stringify(safe));
   return safe;
 }
@@ -5787,7 +6257,7 @@ function getLiveProfileStoreEntriesSorted(store = null) {
 function syncLiveProfileSelectOptions(nameHint = null) {
   if (!el.liveProfileSelect) return;
   const currentName = normalizeLiveProfileName(nameHint || resolveCurrentLiveProfileName(), "default");
-  const store = readLiveProfileStore();
+  const store = writeLiveProfileStore(readLiveProfileStore());
   const entries = getLiveProfileStoreEntriesSorted(store);
 
   const options = [
@@ -5795,9 +6265,10 @@ function syncLiveProfileSelectOptions(nameHint = null) {
     ...entries.map(entry => {
       const timeText = formatLiveProfileSavedAt(entry.savedAt);
       const suffix = timeText ? ` (${timeText})` : "";
+      const protectedLabel = entry.name === "default" ? " [BUILT-IN]" : "";
       return {
         value: entry.name,
-        label: `${entry.name}${suffix}`
+        label: `${entry.name}${protectedLabel}${suffix}`
       };
     })
   ];
@@ -5810,8 +6281,9 @@ function syncLiveProfileSelectOptions(nameHint = null) {
   el.liveProfileSelect.value = hasCurrent ? currentName : LIVE_PROFILE_SELECT_CUSTOM_VALUE;
   if (el.liveProfileDeleteBtn) {
     const selectedName = normalizeLiveProfileName(el.liveProfileSelect.value, "");
-    const canDeleteSelected = entries.some(entry => entry.name === selectedName);
-    el.liveProfileDeleteBtn.disabled = !(canDeleteSelected || hasCurrent);
+    const canDeleteSelected = entries.some(entry => entry.name === selectedName && entry.name !== "default");
+    const canDeleteCurrent = entries.some(entry => entry.name === currentName && entry.name !== "default");
+    el.liveProfileDeleteBtn.disabled = !(canDeleteSelected || canDeleteCurrent);
   }
 }
 
@@ -5913,6 +6385,27 @@ function resolveCurrentLiveProfileName() {
       "default",
     "default"
   );
+}
+
+function resolveLastAppliedLiveProfileName() {
+  return normalizeLiveProfileName(localStorage.getItem(LIVE_PROFILE_LAST_APPLIED_KEY) || "", "");
+}
+
+function setLastAppliedLiveProfileName(name) {
+  const safe = normalizeLiveProfileName(name, "default");
+  localStorage.setItem(LIVE_PROFILE_LAST_APPLIED_KEY, safe);
+  return safe;
+}
+
+function resolveStartupLiveProfileName(store = null) {
+  const source = store && typeof store === "object" ? store : readLiveProfileStore();
+  const preferred = normalizeLiveProfileName(
+    resolveLastAppliedLiveProfileName() || localStorage.getItem(LIVE_PROFILE_LAST_KEY) || "default",
+    "default"
+  );
+  return source.profiles && source.profiles[preferred]
+    ? preferred
+    : "default";
 }
 
 function setCurrentLiveProfileName(name) {
@@ -6038,9 +6531,28 @@ async function applyLiveProfileSnapshot(snapshot = {}, options = {}) {
 }
 
 function initLiveProfileControls() {
-  const initialName = setCurrentLiveProfileName(resolveCurrentLiveProfileName());
+  const startupStore = writeLiveProfileStore(readLiveProfileStore());
+  const initialName = setCurrentLiveProfileName(resolveStartupLiveProfileName(startupStore));
   syncLiveProfileSelectOptions(initialName);
   refreshLiveProfileStatus(initialName);
+
+  const startupEntry = startupStore.profiles?.[initialName] || startupStore.profiles?.default;
+  if (startupEntry?.snapshot) {
+    const startupSnapshot = normalizeLiveProfileSnapshot(startupEntry.snapshot, LIVE_PROFILE_DEFAULT);
+    void applyLiveProfileSnapshot(startupSnapshot, { announce: false, forcePoll: false, pulse: false })
+      .then(ok => {
+        setLastAppliedLiveProfileName(initialName);
+        const summary = formatLiveProfileSnapshotSummary(startupSnapshot);
+        refreshLiveProfileStatus(initialName, ok
+          ? `LIVE PROFILE: ${initialName} auto-loaded | ${summary}`
+          : `LIVE PROFILE: ${initialName} auto-loaded (partial) | ${summary}`);
+        scheduleLiveProfileStatusReset(initialName, 2400);
+      })
+      .catch(() => {
+        refreshLiveProfileStatus(initialName, `LIVE PROFILE: ${initialName} auto-load failed`);
+        scheduleLiveProfileStatusReset(initialName, 2400);
+      });
+  }
 
   if (el.liveProfileName) {
     el.liveProfileName.addEventListener("change", () => {
@@ -6062,7 +6574,7 @@ function initLiveProfileControls() {
         const typed = normalizeLiveProfileName(el.liveProfileName?.value, "");
         const store = readLiveProfileStore();
         if (el.liveProfileDeleteBtn) {
-          el.liveProfileDeleteBtn.disabled = !typed || !store.profiles[typed];
+          el.liveProfileDeleteBtn.disabled = !typed || typed === "default" || !store.profiles[typed];
         }
         refreshLiveProfileStatus(resolveCurrentLiveProfileName());
         return;
@@ -6104,6 +6616,7 @@ function initLiveProfileControls() {
       }
       const snapshot = normalizeLiveProfileSnapshot(entry.snapshot, LIVE_PROFILE_DEFAULT);
       const ok = await applyLiveProfileSnapshot(snapshot, { announce: false, forcePoll: true, pulse: true });
+      setLastAppliedLiveProfileName(name);
       syncLiveProfileSelectOptions(name);
       const summary = formatLiveProfileSnapshotSummary(snapshot);
       refreshLiveProfileStatus(name, ok
@@ -6130,6 +6643,14 @@ function initLiveProfileControls() {
         setBadge(el.health, "warn", "NO SAVED PROFILE TO DELETE");
         return;
       }
+      if (target === "default") {
+        const name = resolveCurrentLiveProfileName();
+        syncLiveProfileSelectOptions(name);
+        refreshLiveProfileStatus(name, "LIVE PROFILE: default is protected");
+        scheduleLiveProfileStatusReset(name);
+        setBadge(el.health, "warn", "DEFAULT PROFILE CANNOT BE DELETED");
+        return;
+      }
       const confirmDelete = window.confirm(`Delete LIVE profile "${target}" from local storage?`);
       if (!confirmDelete) return;
       delete store.profiles[target];
@@ -6150,6 +6671,7 @@ function initLiveProfileControls() {
   if (el.liveProfileResetBtn) {
     el.liveProfileResetBtn.onclick = async () => {
       const ok = await applyLiveProfileSnapshot(LIVE_PROFILE_DEFAULT, { announce: false, forcePoll: true, pulse: true });
+      setLastAppliedLiveProfileName("default");
       const name = resolveCurrentLiveProfileName();
       const summary = formatLiveProfileSnapshotSummary(LIVE_PROFILE_DEFAULT);
       syncLiveProfileSelectOptions(name);
@@ -6162,19 +6684,20 @@ function initLiveProfileControls() {
   }
 }
 
-const PALETTE_FAMILY_ORDER = Object.freeze(["red", "green", "blue"]);
-const PALETTE_FAMILY_ALIASES = Object.freeze({
+const PALETTE_FAMILY_ORDER_DEFAULT = Object.freeze(["red", "yellow", "green", "cyan", "blue"]);
+const PALETTE_FAMILY_ALIASES_DEFAULT = Object.freeze({
   magenta: "red",
   purple: "red",
   pink: "red",
-  amber: "green",
-  yellow: "green",
-  lime: "green",
-  cyan: "blue",
-  aqua: "blue",
-  teal: "blue"
+  amber: "yellow",
+  lime: "yellow",
+  aqua: "cyan",
+  teal: "cyan"
 });
-const PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5, 8, 12]);
+const PALETTE_COLOR_COUNT_OPTIONS_DEFAULT = Object.freeze([1, 3, 5, 8, 12]);
+let PALETTE_FAMILY_ORDER = Object.freeze([...PALETTE_FAMILY_ORDER_DEFAULT]);
+let PALETTE_FAMILY_ALIASES = Object.freeze({ ...PALETTE_FAMILY_ALIASES_DEFAULT });
+let PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([...PALETTE_COLOR_COUNT_OPTIONS_DEFAULT]);
 const PALETTE_SUPPORTED_BRANDS = Object.freeze(["hue", "wiz"]);
 const PALETTE_BRAND_LABELS = Object.freeze({
   hue: "HUE",
@@ -6293,33 +6816,62 @@ const paletteBrandModeNoticeTimers = {
 };
 let paletteBrandMenusDeferredRenderTimer = null;
 let paletteBrandMenusInteractionUntil = 0;
+let paletteGlobalPanelInteractionUntil = 0;
+let paletteMutationQueue = Promise.resolve();
 
-const PALETTE_PRESETS = Object.freeze({
-  all_1: Object.freeze({
-    id: "all_1",
-    label: "ALL COLORS x1",
-    families: Object.freeze(["red", "green", "blue"]),
-    colorsPerFamily: 1
-  }),
-  all_3: Object.freeze({
-    id: "all_3",
-    label: "ALL COLORS x3",
-    families: Object.freeze(["red", "green", "blue"]),
-    colorsPerFamily: 3
-  }),
-  duo_cool: Object.freeze({
-    id: "duo_cool",
-    label: "DUO COOL",
-    families: Object.freeze(["green", "blue"]),
-    colorsPerFamily: null
-  }),
-  duo_warm: Object.freeze({
-    id: "duo_warm",
-    label: "DUO WARM",
-    families: Object.freeze(["red", "green"]),
-    colorsPerFamily: null
-  })
-});
+function enqueuePaletteMutation(task) {
+  const run = typeof task === "function" ? task : async () => false;
+  const next = paletteMutationQueue.then(() => run(), () => run());
+  paletteMutationQueue = next.catch(() => {});
+  return next;
+}
+
+function buildPaletteDefaultPresetsUi(familyOrder = PALETTE_FAMILY_ORDER_DEFAULT) {
+  const ordered = Array.isArray(familyOrder) && familyOrder.length
+    ? Object.freeze(familyOrder.map(name => String(name || "").trim().toLowerCase()).filter(Boolean))
+    : PALETTE_FAMILY_ORDER_DEFAULT;
+  return Object.freeze({
+    all_1: Object.freeze({
+      id: "all_1",
+      label: "ALL COLORS x1",
+      group: "uniform",
+      families: ordered,
+      colorsPerFamily: 1
+    }),
+    all_3: Object.freeze({
+      id: "all_3",
+      label: "ALL COLORS x3",
+      group: "uniform",
+      families: ordered,
+      colorsPerFamily: 3
+    }),
+    duo_cool: Object.freeze({
+      id: "duo_cool",
+      label: "COOL BRIDGE",
+      group: "bridge",
+      families: Object.freeze(["green", "cyan", "blue"]),
+      colorsPerFamily: null,
+      familyColorCounts: Object.freeze({
+        green: 12,
+        cyan: 8,
+        blue: 5
+      })
+    }),
+    duo_warm: Object.freeze({
+      id: "duo_warm",
+      label: "WARM BRIDGE",
+      group: "bridge",
+      families: Object.freeze(["red", "yellow", "green"]),
+      colorsPerFamily: null,
+      familyColorCounts: Object.freeze({
+        red: 5,
+        yellow: 8,
+        green: 12
+      })
+    })
+  });
+}
+let PALETTE_PRESETS = buildPaletteDefaultPresetsUi(PALETTE_FAMILY_ORDER);
 const FIXTURE_METRIC_MODE_ORDER = Object.freeze(["manual", "meta_auto"]);
 const FIXTURE_METRIC_KEYS = Object.freeze(["baseline", "peaks", "transients", "flux"]);
 const FIXTURE_METRIC_LABELS = Object.freeze({
@@ -6360,8 +6912,8 @@ function normalizePaletteBrandUi(value) {
 }
 
 function paletteFamiliesSetEqualUi(a, b) {
-  const aa = normalizePaletteFamiliesUi(a, ["red", "green", "blue"]);
-  const bb = normalizePaletteFamiliesUi(b, ["red", "green", "blue"]);
+  const aa = normalizePaletteFamiliesUi(a, PALETTE_FAMILY_ORDER);
+  const bb = normalizePaletteFamiliesUi(b, PALETTE_FAMILY_ORDER);
   if (aa.length !== bb.length) return false;
   return aa.every(name => bb.includes(name));
 }
@@ -6371,13 +6923,28 @@ function isPalettePresetActiveUi(presetId) {
   const preset = PALETTE_PRESETS[key];
   if (!preset) return false;
   if (!paletteFamiliesSetEqualUi(ui.paletteFamilies, preset.families)) return false;
+  const globalConfig = getPaletteGlobalConfigUi();
+  const presetFamilies = normalizePaletteFamiliesUi(preset.families, PALETTE_FAMILY_ORDER);
+  if (preset.familyColorCounts && typeof preset.familyColorCounts === "object") {
+    const expected = normalizePaletteFamilyColorCountsUi(
+      preset.familyColorCounts,
+      buildPaletteUniformColorCountsUi(3),
+      3
+    );
+    return presetFamilies.every(family => (
+      resolvePaletteColorCountForFamilyUi(globalConfig, family, globalConfig.colorsPerFamily) === expected[family]
+    ));
+  }
   if (Number.isFinite(Number(preset.colorsPerFamily))) {
-    return normalizePaletteColorCountUi(ui.paletteColorsPerFamily, 3) === Number(preset.colorsPerFamily);
+    const target = Number(preset.colorsPerFamily);
+    return presetFamilies.every(family => (
+      resolvePaletteColorCountForFamilyUi(globalConfig, family, globalConfig.colorsPerFamily) === target
+    ));
   }
   return true;
 }
 
-function normalizePaletteFamiliesUi(value, fallback = ["red", "green", "blue"]) {
+function normalizePaletteFamiliesUi(value, fallback = PALETTE_FAMILY_ORDER) {
   const list = Array.isArray(value)
     ? value
     : String(value || "")
@@ -6402,6 +6969,85 @@ function normalizePaletteColorCountUi(value, fallback = 3) {
   const parsed = Number(value);
   if (PALETTE_COLOR_COUNT_OPTIONS.includes(parsed)) return parsed;
   return fallback;
+}
+
+function buildPaletteUniformColorCountsUi(colorCount = 3) {
+  const count = normalizePaletteColorCountUi(colorCount, 3);
+  const out = {};
+  for (const family of PALETTE_FAMILY_ORDER) {
+    out[family] = count;
+  }
+  return out;
+}
+
+function normalizePaletteFamilyColorCountsUi(
+  value,
+  fallback = null,
+  fallbackColorCount = 3
+) {
+  const fallbackCount = normalizePaletteColorCountUi(fallbackColorCount, 3);
+  const source = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+  const fallbackSource = fallback && typeof fallback === "object" && !Array.isArray(fallback)
+    ? fallback
+    : buildPaletteUniformColorCountsUi(fallbackCount);
+  const out = {};
+  for (const family of PALETTE_FAMILY_ORDER) {
+    const raw = Object.prototype.hasOwnProperty.call(source, family)
+      ? source[family]
+      : Object.prototype.hasOwnProperty.call(fallbackSource, family)
+        ? fallbackSource[family]
+        : fallbackCount;
+    out[family] = normalizePaletteColorCountUi(raw, fallbackCount);
+  }
+  return out;
+}
+
+function resolvePaletteColorCountForFamilyUi(
+  config = {},
+  familyId = "red",
+  fallback = 3
+) {
+  const key = String(familyId || "").trim().toLowerCase();
+  const mapped = PALETTE_FAMILY_ALIASES[key] || key;
+  const fallbackCount = normalizePaletteColorCountUi(config?.colorsPerFamily, fallback);
+  if (!PALETTE_FAMILY_ORDER.includes(mapped)) return fallbackCount;
+  const counts = config?.familyColorCounts && typeof config.familyColorCounts === "object"
+    ? config.familyColorCounts
+    : null;
+  if (!counts || !Object.prototype.hasOwnProperty.call(counts, mapped)) return fallbackCount;
+  return normalizePaletteColorCountUi(counts[mapped], fallbackCount);
+}
+
+function getPaletteUniformColorCountUi(config = {}, families = null) {
+  const normalizedFamilies = normalizePaletteFamiliesUi(
+    Array.isArray(families) && families.length ? families : config?.families,
+    PALETTE_FAMILY_ORDER
+  );
+  if (!normalizedFamilies.length) return null;
+  const first = resolvePaletteColorCountForFamilyUi(config, normalizedFamilies[0], config?.colorsPerFamily || 3);
+  for (let i = 1; i < normalizedFamilies.length; i += 1) {
+    const next = resolvePaletteColorCountForFamilyUi(config, normalizedFamilies[i], config?.colorsPerFamily || 3);
+    if (next !== first) return null;
+  }
+  return first;
+}
+
+function getPaletteFamilyCountFingerprintUi(config = {}, families = null) {
+  const normalizedFamilies = normalizePaletteFamiliesUi(
+    Array.isArray(families) && families.length ? families : config?.families,
+    PALETTE_FAMILY_ORDER
+  );
+  return normalizedFamilies
+    .map(family => `${family}:${resolvePaletteColorCountForFamilyUi(config, family, config?.colorsPerFamily || 3)}`)
+    .join(",");
+}
+
+function formatPaletteCountSummaryUi(config = {}, families = null) {
+  const uniform = getPaletteUniformColorCountUi(config, families);
+  if (Number.isFinite(uniform)) return `x${uniform}`;
+  return "MIXED";
 }
 
 function normalizePaletteDisorderAggressionUi(value, fallback = 0.35) {
@@ -6570,7 +7216,8 @@ function normalizePaletteConfigUi(config = {}, fallback = null) {
     ? fallback
     : {
         colorsPerFamily: ui.paletteColorsPerFamily || 3,
-        families: ui.paletteFamilies || ["red", "green", "blue"],
+        familyColorCounts: ui.paletteFamilyColorCounts || buildPaletteUniformColorCountsUi(ui.paletteColorsPerFamily || 3),
+        families: ui.paletteFamilies || PALETTE_FAMILY_ORDER,
         disorder: ui.paletteDisorder,
         disorderAggression: ui.paletteDisorderAggression || 0.35,
         cycleMode: ui.paletteCycleMode || "on_trigger",
@@ -6585,9 +7232,20 @@ function normalizePaletteConfigUi(config = {}, fallback = null) {
         spectrumFeatureMap: ui.paletteSpectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
       };
   const source = config && typeof config === "object" ? config : {};
+  const colorsPerFamily = normalizePaletteColorCountUi(source.colorsPerFamily, base.colorsPerFamily || 3);
+  const familyColorCountsFallback = normalizePaletteFamilyColorCountsUi(
+    base.familyColorCounts,
+    buildPaletteUniformColorCountsUi(base.colorsPerFamily || colorsPerFamily || 3),
+    colorsPerFamily
+  );
   return {
-    colorsPerFamily: normalizePaletteColorCountUi(source.colorsPerFamily, base.colorsPerFamily || 3),
-    families: normalizePaletteFamiliesUi(source.families, base.families || ["red", "green", "blue"]),
+    colorsPerFamily,
+    familyColorCounts: normalizePaletteFamilyColorCountsUi(
+      source.familyColorCounts,
+      familyColorCountsFallback,
+      colorsPerFamily
+    ),
+    families: normalizePaletteFamiliesUi(source.families, base.families || PALETTE_FAMILY_ORDER),
     disorder: Object.prototype.hasOwnProperty.call(source, "disorder")
       ? Boolean(source.disorder)
       : Boolean(base.disorder),
@@ -6847,7 +7505,8 @@ function applyPaletteSnapshotToUi(config = {}, options = {}) {
     next,
     {
       colorsPerFamily: ui.paletteColorsPerFamily || 3,
-      families: ui.paletteFamilies || ["red", "green", "blue"],
+      familyColorCounts: ui.paletteFamilyColorCounts || buildPaletteUniformColorCountsUi(ui.paletteColorsPerFamily || 3),
+      families: ui.paletteFamilies || PALETTE_FAMILY_ORDER,
       disorder: ui.paletteDisorder,
       disorderAggression: ui.paletteDisorderAggression || 0.35,
       cycleMode: ui.paletteCycleMode || "on_trigger",
@@ -6863,6 +7522,7 @@ function applyPaletteSnapshotToUi(config = {}, options = {}) {
     }
   );
   ui.paletteColorsPerFamily = normalizedGlobal.colorsPerFamily;
+  ui.paletteFamilyColorCounts = { ...normalizedGlobal.familyColorCounts };
   ui.paletteFamilies = normalizedGlobal.families.slice();
   ui.paletteDisorder = Boolean(normalizedGlobal.disorder);
   ui.paletteDisorderAggression = normalizedGlobal.disorderAggression;
@@ -6899,11 +7559,13 @@ function applyPaletteSnapshotToUi(config = {}, options = {}) {
       wiz: Array.isArray(opts.brandFixtures.wiz) ? opts.brandFixtures.wiz.slice() : []
     };
   }
+  renderPaletteFamilyButtons(ui.paletteCatalog);
 }
 
 function getPaletteGlobalConfigUi() {
   return normalizePaletteConfigUi({
     colorsPerFamily: ui.paletteColorsPerFamily,
+    familyColorCounts: ui.paletteFamilyColorCounts,
     families: ui.paletteFamilies,
     disorder: ui.paletteDisorder,
     disorderAggression: ui.paletteDisorderAggression,
@@ -7014,7 +7676,8 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
   const selectedFixture = getPaletteBrandSelectionUi(brandKey, fixtures);
   const config = getPaletteScopedConfigUi(brandKey, selectedFixture);
   const colorsPerFamily = normalizePaletteColorCountUi(config.colorsPerFamily, 3);
-  const families = normalizePaletteFamiliesUi(config.families, ["red", "green", "blue"]);
+  const families = normalizePaletteFamiliesUi(config.families, PALETTE_FAMILY_ORDER);
+  const scopedUniformCount = getPaletteUniformColorCountUi(config, families);
   const disorder = Boolean(config.disorder);
   const aggressionPct = Math.round(normalizePaletteDisorderAggressionUi(config.disorderAggression, 0.35) * 100);
   const cycleMode = normalizePaletteCycleModeUi(config.cycleMode, "on_trigger");
@@ -7070,12 +7733,21 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
   ].join("");
 
   const countButtons = PALETTE_COLOR_COUNT_OPTIONS.map(count => (
-    `<button type="button" data-palette-brand-count="${brandKey}" data-count="${count}" class="${count === colorsPerFamily ? "active" : ""}" title="Use ${count} color${count === 1 ? "" : "s"} from each selected family for this target.">${count} COLOR${count === 1 ? "" : "S"}</button>`
+    `<button type="button" data-palette-brand-count="${brandKey}" data-count="${count}" class="${Number.isFinite(scopedUniformCount) && count === scopedUniformCount ? "active" : ""}" title="Set all family counts for this target to ${count}.">${count} COLOR${count === 1 ? "" : "S"}</button>`
   )).join("");
 
-  const familyButtons = PALETTE_FAMILY_ORDER.map(family => (
-    `<button type="button" data-palette-brand-family="${brandKey}" data-family="${family}" class="${families.includes(family) ? "active" : ""}" title="Toggle ${family.toUpperCase()} family in the playback sequence for this target.">${family.toUpperCase()}</button>`
-  )).join("");
+  const familyControls = PALETTE_FAMILY_ORDER.map(family => {
+    const count = resolvePaletteColorCountForFamilyUi(config, family, colorsPerFamily);
+    const countOptions = PALETTE_COLOR_COUNT_OPTIONS.map(option => (
+      `<option value="${option}" ${option === count ? "selected" : ""}>${option}</option>`
+    )).join("");
+    return (
+      `<div class="paletteBrandFamilyControl">` +
+        `<button type="button" data-palette-brand-family="${brandKey}" data-family="${family}" class="${families.includes(family) ? "active" : ""}" title="Toggle ${family.toUpperCase()} family in the playback sequence for this target.">${family.toUpperCase()}</button>` +
+        `<select data-palette-brand-family-count="${brandKey}" data-family="${family}" title="Set ${family.toUpperCase()} family color count for this target.">${countOptions}</select>` +
+      `</div>`
+    );
+  }).join("");
   const vividnessButtons = PALETTE_VIVIDNESS_LEVEL_OPTIONS.map(level => (
     `<button type="button" data-palette-brand-vividness="${brandKey}" data-level="${level}" class="${level === vividness ? "active" : ""}" title="Set ${brandLabel} vividness to ${(PALETTE_VIVIDNESS_LABELS[level] || String(level)).toUpperCase()}.">${(PALETTE_VIVIDNESS_LABELS[level] || String(level)).toUpperCase()}</button>`
   )).join("");
@@ -7143,12 +7815,16 @@ function buildPaletteBrandCardUi(brand, fixtures = []) {
         `<details class="paletteBrandSection" open>` +
           `<summary>COLOR PALETTE</summary>` +
           `<div class="paletteBrandSectionBody">` +
-            `<p class="paletteBrandSubLabel">COLORS PER FAMILY</p>` +
-            `<div class="paletteBrandMiniGrid">${countButtons}</div>` +
+            `<details class="paletteBrandQuickSet">` +
+              `<summary>UNIFORM COUNT QUICK SET</summary>` +
+              `<div class="paletteBrandQuickSetBody">` +
+                `<div class="paletteBrandMiniGrid">${countButtons}</div>` +
+              `</div>` +
+            `</details>` +
             `<p class="paletteBrandSubLabel">VIVIDNESS</p>` +
             `<div class="paletteBrandMiniGrid">${vividnessButtons}</div>` +
-            `<p class="paletteBrandSubLabel">FAMILIES</p>` +
-            `<div class="paletteBrandFamilyGrid">${familyButtons}</div>` +
+            `<p class="paletteBrandSubLabel">FAMILIES + PER-PALETTE COUNT</p>` +
+            `<div class="paletteBrandFamilyGrid">${familyControls}</div>` +
           `</div>` +
         `</details>` +
         `<details class="paletteBrandSection" open>` +
@@ -7272,8 +7948,33 @@ function markPaletteBrandMenusInteraction(holdMs = 1200) {
   }
 }
 
+function markPaletteGlobalPanelInteraction(holdMs = 1200) {
+  const nextUntil = Date.now() + Math.max(250, Number(holdMs) || 1200);
+  if (nextUntil > paletteGlobalPanelInteractionUntil) {
+    paletteGlobalPanelInteractionUntil = nextUntil;
+  }
+}
+
 function isPaletteBrandMenusInteractionActive() {
+  if (el.paletteBrandMenus && document.activeElement && el.paletteBrandMenus.contains(document.activeElement)) {
+    const active = document.activeElement;
+    const tag = String(active.tagName || "").trim().toLowerCase();
+    if (tag === "select" || tag === "input" || tag === "textarea") {
+      return true;
+    }
+  }
   return Date.now() < Number(paletteBrandMenusInteractionUntil || 0);
+}
+
+function isPaletteGlobalPanelInteractionActive() {
+  if (el.paletteGlobalPanel && document.activeElement && el.paletteGlobalPanel.contains(document.activeElement)) {
+    const active = document.activeElement;
+    const tag = String(active.tagName || "").trim().toLowerCase();
+    if (tag === "select" || tag === "input" || tag === "textarea") {
+      return true;
+    }
+  }
+  return Date.now() < Number(paletteGlobalPanelInteractionUntil || 0);
 }
 
 function schedulePaletteBrandMenusDeferredRender(options = {}) {
@@ -7325,11 +8026,111 @@ function renderPaletteBrandMenus(options = {}) {
   el.paletteBrandMenus.innerHTML = cards.join("");
 }
 
+function applyPaletteRuntimeMetadataUi(snapshot = {}) {
+  const data = snapshot && typeof snapshot === "object" ? snapshot : {};
+  const options = data.options && typeof data.options === "object" ? data.options : {};
+
+  if (Array.isArray(options.families)) {
+    const nextFamilyOrder = [];
+    for (const raw of options.families) {
+      const key = String(raw || "").trim().toLowerCase();
+      if (!key) continue;
+      if (nextFamilyOrder.includes(key)) continue;
+      nextFamilyOrder.push(key);
+    }
+    if (nextFamilyOrder.length) {
+      PALETTE_FAMILY_ORDER = Object.freeze(nextFamilyOrder);
+    }
+  }
+
+  const canonicalTargets = new Set(PALETTE_FAMILY_ORDER);
+  if (options.familyAliases && typeof options.familyAliases === "object") {
+    const nextAliases = {};
+    for (const [aliasRaw, targetRaw] of Object.entries(PALETTE_FAMILY_ALIASES_DEFAULT)) {
+      const alias = String(aliasRaw || "").trim().toLowerCase();
+      const target = String(targetRaw || "").trim().toLowerCase();
+      if (!alias || !canonicalTargets.has(target)) continue;
+      nextAliases[alias] = target;
+    }
+    for (const [aliasRaw, targetRaw] of Object.entries(options.familyAliases)) {
+      const alias = String(aliasRaw || "").trim().toLowerCase();
+      const target = String(targetRaw || "").trim().toLowerCase();
+      if (!alias || !canonicalTargets.has(target)) continue;
+      nextAliases[alias] = target;
+    }
+    PALETTE_FAMILY_ALIASES = Object.freeze(nextAliases);
+  } else {
+    const fallbackAliases = {};
+    for (const [aliasRaw, targetRaw] of Object.entries(PALETTE_FAMILY_ALIASES_DEFAULT)) {
+      const alias = String(aliasRaw || "").trim().toLowerCase();
+      const target = String(targetRaw || "").trim().toLowerCase();
+      if (!alias || !canonicalTargets.has(target)) continue;
+      fallbackAliases[alias] = target;
+    }
+    PALETTE_FAMILY_ALIASES = Object.freeze(fallbackAliases);
+  }
+
+  if (Array.isArray(options.colorsPerFamily)) {
+    const nextCounts = [];
+    for (const raw of options.colorsPerFamily) {
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) continue;
+      const count = Math.round(parsed);
+      if (count < 1) continue;
+      if (nextCounts.includes(count)) continue;
+      nextCounts.push(count);
+    }
+    if (nextCounts.length) {
+      PALETTE_COLOR_COUNT_OPTIONS = Object.freeze(nextCounts);
+    }
+  }
+
+  if (options.presets && typeof options.presets === "object") {
+    const normalizedPresets = {};
+    for (const [presetKey, presetRaw] of Object.entries(options.presets || {})) {
+      const preset = presetRaw && typeof presetRaw === "object" ? presetRaw : {};
+      const id = String(preset.id || presetKey || "").trim().toLowerCase();
+      if (!id) continue;
+      const families = normalizePaletteFamiliesUi(
+        preset.families,
+        PALETTE_FAMILY_ORDER
+      );
+      const entry = {
+        id,
+        label: String(preset.label || id).trim() || id,
+        group: String(preset.group || "").trim().toLowerCase() || "custom",
+        families: Object.freeze(families.slice()),
+        colorsPerFamily: null
+      };
+      if (Number.isFinite(Number(preset.colorsPerFamily))) {
+        entry.colorsPerFamily = normalizePaletteColorCountUi(
+          preset.colorsPerFamily,
+          PALETTE_COLOR_COUNT_OPTIONS[0] || 3
+        );
+      }
+      if (preset.familyColorCounts && typeof preset.familyColorCounts === "object") {
+        entry.familyColorCounts = Object.freeze(normalizePaletteFamilyColorCountsUi(
+          preset.familyColorCounts,
+          buildPaletteUniformColorCountsUi(entry.colorsPerFamily || (PALETTE_COLOR_COUNT_OPTIONS[0] || 3)),
+          entry.colorsPerFamily || (PALETTE_COLOR_COUNT_OPTIONS[0] || 3)
+        ));
+      }
+      normalizedPresets[id] = Object.freeze(entry);
+    }
+    PALETTE_PRESETS = Object.keys(normalizedPresets).length
+      ? Object.freeze(normalizedPresets)
+      : buildPaletteDefaultPresetsUi(PALETTE_FAMILY_ORDER);
+  } else {
+    PALETTE_PRESETS = buildPaletteDefaultPresetsUi(PALETTE_FAMILY_ORDER);
+  }
+}
+
 function applyPaletteRuntimeSnapshotToUi(snapshot = {}, options = {}) {
   const data = snapshot && typeof snapshot === "object" ? snapshot : {};
   const opts = options && typeof options === "object" ? options : {};
-  if (Array.isArray(data.catalog) && data.catalog.length) {
-    renderPaletteFamilyButtons(data.catalog);
+  applyPaletteRuntimeMetadataUi(data);
+  if (Array.isArray(data.catalog)) {
+    ui.paletteCatalog = data.catalog.slice();
   }
   applyPaletteSnapshotToUi(data.config || {}, {
     fixtureOverrides: data.fixtureOverrides || {},
@@ -8352,6 +9153,35 @@ async function deleteJson(path) {
     return { ok: res.ok, status: res.status, data: json };
   } catch {
     return { ok: false, status: 0, data: null };
+  }
+}
+
+const uiActionLocks = Object.create(null);
+
+function collectUiGroupButtons(nodes = []) {
+  return Array.isArray(nodes) ? nodes.filter(Boolean) : [];
+}
+
+async function runUiActionWithGroupLock(lockKey, nodes, action) {
+  const key = String(lockKey || "").trim();
+  const run = typeof action === "function" ? action : async () => null;
+  if (!key) return run();
+  if (uiActionLocks[key]) return null;
+
+  uiActionLocks[key] = true;
+  const buttons = collectUiGroupButtons(nodes);
+  const priorDisabled = buttons.map(btn => Boolean(btn.disabled));
+  buttons.forEach(btn => {
+    btn.disabled = true;
+  });
+
+  try {
+    return await run();
+  } finally {
+    buttons.forEach((btn, idx) => {
+      btn.disabled = priorDisabled[idx];
+    });
+    uiActionLocks[key] = false;
   }
 }
 
@@ -9632,40 +10462,6 @@ function formatFixtureBrandForUi(value) {
   return brand.toUpperCase();
 }
 
-function collectActiveSceneSyncBrands(fixtures = []) {
-  const set = new Set();
-  const list = Array.isArray(fixtures) ? fixtures : [];
-  list.forEach(fixture => {
-    const brand = String(fixture?.brand || "").trim().toLowerCase();
-    if (!isValidFixtureBrand(brand)) return;
-    const enabled = fixture?.enabled !== false;
-    const mode = String(fixture?.controlMode || "").trim().toLowerCase();
-    const engineEnabled = fixture?.engineEnabled === false
-      ? false
-      : (fixture?.engineEnabled === true || mode === "engine" || mode === "");
-    if (!enabled || !engineEnabled) return;
-    set.add(brand);
-  });
-  const builtinOrder = { hue: 0, wiz: 1 };
-  return [...set].sort((a, b) => {
-    const rankA = Object.prototype.hasOwnProperty.call(builtinOrder, a) ? builtinOrder[a] : 99;
-    const rankB = Object.prototype.hasOwnProperty.call(builtinOrder, b) ? builtinOrder[b] : 99;
-    if (rankA !== rankB) return rankA - rankB;
-    return a.localeCompare(b);
-  });
-}
-
-function getSceneSyncLabelContext() {
-  return {
-    syncButton: "SYNC HUE + WIZ",
-    desyncButton: "WIZ STANDALONE",
-    statusSynced: "SCENE LINK: HUE + WIZ SYNCED",
-    statusDesynced: "SCENE LINK: WIZ STANDALONE",
-    badgeSynced: "SCENE LINKED",
-    badgeDesynced: "WIZ STANDALONE"
-  };
-}
-
 function resolveFixtureFormBrand(fallback = "") {
   const fallbackBrand = isBuiltinFixtureBrand(fallback)
     ? String(fallback).trim().toLowerCase()
@@ -9851,11 +10647,6 @@ function readFixtureModeFields() {
     el.fxCustomEnabled.value = "false";
   }
 
-  if (!engineEnabled && !twitchEnabled && !customEnabled) {
-    customEnabled = true;
-    el.fxCustomEnabled.value = "true";
-  }
-
   const engineBinding = engineEnabled ? brand : "standalone";
   const controlMode = engineEnabled ? "engine" : "standalone";
   el.fxEngineBinding.value = engineBinding;
@@ -9884,10 +10675,6 @@ function validateFixtureCoupling(brand, modeState) {
     return { ok: false, message: "Fixture brand must be hue, wiz, or a valid lowercase mod brand id." };
   }
 
-  if (!engineEnabled && !twitchEnabled && !customEnabled) {
-    return { ok: false, message: "Enable at least one mode: engine, twitch, or custom." };
-  }
-
   if (engineEnabled && customEnabled) {
     return { ok: false, message: "Custom mode cannot be enabled while Engine mode is enabled." };
   }
@@ -9903,7 +10690,7 @@ function validateFixtureCoupling(brand, modeState) {
   if (engineEnabled) active.push("engine");
   if (twitchEnabled) active.push("twitch");
   if (customEnabled) active.push("custom");
-  return { ok: true, message: `Modes: ${active.join(" + ")}` };
+  return { ok: true, message: active.length ? `Modes: ${active.join(" + ")}` : "Modes: idle (no routing)" };
 }
 
 function updateFixtureCompatibilityHint() {
@@ -10347,17 +11134,37 @@ async function loadAutomationConfig() {
 
 function renderPaletteFamilyButtons(palettes = []) {
   if (!el.paletteFamilyGrid) return;
-  if (!Array.isArray(palettes) || !palettes.length) return;
-
-  el.paletteFamilyGrid.innerHTML = "";
-  for (const palette of palettes) {
-    if (!palette || !palette.id) continue;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.dataset.paletteFamily = String(palette.id).toLowerCase();
-    btn.textContent = String(palette.label || palette.id).toUpperCase();
-    el.paletteFamilyGrid.appendChild(btn);
+  const source = Array.isArray(palettes) && palettes.length
+    ? palettes
+    : (Array.isArray(ui.paletteCatalog) ? ui.paletteCatalog : []);
+  const labelsByFamily = {};
+  for (const palette of source) {
+    const raw = String(palette?.id || "").trim().toLowerCase();
+    if (!raw) continue;
+    const family = PALETTE_FAMILY_ALIASES[raw] || raw;
+    if (!PALETTE_FAMILY_ORDER.includes(family)) continue;
+    labelsByFamily[family] = String(palette?.label || family).trim().toUpperCase() || family.toUpperCase();
   }
+  const config = getPaletteGlobalConfigUi();
+  const families = normalizePaletteFamiliesUi(config.families, PALETTE_FAMILY_ORDER);
+  const cards = PALETTE_FAMILY_ORDER.map(family => {
+    const label = escapeHtmlUi(labelsByFamily[family] || family.toUpperCase());
+    const selected = families.includes(family);
+    const count = resolvePaletteColorCountForFamilyUi(config, family, config.colorsPerFamily || 3);
+    const countOptions = PALETTE_COLOR_COUNT_OPTIONS.map(option => (
+      `<option value="${option}" ${option === count ? "selected" : ""}>${option}</option>`
+    )).join("");
+    return (
+      `<div class="paletteFamilyCard" data-palette-family-card="${family}">` +
+        `<button type="button" data-palette-family="${family}" class="${selected ? "active" : ""}" title="Toggle ${label} family in the playback sequence.">${label}</button>` +
+        `<div class="paletteFamilyCountRow">` +
+          `<span>COUNT</span>` +
+          `<select data-palette-family-count="${family}" title="Set ${label} family color count.">${countOptions}</select>` +
+        `</div>` +
+      `</div>`
+    );
+  });
+  el.paletteFamilyGrid.innerHTML = cards.join("");
 }
 
 async function loadPaletteConfig() {
@@ -11980,10 +12787,6 @@ async function applyFixtureRouteMode() {
     customEnabled = false;
     setRouteChipState(el.standRouteCustom, false);
   }
-  if (!engineEnabled && !twitchEnabled && !customEnabled) {
-    setBadge(el.health, "warn", "ENABLE AT LEAST ONE MODE");
-    return;
-  }
 
   const brand = String(fixture.brand || "").trim().toLowerCase();
   if (!isValidFixtureBrand(brand)) {
@@ -12768,26 +13571,32 @@ el.modDiscardBtn.onclick = discardModDraftFromUi;
 el.modActionRunBtn.onclick = runModAction;
 
 /* POWER */
-el.onBtn.onclick = async () => {
+const POWER_ACTION_BUTTONS = collectUiGroupButtons([el.onBtn, el.offBtn, el.panicBtn]);
+el.onBtn.onclick = () => runUiActionWithGroupLock("power_state", POWER_ACTION_BUTTONS, async () => {
   const ok = await api("/rave/on");
   ui.raveOn = ok;
   setBadge(el.health, ok ? "ok" : "bad", ok ? "RAVE ON" : "RAVE ON FAIL");
   sync();
-};
+});
 
-el.offBtn.onclick = async () => {
+el.offBtn.onclick = () => runUiActionWithGroupLock("power_state", POWER_ACTION_BUTTONS, async () => {
   const ok = await api("/rave/off");
   if (ok) ui.raveOn = false;
   setBadge(el.health, ok ? "ok" : "bad", ok ? "RAVE OFF" : "RAVE OFF FAIL");
   sync();
-};
+});
 
-el.panicBtn.onclick = async () => {
+el.panicBtn.onclick = () => runUiActionWithGroupLock("power_state", POWER_ACTION_BUTTONS, async () => {
   if (shouldConfirmDangerousAction() && !window.confirm("Trigger PANIC blackout?")) return;
-  await api("/rave/panic");
+  const ok = await api("/rave/panic");
+  if (!ok) {
+    setBadge(el.health, "bad", "PANIC FAIL");
+    return;
+  }
   ui.raveOn = false;
+  setBadge(el.health, "warn", "PANIC");
   sync();
-};
+});
 
 /* ENGINE */
 el.reloadBtn.onclick = async () => {
@@ -13305,7 +14114,8 @@ async function buildMetaAutoTempoTrackerCandidates(options = {}) {
   return true;
 }
 
-el.metaAutoOnBtn.onclick = async () => {
+const META_AUTO_STATE_BUTTONS = collectUiGroupButtons([el.metaAutoOnBtn, el.metaAutoOffBtn]);
+el.metaAutoOnBtn.onclick = () => runUiActionWithGroupLock("meta_auto_state", META_AUTO_STATE_BUTTONS, async () => {
   const r = await postJson("/rave/meta/auto?enabled=true", {});
   if (!r.ok || !r.data) {
     setBadge(el.health, "bad", "META AUTO FAIL");
@@ -13319,9 +14129,9 @@ el.metaAutoOnBtn.onclick = async () => {
   maybeApplySmartLiveReactivityPolicy("META AUTO ON");
   setBadge(el.health, "ok", "META AUTO ON");
   sync();
-};
+});
 
-el.metaAutoOffBtn.onclick = async () => {
+el.metaAutoOffBtn.onclick = () => runUiActionWithGroupLock("meta_auto_state", META_AUTO_STATE_BUTTONS, async () => {
   const r = await postJson("/rave/meta/auto?enabled=false", {});
   if (!r.ok || !r.data) {
     setBadge(el.health, "bad", "META AUTO FAIL");
@@ -13333,7 +14143,7 @@ el.metaAutoOffBtn.onclick = async () => {
   maybeApplySmartLiveReactivityPolicy("META AUTO OFF");
   setBadge(el.health, "ok", "META AUTO OFF");
   sync();
-};
+});
 
 if (el.metaAutoHueWizBaselineBlendBtn) {
   el.metaAutoHueWizBaselineBlendBtn.onclick = async () => {
@@ -13368,7 +14178,7 @@ if (el.metaAutoTrackerFluxBtn) {
 
 /* AUTO PROFILE */
 autoProfileButtons.forEach(btn => {
-  btn.onclick = async () => {
+  btn.onclick = () => runUiActionWithGroupLock("auto_profile_select", autoProfileButtons, async () => {
     const name = btn.dataset.autoProfile;
     const metaOk = await disableMetaAutoForManualOverride({ announce: false });
     if (!metaOk) return;
@@ -13383,12 +14193,12 @@ autoProfileButtons.forEach(btn => {
     maybeApplySmartLiveReactivityPolicy(`AUTO ${String(name || "").toUpperCase()}`);
     setBadge(el.health, "ok", `AUTO ${name.toUpperCase()}`);
     sync();
-  };
+  });
 });
 
 /* AUDIO REACTIVITY */
 audioReactivityButtons.forEach(btn => {
-  btn.onclick = async () => {
+  btn.onclick = () => runUiActionWithGroupLock("audio_reactivity_select", audioReactivityButtons, async () => {
     const name = btn.dataset.audioReactivity;
     const metaOk = await disableMetaAutoForManualOverride({ announce: false });
     if (!metaOk) return;
@@ -13403,59 +14213,35 @@ audioReactivityButtons.forEach(btn => {
     maybeApplySmartLiveReactivityPolicy(`A-REACT ${String(name || "").toUpperCase()}`);
     setBadge(el.health, "ok", `A-REACT ${name.toUpperCase()}`);
     sync();
-  };
+  });
 });
 
 /* SCENE LOCK */
 sceneButtons.forEach(btn => {
-  btn.onclick = async () => {
+  btn.onclick = () => runUiActionWithGroupLock("scene_lock_select", sceneButtons, async () => {
+    const previousScene = String(ui.sceneLock || "auto");
     const scene = btn.dataset.scene;
+    const targetScene = scene === "auto" ? "auto" : scene;
+    if (!targetScene) return;
+    const ok = scene === "auto"
+      ? await api("/rave/scene/auto")
+      : await api(`/rave/scene?name=${scene}`);
+    if (!ok) {
+      ui.sceneLock = previousScene;
+      setBadge(el.health, "bad", "SCENE CHANGE FAIL");
+      sync();
+      return;
+    }
     if (scene === "auto") {
       ui.sceneLock = "auto";
-      await api("/rave/scene/auto");
     } else {
       ui.sceneLock = scene;
-      await api(`/rave/scene?name=${scene}`);
     }
+    setBadge(el.health, "ok", `SCENE ${String(ui.sceneLock || "auto").toUpperCase()}`);
     maybeApplySmartLiveReactivityPolicy(`SCENE ${String(ui.sceneLock || "auto").toUpperCase()}`);
     sync();
-  };
+  });
 });
-
-async function setSceneSyncMode(enabled) {
-  const response = await postJson("/rave/scene/sync", { enabled: Boolean(enabled) });
-  if (!response.ok || !response.data) {
-    setBadge(el.health, "bad", "SCENE SYNC FAIL");
-    return false;
-  }
-
-  ui.wizSceneSync = Boolean(response.data.enabled);
-  ui.sceneSyncStrategy = String(response.data.strategy || ui.sceneSyncStrategy || "").trim().toLowerCase()
-    || (ui.wizSceneSync ? "linked" : "standalone");
-  const sceneSyncLabels = getSceneSyncLabelContext();
-  const standalone = ui.sceneSyncStrategy === "standalone";
-  setBadge(
-    el.health,
-    "ok",
-    ui.wizSceneSync && !standalone
-      ? sceneSyncLabels.badgeSynced
-      : sceneSyncLabels.badgeDesynced
-  );
-  sync();
-  return true;
-}
-
-if (el.sceneSyncOnBtn) {
-  el.sceneSyncOnBtn.onclick = async () => {
-    await setSceneSyncMode(true);
-  };
-}
-
-if (el.sceneSyncOffBtn) {
-  el.sceneSyncOffBtn.onclick = async () => {
-    await setSceneSyncMode(false);
-  };
-}
 
 /* OVERCLOCK */
 async function setOverclockAutoEnabled(enabled, options = {}) {
@@ -13612,70 +14398,95 @@ async function setUnsafeDevOverclock(hz) {
   return true;
 }
 
-el.ocLudicrousBtn.onclick = () => setOverclockPreset(7, "/rave/overclock/ludicrous/on", "OC 16HZ");
-el.ocHyperBtn.onclick = () => setOverclockPreset(6, "/rave/overclock/hyper/on", "OC 14HZ");
-el.ocInsaneBtn.onclick = () => setOverclockPreset(5, "/rave/overclock/insane/on", "OC 12HZ");
-el.ocExtremeBtn.onclick = () => setOverclockPreset(4, "/rave/overclock/extreme/on", "OC 10HZ");
-el.ocUltraBtn.onclick = () => setOverclockPreset(3, "/rave/overclock/ultra/on", "OC 8HZ");
-el.ocTurboBtn.onclick = () => setOverclockPreset(2, "/rave/overclock/turbo/on", "OC 6HZ");
-el.ocOnBtn.onclick = () => setOverclockPreset(1, "/rave/overclock/on", "OC 4HZ");
-el.ocOffBtn.onclick = () => setOverclockPreset(0, "/rave/overclock/off", "OC 2HZ");
-if (el.ocAutoBtn) {
-  el.ocAutoBtn.onclick = async () => {
-    await setOverclockAutoEnabled(!ui.overclockAutoEnabled);
-  };
+function getOverclockControlButtons() {
+  return collectUiGroupButtons([
+    el.ocOffBtn,
+    el.ocOnBtn,
+    el.ocTurboBtn,
+    el.ocUltraBtn,
+    el.ocExtremeBtn,
+    el.ocInsaneBtn,
+    el.ocHyperBtn,
+    el.ocLudicrousBtn,
+    el.ocAutoBtn,
+    el.ocDev20Btn,
+    el.ocDev30Btn,
+    el.ocDev40Btn,
+    el.ocDev50Btn,
+    el.ocDev60Btn
+  ]);
 }
 
-if (el.ocDev20Btn) el.ocDev20Btn.onclick = () => setUnsafeDevOverclock(20);
-if (el.ocDev30Btn) el.ocDev30Btn.onclick = () => setUnsafeDevOverclock(30);
-if (el.ocDev40Btn) el.ocDev40Btn.onclick = () => setUnsafeDevOverclock(40);
-if (el.ocDev50Btn) el.ocDev50Btn.onclick = () => setUnsafeDevOverclock(50);
-if (el.ocDev60Btn) el.ocDev60Btn.onclick = () => setUnsafeDevOverclock(60);
+el.ocLudicrousBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setOverclockPreset(7, "/rave/overclock/ludicrous/on", "OC 16HZ"));
+el.ocHyperBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setOverclockPreset(6, "/rave/overclock/hyper/on", "OC 14HZ"));
+el.ocInsaneBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setOverclockPreset(5, "/rave/overclock/insane/on", "OC 12HZ"));
+el.ocExtremeBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setOverclockPreset(4, "/rave/overclock/extreme/on", "OC 10HZ"));
+el.ocUltraBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setOverclockPreset(3, "/rave/overclock/ultra/on", "OC 8HZ"));
+el.ocTurboBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setOverclockPreset(2, "/rave/overclock/turbo/on", "OC 6HZ"));
+el.ocOnBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setOverclockPreset(1, "/rave/overclock/on", "OC 4HZ"));
+el.ocOffBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setOverclockPreset(0, "/rave/overclock/off", "OC 2HZ"));
+if (el.ocAutoBtn) {
+  el.ocAutoBtn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), async () => {
+    await setOverclockAutoEnabled(!ui.overclockAutoEnabled);
+  });
+}
+
+if (el.ocDev20Btn) el.ocDev20Btn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setUnsafeDevOverclock(20));
+if (el.ocDev30Btn) el.ocDev30Btn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setUnsafeDevOverclock(30));
+if (el.ocDev40Btn) el.ocDev40Btn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setUnsafeDevOverclock(40));
+if (el.ocDev50Btn) el.ocDev50Btn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setUnsafeDevOverclock(50));
+if (el.ocDev60Btn) el.ocDev60Btn.onclick = () => runUiActionWithGroupLock("overclock_select", getOverclockControlButtons(), () => setUnsafeDevOverclock(60));
 
 /* MANUAL PALETTE SEQUENCER */
 async function applyPalettePatch(patch = {}, badgePrefix = "PALETTE") {
-  const r = await postJson("/rave/palette", patch);
-  if (!r.ok || !r.data || !r.data.ok) {
-    const reason = r.data?.error ? `: ${r.data.error}` : "";
-    setBadge(el.health, "bad", `${badgePrefix} FAIL${reason}`);
-    return false;
-  }
-  applyPaletteRuntimeSnapshotToUi(r.data || {}, { forceRender: true });
-  maybeApplySmartLiveReactivityPolicy(`${badgePrefix} UPDATE`);
-  sync();
-  return true;
+  return enqueuePaletteMutation(async () => {
+    const r = await postJson("/rave/palette", patch);
+    if (!r.ok || !r.data || !r.data.ok) {
+      const reason = r.data?.error ? `: ${r.data.error}` : "";
+      setBadge(el.health, "bad", `${badgePrefix} FAIL${reason}`);
+      return false;
+    }
+    applyPaletteRuntimeSnapshotToUi(r.data || {}, { forceRender: true });
+    maybeApplySmartLiveReactivityPolicy(`${badgePrefix} UPDATE`);
+    sync();
+    return true;
+  });
 }
 
 async function applyFixtureMetricPatch(patch = {}, badgePrefix = "FIXTURE METRIC") {
-  const r = await postJson("/rave/fixture-metrics", patch);
-  if (!r.ok || !r.data || !r.data.ok) {
-    const reason = r.data?.error ? `: ${r.data.error}` : "";
-    setBadge(el.health, "bad", `${badgePrefix} FAIL${reason}`);
-    return false;
-  }
-  applyFixtureMetricRoutingSnapshotToUi(r.data || {});
-  if (r.data?.brandFixtures && typeof r.data.brandFixtures === "object") {
-    ui.paletteBrandFixtures = {
-      hue: Array.isArray(r.data.brandFixtures.hue) ? r.data.brandFixtures.hue.slice() : [],
-      wiz: Array.isArray(r.data.brandFixtures.wiz) ? r.data.brandFixtures.wiz.slice() : []
-    };
-  }
-  renderPaletteBrandMenus({ force: true, reason: "fixture_metric_patch" });
-  sync();
-  return true;
+  return enqueuePaletteMutation(async () => {
+    const r = await postJson("/rave/fixture-metrics", patch);
+    if (!r.ok || !r.data || !r.data.ok) {
+      const reason = r.data?.error ? `: ${r.data.error}` : "";
+      setBadge(el.health, "bad", `${badgePrefix} FAIL${reason}`);
+      return false;
+    }
+    applyFixtureMetricRoutingSnapshotToUi(r.data || {});
+    if (r.data?.brandFixtures && typeof r.data.brandFixtures === "object") {
+      ui.paletteBrandFixtures = {
+        hue: Array.isArray(r.data.brandFixtures.hue) ? r.data.brandFixtures.hue.slice() : [],
+        wiz: Array.isArray(r.data.brandFixtures.wiz) ? r.data.brandFixtures.wiz.slice() : []
+      };
+    }
+    renderPaletteBrandMenus({ force: true, reason: "fixture_metric_patch" });
+    sync();
+    return true;
+  });
 }
 
 async function applyFixtureRoutingClearPatch(patch = {}, badgePrefix = "OVERRIDE") {
-  const r = await postJson("/rave/fixture-routing/clear", patch);
-  if (!r.ok || !r.data || !r.data.ok) {
-    const reason = r.data?.error ? `: ${r.data.error}` : "";
-    setBadge(el.health, "bad", `${badgePrefix} FAIL${reason}`);
-    return false;
-  }
-  applyPaletteRuntimeSnapshotToUi(r.data || {}, { forceRender: true });
-  maybeApplySmartLiveReactivityPolicy(`${badgePrefix} UPDATE`);
-  sync();
-  return true;
+  return enqueuePaletteMutation(async () => {
+    const r = await postJson("/rave/fixture-routing/clear", patch);
+    if (!r.ok || !r.data || !r.data.ok) {
+      const reason = r.data?.error ? `: ${r.data.error}` : "";
+      setBadge(el.health, "bad", `${badgePrefix} FAIL${reason}`);
+      return false;
+    }
+    applyPaletteRuntimeSnapshotToUi(r.data || {}, { forceRender: true });
+    maybeApplySmartLiveReactivityPolicy(`${badgePrefix} UPDATE`);
+    sync();
+    return true;
+  });
 }
 
 function syncPaletteDisorderAggressionSliderUi() {
@@ -13876,6 +14687,28 @@ paletteCustomBrandButtons.forEach(btn => {
   };
 });
 
+if (el.paletteGlobalPanel) {
+  const markPaletteGlobalHot = evt => {
+    const type = String(evt?.type || "").trim().toLowerCase();
+    if (type === "pointerdown" || type === "focusin") {
+      markPaletteGlobalPanelInteraction(1800);
+      return;
+    }
+    if (type === "change") {
+      markPaletteGlobalPanelInteraction(1200);
+      return;
+    }
+    if (type === "input") {
+      markPaletteGlobalPanelInteraction(900);
+      return;
+    }
+    markPaletteGlobalPanelInteraction(750);
+  };
+  ["pointerdown", "focusin", "keydown", "input", "change"].forEach(type => {
+    el.paletteGlobalPanel.addEventListener(type, markPaletteGlobalHot, { capture: true });
+  });
+}
+
 paletteCycleModeButtons.forEach(btn => {
   btn.onclick = async () => {
     if (!isPaletteGlobalScopeActiveUi()) return;
@@ -14067,11 +14900,12 @@ palettePresetButtons.forEach(btn => {
     if (Number.isFinite(Number(preset.colorsPerFamily))) {
       patch.colorsPerFamily = Number(preset.colorsPerFamily);
     }
+    if (preset.familyColorCounts && typeof preset.familyColorCounts === "object") {
+      patch.familyColorCounts = { ...preset.familyColorCounts };
+    }
     const ok = await applyPalettePatch(patch, "PALETTE PRESET");
     if (ok) {
-      const countText = Number.isFinite(Number(preset.colorsPerFamily))
-        ? `x${Number(preset.colorsPerFamily)}`
-        : `x${normalizePaletteColorCountUi(ui.paletteColorsPerFamily, 3)}`;
+      const countText = formatPaletteCountSummaryUi(getPaletteGlobalConfigUi(), ui.paletteFamilies);
       setBadge(el.health, "ok", `PRESET ${String(preset.label || key).toUpperCase()} ${countText}`);
     }
   };
@@ -14080,11 +14914,12 @@ palettePresetButtons.forEach(btn => {
 if (el.paletteFamilyGrid) {
   el.paletteFamilyGrid.onclick = async e => {
     if (!isPaletteGlobalScopeActiveUi()) return;
+    if (e.target.closest("select[data-palette-family-count]")) return;
     const btn = e.target.closest("[data-palette-family]");
     if (!btn) return;
     const selected = String(btn.dataset.paletteFamily || "").trim().toLowerCase();
     if (!selected || !PALETTE_FAMILY_ORDER.includes(selected)) return;
-    const current = normalizePaletteFamiliesUi(ui.paletteFamilies, ["red", "green", "blue"]);
+    const current = normalizePaletteFamiliesUi(ui.paletteFamilies, PALETTE_FAMILY_ORDER);
     const exists = current.includes(selected);
     let nextFamilies = exists
       ? current.filter(name => name !== selected)
@@ -14094,6 +14929,33 @@ if (el.paletteFamilyGrid) {
     const ok = await applyPalettePatch({ families: nextFamilies }, "PALETTE FAMILIES");
     if (ok) {
       setBadge(el.health, "ok", `PALETTES ${getPaletteFamiliesLabelUi(nextFamilies)}`);
+    }
+  };
+  el.paletteFamilyGrid.onchange = async e => {
+    if (!isPaletteGlobalScopeActiveUi()) return;
+    const select = e.target.closest("select[data-palette-family-count]");
+    if (!select) return;
+    markPaletteGlobalPanelInteraction(1500);
+    const family = String(select.dataset.paletteFamilyCount || "").trim().toLowerCase();
+    if (!PALETTE_FAMILY_ORDER.includes(family)) return;
+    const count = normalizePaletteColorCountUi(
+      select.value,
+      resolvePaletteColorCountForFamilyUi(getPaletteGlobalConfigUi(), family, ui.paletteColorsPerFamily || 3)
+    );
+    const currentFamilies = normalizePaletteFamiliesUi(ui.paletteFamilies, PALETTE_FAMILY_ORDER);
+    let nextFamilies = currentFamilies.slice();
+    if (!nextFamilies.includes(family)) {
+      nextFamilies = PALETTE_FAMILY_ORDER.filter(name => nextFamilies.concat([family]).includes(name));
+    }
+    const patch = {
+      familyColorCounts: { [family]: count }
+    };
+    if (!currentFamilies.includes(family)) {
+      patch.families = nextFamilies;
+    }
+    const ok = await applyPalettePatch(patch, "PALETTE FAMILY COUNT");
+    if (ok) {
+      setBadge(el.health, "ok", `${family.toUpperCase()} COUNT ${count}`);
     }
   };
 }
@@ -14154,21 +15016,70 @@ function getPaletteBrandScopePatchUi(brandKey) {
 }
 
 if (el.paletteBrandMenus) {
-  const markBrandMenusHot = () => markPaletteBrandMenusInteraction(480);
+  const markBrandMenusHot = evt => {
+    const type = String(evt?.type || "").trim().toLowerCase();
+    if (type === "pointerdown" || type === "focusin") {
+      markPaletteBrandMenusInteraction(5200);
+      return;
+    }
+    if (type === "change") {
+      markPaletteBrandMenusInteraction(2200);
+      return;
+    }
+    if (type === "input") {
+      markPaletteBrandMenusInteraction(1600);
+      return;
+    }
+    markPaletteBrandMenusInteraction(1200);
+  };
   ["pointerdown", "focusin", "keydown", "input", "change"].forEach(type => {
     el.paletteBrandMenus.addEventListener(type, markBrandMenusHot, { capture: true });
   });
 
   el.paletteBrandMenus.onchange = async e => {
     const fixtureSelect = e.target.closest("select[data-palette-brand-fixture]");
-    if (!fixtureSelect) return;
-    const brand = normalizePaletteBrandUi(fixtureSelect.dataset.paletteBrandFixture);
-    if (!brand) return;
-    const selected = String(fixtureSelect.value || PALETTE_ALL_FIXTURES_VALUE).trim() || PALETTE_ALL_FIXTURES_VALUE;
-    ui.paletteFixtureSelectionByBrand[brand] = selected;
-    persistPaletteFixtureSelectionMemory();
-    renderPaletteBrandMenus({ force: true, reason: "fixture_select_change" });
-    sync();
+    if (fixtureSelect) {
+      const brand = normalizePaletteBrandUi(fixtureSelect.dataset.paletteBrandFixture);
+      if (!brand) return;
+      const selected = String(fixtureSelect.value || PALETTE_ALL_FIXTURES_VALUE).trim() || PALETTE_ALL_FIXTURES_VALUE;
+      ui.paletteFixtureSelectionByBrand[brand] = selected;
+      persistPaletteFixtureSelectionMemory();
+      renderPaletteBrandMenus({ force: true, reason: "fixture_select_change" });
+      sync();
+      return;
+    }
+
+    const familyCountSelect = e.target.closest("select[data-palette-brand-family-count]");
+    if (familyCountSelect) {
+      const brand = normalizePaletteBrandUi(familyCountSelect.dataset.paletteBrandFamilyCount);
+      if (!brand) return;
+      const family = String(familyCountSelect.dataset.family || "").trim().toLowerCase();
+      if (!PALETTE_FAMILY_ORDER.includes(family)) return;
+      const count = normalizePaletteColorCountUi(familyCountSelect.value, 3);
+      const scopePatch = getPaletteBrandScopePatchUi(brand);
+      if (!scopePatch) return;
+      const selectedFixture = scopePatch.fixtureId || PALETTE_ALL_FIXTURES_VALUE;
+      const currentConfig = getPaletteScopedConfigUi(brand, selectedFixture);
+      const currentFamilies = normalizePaletteFamiliesUi(currentConfig.families, PALETTE_FAMILY_ORDER);
+      let nextFamilies = currentFamilies.slice();
+      if (!nextFamilies.includes(family)) {
+        nextFamilies = PALETTE_FAMILY_ORDER.filter(name => nextFamilies.concat([family]).includes(name));
+      }
+      const patch = {
+        ...scopePatch,
+        familyColorCounts: { [family]: count }
+      };
+      if (!currentFamilies.includes(family)) {
+        patch.families = nextFamilies;
+      }
+      const ok = await applyPalettePatch(
+        patch,
+        `${brand.toUpperCase()} ${family.toUpperCase()} COUNT`
+      );
+      if (ok) {
+        setBadge(el.health, "ok", `${brand.toUpperCase()} ${family.toUpperCase()} COUNT ${count}`);
+      }
+    }
   };
 
   el.paletteBrandMenus.oninput = e => {
@@ -14314,7 +15225,7 @@ if (el.paletteBrandMenus) {
       if (!scopePatch) return;
       const selectedFixture = scopePatch.fixtureId || PALETTE_ALL_FIXTURES_VALUE;
       const currentConfig = getPaletteScopedConfigUi(brand, selectedFixture);
-      const currentFamilies = normalizePaletteFamiliesUi(currentConfig.families, ["red", "green", "blue"]);
+      const currentFamilies = normalizePaletteFamiliesUi(currentConfig.families, PALETTE_FAMILY_ORDER);
       const exists = currentFamilies.includes(family);
       let nextFamilies = exists
         ? currentFamilies.filter(name => name !== family)
@@ -15488,7 +16399,8 @@ function sync() {
       ? `AUTO HZ ${autoHzLabel ? `${autoHzLabel}HZ` : "ON"}`
       : "AUTO HZ (NO META)";
   }
-  el.ocLudicrousBtn.classList.toggle("active", ui.overclockLevel === 7);
+  const overclockManualActive = !Boolean(ui.overclockAutoEnabled);
+  el.ocLudicrousBtn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 7);
   if (el.ocDevCluster) {
     el.ocDevCluster.classList.toggle("hidden", !ui.devDebugMode);
   }
@@ -15498,37 +16410,28 @@ function sync() {
   if (el.devDebugToggleBtn) {
     el.devDebugToggleBtn.classList.toggle("active", ui.devDebugMode);
   }
-  if (el.ocDev20Btn) el.ocDev20Btn.classList.toggle("active", ui.overclockLevel === 8);
-  if (el.ocDev30Btn) el.ocDev30Btn.classList.toggle("active", ui.overclockLevel === 9);
-  if (el.ocDev40Btn) el.ocDev40Btn.classList.toggle("active", ui.overclockLevel === 10);
-  if (el.ocDev50Btn) el.ocDev50Btn.classList.toggle("active", ui.overclockLevel === 11);
-  if (el.ocDev60Btn) el.ocDev60Btn.classList.toggle("active", ui.overclockLevel === 12);
-  el.ocHyperBtn.classList.toggle("active", ui.overclockLevel === 6);
-  el.ocInsaneBtn.classList.toggle("active", ui.overclockLevel === 5);
-  el.ocExtremeBtn.classList.toggle("active", ui.overclockLevel === 4);
-  el.ocUltraBtn.classList.toggle("active", ui.overclockLevel === 3);
-  el.ocTurboBtn.classList.toggle("active", ui.overclockLevel === 2);
-  el.ocOnBtn.classList.toggle("active", ui.overclockLevel === 1);
-  el.ocOffBtn.classList.toggle("active", ui.overclockLevel === 0);
+  if (el.ocDev20Btn) el.ocDev20Btn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 8);
+  if (el.ocDev30Btn) el.ocDev30Btn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 9);
+  if (el.ocDev40Btn) el.ocDev40Btn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 10);
+  if (el.ocDev50Btn) el.ocDev50Btn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 11);
+  if (el.ocDev60Btn) el.ocDev60Btn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 12);
+  el.ocHyperBtn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 6);
+  el.ocInsaneBtn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 5);
+  el.ocExtremeBtn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 4);
+  el.ocUltraBtn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 3);
+  el.ocTurboBtn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 2);
+  el.ocOnBtn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 1);
+  el.ocOffBtn.classList.toggle("active", overclockManualActive && ui.overclockLevel === 0);
 
   sceneButtons.forEach(btn => {
     const scene = btn.dataset.scene;
     btn.classList.toggle("active", scene === ui.sceneLock);
   });
-  const sceneSyncLabels = getSceneSyncLabelContext();
   const sceneStandalone = String(ui.sceneSyncStrategy || "standalone").trim().toLowerCase() === "standalone";
-  if (el.sceneSyncOnBtn) {
-    el.sceneSyncOnBtn.classList.toggle("active", !sceneStandalone && Boolean(ui.wizSceneSync));
-    el.sceneSyncOnBtn.textContent = sceneSyncLabels.syncButton;
-  }
-  if (el.sceneSyncOffBtn) {
-    el.sceneSyncOffBtn.classList.toggle("active", sceneStandalone || !Boolean(ui.wizSceneSync));
-    el.sceneSyncOffBtn.textContent = sceneSyncLabels.desyncButton;
-  }
   if (el.sceneSyncStat) {
-    el.sceneSyncStat.textContent = (!sceneStandalone && Boolean(ui.wizSceneSync))
-      ? sceneSyncLabels.statusSynced
-      : sceneSyncLabels.statusDesynced;
+    el.sceneSyncStat.textContent = sceneStandalone
+      ? "WIZ SCENE MODE: STANDALONE (ENFORCED)"
+      : "SCENE LINK: HUE + WIZ SYNCED";
   }
 
   const paletteScope = normalizePaletteControlScopeUi(ui.paletteControlScope, "global");
@@ -15541,7 +16444,7 @@ function sync() {
     el.paletteScopeCustomBtn.classList.toggle("active", customScopeActive);
   }
   if (el.paletteGlobalPanel) {
-    el.paletteGlobalPanel.classList.toggle("isDisabled", customScopeActive);
+    el.paletteGlobalPanel.classList.toggle("hidden", customScopeActive);
   }
   if (el.paletteCustomPanel) {
     el.paletteCustomPanel.classList.toggle("hidden", !customScopeActive);
@@ -15572,42 +16475,69 @@ function sync() {
     });
   }
 
+  const globalPaletteConfig = getPaletteGlobalConfigUi();
+  const globalUniformCount = getPaletteUniformColorCountUi(globalPaletteConfig, globalPaletteConfig.families);
+  const paletteGlobalInteractionActive = isPaletteGlobalPanelInteractionActive();
   paletteCountButtons.forEach(btn => {
     const count = normalizePaletteColorCountUi(btn.dataset.paletteCount, ui.paletteColorsPerFamily || 3);
-    btn.classList.toggle("active", count === ui.paletteColorsPerFamily);
+    btn.classList.toggle("active", Number.isFinite(globalUniformCount) && count === globalUniformCount);
+    btn.disabled = customScopeActive;
   });
   paletteVividnessButtons.forEach(btn => {
     const level = normalizePaletteVividnessUi(btn.dataset.paletteVividness, ui.paletteVividness || 2);
     btn.classList.toggle("active", level === normalizePaletteVividnessUi(ui.paletteVividness, 2));
+    btn.disabled = customScopeActive;
   });
   palettePresetButtons.forEach(btn => {
     const key = String(btn.dataset.palettePreset || "").trim().toLowerCase();
     btn.classList.toggle("active", isPalettePresetActiveUi(key));
+    btn.disabled = customScopeActive;
   });
   getPaletteFamilyButtons().forEach(btn => {
     const key = String(btn.dataset.paletteFamily || "").trim().toLowerCase();
     btn.classList.toggle("active", normalizePaletteFamiliesUi(ui.paletteFamilies).includes(key));
+    btn.disabled = customScopeActive;
+  });
+  getPaletteFamilyCountSelectors().forEach(select => {
+    const family = String(select.dataset.paletteFamilyCount || "").trim().toLowerCase();
+    if (!PALETTE_FAMILY_ORDER.includes(family)) return;
+    const count = resolvePaletteColorCountForFamilyUi(globalPaletteConfig, family, ui.paletteColorsPerFamily || 3);
+    if (!paletteGlobalInteractionActive) {
+      select.value = String(count);
+    }
+    select.disabled = customScopeActive;
   });
   paletteDisorderButtons.forEach(btn => {
     const disorder = String(btn.dataset.paletteDisorder || "").toLowerCase() === "true";
     btn.classList.toggle("active", disorder === Boolean(ui.paletteDisorder));
+    btn.disabled = customScopeActive;
   });
   paletteCycleModeButtons.forEach(btn => {
     const mode = normalizePaletteCycleModeUi(btn.dataset.paletteCycleMode, "on_trigger");
     btn.classList.toggle("active", mode === normalizePaletteCycleModeUi(ui.paletteCycleMode, "on_trigger"));
+    btn.disabled = customScopeActive;
   });
   paletteBeatLockButtons.forEach(btn => {
     const enabled = String(btn.dataset.paletteBeatLock || "").trim().toLowerCase() === "true";
     btn.classList.toggle("active", enabled === (ui.paletteBeatLock === true));
+    btn.disabled = customScopeActive;
   });
   paletteBrightnessModeButtons.forEach(btn => {
     const mode = normalizePaletteBrightnessModeUi(btn.dataset.paletteBrightnessMode, "legacy");
     btn.classList.toggle("active", mode === normalizePaletteBrightnessModeUi(ui.paletteBrightnessMode, "legacy"));
+    btn.disabled = customScopeActive;
   });
   paletteSpectrumModeButtons.forEach(btn => {
     const mode = normalizePaletteSpectrumMapModeUi(btn.dataset.paletteSpectrumMode, "auto");
     btn.classList.toggle("active", mode === normalizePaletteSpectrumMapModeUi(ui.paletteSpectrumMapMode, "auto"));
+    btn.disabled = customScopeActive;
   });
+  if (el.paletteDisorderAggression) {
+    el.paletteDisorderAggression.disabled = customScopeActive;
+  }
+  if (el.paletteDisorderAggressionResetBtn) {
+    el.paletteDisorderAggressionResetBtn.disabled = customScopeActive;
+  }
   syncPaletteDisorderAggressionSliderUi();
   syncPaletteTimedIntervalSliderUi();
   syncPaletteBeatLockGraceSliderUi();
@@ -15619,7 +16549,7 @@ function sync() {
     el.paletteBrightnessFollowWrap.classList.toggle("hidden", brightnessMode !== "test");
   }
   if (el.paletteBrightnessFollowAmount) {
-    el.paletteBrightnessFollowAmount.disabled = brightnessMode !== "test";
+    el.paletteBrightnessFollowAmount.disabled = customScopeActive || brightnessMode !== "test";
   }
   const globalCycleMode = normalizePaletteCycleModeUi(ui.paletteCycleMode, "on_trigger");
   const showTimed = globalCycleMode === "timed_cycle";
@@ -15634,13 +16564,22 @@ function sync() {
   if (el.paletteSpectrumControls) {
     el.paletteSpectrumControls.classList.toggle("hidden", !showSpectrum);
   }
+  if (el.paletteTimedIntervalSec) {
+    el.paletteTimedIntervalSec.disabled = customScopeActive || !showTimed;
+  }
+  if (el.paletteBeatLockGraceSec) {
+    el.paletteBeatLockGraceSec.disabled = customScopeActive || !showTimed;
+  }
+  if (el.paletteReactiveMargin) {
+    el.paletteReactiveMargin.disabled = customScopeActive || !showReactive;
+  }
   const canEditSpectrumMap = showSpectrum && normalizePaletteSpectrumMapModeUi(ui.paletteSpectrumMapMode, "auto") === "manual";
   getPaletteSpectrumFeatureSelectors().forEach(node => {
     if (!node) return;
-    node.disabled = !canEditSpectrumMap;
+    node.disabled = customScopeActive || !canEditSpectrumMap;
   });
   if (el.paletteStat) {
-    el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} x${ui.paletteColorsPerFamily} | ${formatPaletteVividnessLabelUi(ui.paletteVividness)}`;
+    el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} ${formatPaletteCountSummaryUi(globalPaletteConfig, ui.paletteFamilies)} | ${formatPaletteVividnessLabelUi(ui.paletteVividness)}`;
   }
   if (el.paletteOrderStat) {
     el.paletteOrderStat.textContent = ui.paletteDisorder
@@ -15666,7 +16605,6 @@ function updateFixtures(f) {
     ? f.standalone
     : (Array.isArray(ui.standaloneFixtures) ? ui.standaloneFixtures.slice() : []);
   ui.fixtureModBrands = collectFixtureModBrandsFromSnapshot(summary, fixtures);
-  ui.sceneSyncActiveBrands = collectActiveSceneSyncBrands(fixtures);
   syncFixtureBrandOptions();
   updateConnectivityCache(f?.connectivity || []);
   ui.connectivitySummary = f?.connectivitySummary || null;
@@ -16992,6 +17930,7 @@ function computeSmartMatchTelemetryFingerprint() {
     String(ui.audioReactivityPreset || "balanced"),
     String(ui.sceneLock || "auto"),
     String(ui.paletteColorsPerFamily || 3),
+    getPaletteFamilyCountFingerprintUi(getPaletteGlobalConfigUi(), ui.paletteFamilies),
     String(normalizePaletteVividnessUi(ui.paletteVividness, 2)),
     getPaletteFamiliesLabelUi(ui.paletteFamilies),
     ui.paletteDisorder ? "disorder" : "ordered",
@@ -17490,7 +18429,7 @@ async function poll(options = {}) {
   el.phrase.textContent = t.phrase || "-";
   el.dropStat.textContent = t.drop ? "YES" : "NO";
   if (el.paletteStat) {
-    el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} x${ui.paletteColorsPerFamily} | ${formatPaletteVividnessLabelUi(ui.paletteVividness)}`;
+    el.paletteStat.textContent = `${getPaletteFamiliesLabelUi(ui.paletteFamilies)} ${formatPaletteCountSummaryUi(getPaletteGlobalConfigUi(), ui.paletteFamilies)} | ${formatPaletteVividnessLabelUi(ui.paletteVividness)}`;
   }
   if (el.paletteOrderStat) {
     el.paletteOrderStat.textContent = ui.paletteDisorder
@@ -17519,83 +18458,95 @@ async function poll(options = {}) {
   }
   if (t.autoProfile) ui.autoProfile = t.autoProfile;
   if (t.audioReactivityPreset) ui.audioReactivityPreset = t.audioReactivityPreset;
-  if (Object.prototype.hasOwnProperty.call(t, "paletteFamilies")) {
-    ui.paletteFamilies = normalizePaletteFamiliesUi(
-      Array.isArray(t.paletteFamilies) ? t.paletteFamilies : String(t.paletteFamilies || ""),
-      ui.paletteFamilies || ["red", "green", "blue"]
-    );
-  }
-  if (Number.isFinite(Number(t.paletteColorsPerFamily))) {
-    ui.paletteColorsPerFamily = normalizePaletteColorCountUi(
-      t.paletteColorsPerFamily,
-      ui.paletteColorsPerFamily || 3
-    );
-  }
-  if (typeof t.paletteDisorder === "boolean") {
-    ui.paletteDisorder = t.paletteDisorder;
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteDisorderAggression")) {
-    ui.paletteDisorderAggression = normalizePaletteDisorderAggressionUi(
-      t.paletteDisorderAggression,
-      ui.paletteDisorderAggression || 0.35
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteCycleMode")) {
-    ui.paletteCycleMode = normalizePaletteCycleModeUi(
-      t.paletteCycleMode,
-      ui.paletteCycleMode || "on_trigger"
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteTimedIntervalSec")) {
-    ui.paletteTimedIntervalSec = normalizePaletteTimedIntervalSecUi(
-      t.paletteTimedIntervalSec,
-      ui.paletteTimedIntervalSec || 5
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteBeatLock")) {
-    ui.paletteBeatLock = parseBooleanUi(t.paletteBeatLock, ui.paletteBeatLock === true);
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteBeatLockGraceSec")) {
-    ui.paletteBeatLockGraceSec = normalizePaletteBeatLockGraceSecUi(
-      t.paletteBeatLockGraceSec,
-      ui.paletteBeatLockGraceSec || 2
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteReactiveMargin")) {
-    ui.paletteReactiveMargin = normalizePaletteReactiveMarginUi(
-      t.paletteReactiveMargin,
-      ui.paletteReactiveMargin || 28
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteBrightnessMode")) {
-    ui.paletteBrightnessMode = normalizePaletteBrightnessModeUi(
-      t.paletteBrightnessMode,
-      ui.paletteBrightnessMode || "legacy"
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteBrightnessFollowAmount")) {
-    ui.paletteBrightnessFollowAmount = normalizePaletteBrightnessFollowAmountUi(
-      t.paletteBrightnessFollowAmount,
-      ui.paletteBrightnessFollowAmount ?? 1
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteVividness")) {
-    ui.paletteVividness = normalizePaletteVividnessUi(
-      t.paletteVividness,
-      ui.paletteVividness || 2
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteSpectrumMapMode")) {
-    ui.paletteSpectrumMapMode = normalizePaletteSpectrumMapModeUi(
-      t.paletteSpectrumMapMode,
-      ui.paletteSpectrumMapMode || "auto"
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(t, "paletteSpectrumFeatureMap")) {
-    ui.paletteSpectrumFeatureMap = normalizePaletteSpectrumFeatureMapUi(
-      t.paletteSpectrumFeatureMap,
-      ui.paletteSpectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
-    );
+  const paletteTelemetryLocked = !force &&
+    isPaletteGlobalScopeActiveUi() &&
+    isPaletteGlobalPanelInteractionActive();
+  if (!paletteTelemetryLocked) {
+    if (Object.prototype.hasOwnProperty.call(t, "paletteFamilies")) {
+      ui.paletteFamilies = normalizePaletteFamiliesUi(
+        Array.isArray(t.paletteFamilies) ? t.paletteFamilies : String(t.paletteFamilies || ""),
+        ui.paletteFamilies || PALETTE_FAMILY_ORDER
+      );
+    }
+    if (Number.isFinite(Number(t.paletteColorsPerFamily))) {
+      ui.paletteColorsPerFamily = normalizePaletteColorCountUi(
+        t.paletteColorsPerFamily,
+        ui.paletteColorsPerFamily || 3
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteFamilyColorCounts")) {
+      ui.paletteFamilyColorCounts = normalizePaletteFamilyColorCountsUi(
+        t.paletteFamilyColorCounts,
+        ui.paletteFamilyColorCounts,
+        ui.paletteColorsPerFamily || 3
+      );
+    }
+    if (typeof t.paletteDisorder === "boolean") {
+      ui.paletteDisorder = t.paletteDisorder;
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteDisorderAggression")) {
+      ui.paletteDisorderAggression = normalizePaletteDisorderAggressionUi(
+        t.paletteDisorderAggression,
+        ui.paletteDisorderAggression || 0.35
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteCycleMode")) {
+      ui.paletteCycleMode = normalizePaletteCycleModeUi(
+        t.paletteCycleMode,
+        ui.paletteCycleMode || "on_trigger"
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteTimedIntervalSec")) {
+      ui.paletteTimedIntervalSec = normalizePaletteTimedIntervalSecUi(
+        t.paletteTimedIntervalSec,
+        ui.paletteTimedIntervalSec || 5
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteBeatLock")) {
+      ui.paletteBeatLock = parseBooleanUi(t.paletteBeatLock, ui.paletteBeatLock === true);
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteBeatLockGraceSec")) {
+      ui.paletteBeatLockGraceSec = normalizePaletteBeatLockGraceSecUi(
+        t.paletteBeatLockGraceSec,
+        ui.paletteBeatLockGraceSec || 2
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteReactiveMargin")) {
+      ui.paletteReactiveMargin = normalizePaletteReactiveMarginUi(
+        t.paletteReactiveMargin,
+        ui.paletteReactiveMargin || 28
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteBrightnessMode")) {
+      ui.paletteBrightnessMode = normalizePaletteBrightnessModeUi(
+        t.paletteBrightnessMode,
+        ui.paletteBrightnessMode || "legacy"
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteBrightnessFollowAmount")) {
+      ui.paletteBrightnessFollowAmount = normalizePaletteBrightnessFollowAmountUi(
+        t.paletteBrightnessFollowAmount,
+        ui.paletteBrightnessFollowAmount ?? 1
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteVividness")) {
+      ui.paletteVividness = normalizePaletteVividnessUi(
+        t.paletteVividness,
+        ui.paletteVividness || 2
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteSpectrumMapMode")) {
+      ui.paletteSpectrumMapMode = normalizePaletteSpectrumMapModeUi(
+        t.paletteSpectrumMapMode,
+        ui.paletteSpectrumMapMode || "auto"
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(t, "paletteSpectrumFeatureMap")) {
+      ui.paletteSpectrumFeatureMap = normalizePaletteSpectrumFeatureMapUi(
+        t.paletteSpectrumFeatureMap,
+        ui.paletteSpectrumFeatureMap || PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
+      );
+    }
   }
   if (typeof t.metaAutoEnabled === "boolean") ui.metaAutoEnabled = t.metaAutoEnabled;
   if (typeof t.metaAutoReason === "string" && t.metaAutoReason) ui.metaAutoReason = t.metaAutoReason;

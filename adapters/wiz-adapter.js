@@ -30,6 +30,22 @@ module.exports = function createWizAdapter({ ip }) {
     console.log(`[WIZ] UDP socket ready for ${ip}`);
   });
 
+  let latestSendSeq = 0;
+  const repeatTimers = new Set();
+
+  function clearRepeatTimers() {
+    for (const timer of repeatTimers) {
+      clearTimeout(timer);
+    }
+    repeatTimers.clear();
+  }
+
+  function sendPacket(buffer) {
+    try {
+      socket.send(buffer, 38899, ip);
+    } catch {}
+  }
+
   const setWizColor = (state, options = {}) => {
     const source = state && typeof state === "object" ? state : {};
     const on = source.on !== false;
@@ -45,6 +61,11 @@ module.exports = function createWizAdapter({ ip }) {
       payload.params.dimming = Math.max(1, Math.min(100, Math.round(Number(source.dimming))));
     } else {
       payload.params.dimming = on ? 50 : 1;
+    }
+
+    if (on && Number.isFinite(Number(source.speed))) {
+      // WiZ local API accepts speed in the 20..200 range for dynamic behavior.
+      payload.params.speed = Math.max(20, Math.min(200, Math.round(Number(source.speed))));
     }
 
     if (on && Number.isFinite(Number(source.temp))) {
@@ -64,20 +85,24 @@ module.exports = function createWizAdapter({ ip }) {
     const repeats = Math.max(1, Math.min(3, Math.round(options.repeats || 1)));
     const repeatDelayMs = Math.max(8, Math.min(120, Math.round(options.repeatDelayMs || 18)));
 
-    for (let i = 0; i < repeats; i++) {
-      if (i === 0) {
-        socket.send(msg, 38899, ip);
-      } else {
-        setTimeout(() => {
-          try {
-            socket.send(msg, 38899, ip);
-          } catch {}
-        }, i * repeatDelayMs);
-      }
+    const sendSeq = ++latestSendSeq;
+    clearRepeatTimers();
+    sendPacket(msg);
+
+    for (let i = 1; i < repeats; i++) {
+      const timer = setTimeout(() => {
+        repeatTimers.delete(timer);
+        if (sendSeq !== latestSendSeq) return;
+        sendPacket(msg);
+      }, i * repeatDelayMs);
+      if (typeof timer.unref === "function") timer.unref();
+      repeatTimers.add(timer);
     }
   };
 
   setWizColor.close = () => {
+    latestSendSeq += 1;
+    clearRepeatTimers();
     try {
       socket.close();
     } catch {}
