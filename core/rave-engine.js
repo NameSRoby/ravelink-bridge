@@ -6747,13 +6747,14 @@ module.exports = function createRaveEngine(controls) {
   // Legacy brightness floor tuned for full range without premature "near-black" dips.
   const BRIGHTNESS_TIER_MIN = 0.026;
   const WIZ_BRIGHTNESS_TIER_MIN = 0.003;
-  const WIZ_COLOR_SHIFT_SLOWDOWN = 150.0;
+  const WIZ_COLOR_SHIFT_SLOWDOWN = 200.0;
   const WIZ_COLOR_SLOW_BASELINE = 6.0;
   const WIZ_PALETTE_SLOW_SCALE = Math.max(1, Math.sqrt(WIZ_COLOR_SHIFT_SLOWDOWN / WIZ_COLOR_SLOW_BASELINE));
   const WIZ_DRIFT_SLOW_SCALE = Math.max(1, Math.cbrt(WIZ_COLOR_SHIFT_SLOWDOWN / WIZ_COLOR_SLOW_BASELINE));
-  const WIZ_PALETTE_MAX_FLOW_DWELL_MS = 24000;
-  const WIZ_PALETTE_MAX_PULSE_DWELL_MS = 3200;
-  const WIZ_PALETTE_MAX_BASE_DWELL_MS = 4200;
+  const WIZ_DWELL_CAP_SCALE = clamp(Math.sqrt(WIZ_COLOR_SHIFT_SLOWDOWN / 120), 1, 1.45);
+  const WIZ_PALETTE_MAX_FLOW_DWELL_MS = Math.round(24000 * WIZ_DWELL_CAP_SCALE);
+  const WIZ_PALETTE_MAX_PULSE_DWELL_MS = Math.round(3200 * WIZ_DWELL_CAP_SCALE);
+  const WIZ_PALETTE_MAX_BASE_DWELL_MS = Math.round(4200 * WIZ_DWELL_CAP_SCALE);
   const WIZ_FLOW_HUE_STEP_MIN = 0.012 / WIZ_DRIFT_SLOW_SCALE;
   const WIZ_FLOW_HUE_STEP_MAX = 0.09 / WIZ_DRIFT_SLOW_SCALE;
   const WIZ_FLOW_COLOR_ALPHA_MIN = 0.00045 / WIZ_DRIFT_SLOW_SCALE;
@@ -9202,8 +9203,8 @@ function getModeSwitchBias() {
           : (signal.isBeat ? 0.00022 : (signal.motion > 0.44 ? 0.00018 : 0.00014))
       );
       const driftDamp = clamp(
-        1 - ((advanceDecision.sinceLastAdvance / Math.max(1, advanceDecision.cadenceMs)) * 0.35),
-        0.28,
+        1 - ((advanceDecision.sinceLastAdvance / Math.max(1, advanceDecision.cadenceMs)) * 0.45),
+        0.18,
         1
       );
       const slowedFlowStepFloor = (flowStepFloor / WIZ_DRIFT_SLOW_SCALE) * driftDamp;
