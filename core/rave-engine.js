@@ -6747,13 +6747,17 @@ module.exports = function createRaveEngine(controls) {
   // Legacy brightness floor tuned for full range without premature "near-black" dips.
   const BRIGHTNESS_TIER_MIN = 0.026;
   const WIZ_BRIGHTNESS_TIER_MIN = 0.003;
-  const WIZ_COLOR_SHIFT_SLOWDOWN = 100.0;
+  const WIZ_COLOR_SHIFT_SLOWDOWN = 120.0;
   const WIZ_COLOR_SLOW_BASELINE = 6.0;
-  const WIZ_COLOR_SLOW_MIN_SCALE = Math.max(1, WIZ_COLOR_SHIFT_SLOWDOWN / WIZ_COLOR_SLOW_BASELINE);
-  const WIZ_FLOW_HUE_STEP_MIN = 0.012 / WIZ_COLOR_SLOW_MIN_SCALE;
-  const WIZ_FLOW_HUE_STEP_MAX = 0.09 / WIZ_COLOR_SLOW_MIN_SCALE;
-  const WIZ_FLOW_COLOR_ALPHA_MIN = 0.00045 / WIZ_COLOR_SLOW_MIN_SCALE;
-  const WIZ_FLOW_COLOR_ALPHA_MAX = 0.0022 / WIZ_COLOR_SLOW_MIN_SCALE;
+  const WIZ_PALETTE_SLOW_SCALE = Math.max(1, Math.sqrt(WIZ_COLOR_SHIFT_SLOWDOWN / WIZ_COLOR_SLOW_BASELINE));
+  const WIZ_DRIFT_SLOW_SCALE = Math.max(1, Math.cbrt(WIZ_COLOR_SHIFT_SLOWDOWN / WIZ_COLOR_SLOW_BASELINE));
+  const WIZ_PALETTE_MAX_FLOW_DWELL_MS = 24000;
+  const WIZ_PALETTE_MAX_PULSE_DWELL_MS = 3200;
+  const WIZ_PALETTE_MAX_BASE_DWELL_MS = 4200;
+  const WIZ_FLOW_HUE_STEP_MIN = 0.012 / WIZ_DRIFT_SLOW_SCALE;
+  const WIZ_FLOW_HUE_STEP_MAX = 0.09 / WIZ_DRIFT_SLOW_SCALE;
+  const WIZ_FLOW_COLOR_ALPHA_MIN = 0.00045 / WIZ_DRIFT_SLOW_SCALE;
+  const WIZ_FLOW_COLOR_ALPHA_MAX = 0.0022 / WIZ_DRIFT_SLOW_SCALE;
   const BRIGHTNESS_TIER_LOW = 0.34;
   const BRIGHTNESS_TIER_MEDIUM = 0.68;
   const BRIGHTNESS_TIER_HIGH = 1.00;
@@ -8875,13 +8879,16 @@ function getModeSwitchBias() {
     const sinceLastAdvance = lastWizPaletteAdvanceAt > 0
       ? Math.max(0, signal.now - lastWizPaletteAdvanceAt)
       : Number.POSITIVE_INFINITY;
+    const scaleMs = (value, cap = Number.POSITIVE_INFINITY) => (
+      Math.min(cap, Math.round(value * WIZ_PALETTE_SLOW_SCALE))
+    );
     // Keep a visible dwell per palette color; very short floors can feel like flicker on WiZ.
     const cadenceFloorMs = signal.flowScene
-      ? Math.round(8000 * WIZ_COLOR_SHIFT_SLOWDOWN)
-      : Math.round((signal.pulseScene ? 240 : 280) * WIZ_COLOR_SHIFT_SLOWDOWN);
+      ? scaleMs(8000, WIZ_PALETTE_MAX_FLOW_DWELL_MS)
+      : scaleMs(signal.pulseScene ? 240 : 280, signal.pulseScene ? 1600 : 2200);
     const cadenceCeilMs = signal.flowScene
-      ? Math.round(16000 * WIZ_COLOR_SHIFT_SLOWDOWN)
-      : Math.round((signal.pulseScene ? 860 : 1320) * WIZ_COLOR_SHIFT_SLOWDOWN);
+      ? scaleMs(16000, WIZ_PALETTE_MAX_FLOW_DWELL_MS)
+      : scaleMs(signal.pulseScene ? 860 : 1320, signal.pulseScene ? 2600 : 3800);
     let cadenceMs = (
       (signal.pulseScene ? 240 : (signal.flowScene ? 900 : 300)) +
       (signal.calmHold * (signal.pulseScene ? 300 : (signal.flowScene ? 1200 : 640))) +
@@ -8889,11 +8896,16 @@ function getModeSwitchBias() {
       (signal.motion * (signal.pulseScene ? 72 : (signal.flowScene ? 10 : 94))) -
       (signal.drive * (signal.flowScene ? 6 : 44))
     );
-    cadenceMs *= WIZ_COLOR_SHIFT_SLOWDOWN;
+    cadenceMs *= WIZ_PALETTE_SLOW_SCALE;
     cadenceMs = clamp(cadenceMs, cadenceFloorMs, cadenceCeilMs);
     const eventMinGapMs = signal.isDrop
-      ? Math.round(1500 * WIZ_COLOR_SHIFT_SLOWDOWN)
-      : Math.round((signal.flowScene ? 24000 : (signal.pulseScene ? 520 : 560)) * WIZ_COLOR_SHIFT_SLOWDOWN);
+      ? scaleMs(1500, signal.flowScene ? 14000 : (signal.pulseScene ? 2200 : 2600))
+      : scaleMs(
+        signal.flowScene ? 24000 : (signal.pulseScene ? 520 : 560),
+        signal.flowScene
+          ? WIZ_PALETTE_MAX_FLOW_DWELL_MS
+          : (signal.pulseScene ? WIZ_PALETTE_MAX_PULSE_DWELL_MS : WIZ_PALETTE_MAX_BASE_DWELL_MS)
+      );
     const strongBeat = signal.isBeat && (
       signal.beatConfidence > (signal.flowScene ? 0.88 : 0.74) ||
       signal.wizBeatPulse > (signal.flowScene ? 0.95 : 0.84)
@@ -8912,18 +8924,21 @@ function getModeSwitchBias() {
       ? (
         signal.motion > (0.16 + signal.calmHold * 0.14) &&
         sinceLastAdvance >= Math.max(
-          Math.round(18000 * WIZ_COLOR_SHIFT_SLOWDOWN),
-          cadenceMs * 7.2
+          scaleMs(18000, WIZ_PALETTE_MAX_FLOW_DWELL_MS),
+          cadenceMs * 4.8
         )
       )
       : (
         !signal.pulseScene &&
-        sinceLastAdvance >= Math.max(Math.round(1100 * WIZ_COLOR_SHIFT_SLOWDOWN), cadenceMs * 2.8)
+        sinceLastAdvance >= Math.max(
+          scaleMs(1100, WIZ_PALETTE_MAX_BASE_DWELL_MS),
+          cadenceMs * 2.2
+        )
       );
     const hardLivenessAdvance = sinceLastAdvance >= (
       signal.flowScene
-        ? Math.round(38000 * WIZ_COLOR_SHIFT_SLOWDOWN)
-        : Math.round((signal.pulseScene ? 1500 : 1800) * WIZ_COLOR_SHIFT_SLOWDOWN)
+        ? WIZ_PALETTE_MAX_FLOW_DWELL_MS
+        : (signal.pulseScene ? WIZ_PALETTE_MAX_PULSE_DWELL_MS : WIZ_PALETTE_MAX_BASE_DWELL_MS)
     );
     const shouldAdvance = Boolean(
       eventAdvance ||
@@ -9186,9 +9201,18 @@ function getModeSwitchBias() {
           ? 0.00032
           : (signal.isBeat ? 0.00022 : (signal.motion > 0.44 ? 0.00018 : 0.00014))
       );
-      const slowedFlowStepFloor = flowStepFloor / WIZ_COLOR_SHIFT_SLOWDOWN;
-      const slowedFlowStepCap = flowStepCap / WIZ_COLOR_SHIFT_SLOWDOWN;
-      step = clamp(step / WIZ_COLOR_SHIFT_SLOWDOWN, slowedFlowStepFloor, slowedFlowStepCap);
+      const driftDamp = clamp(
+        1 - ((advanceDecision.sinceLastAdvance / Math.max(1, advanceDecision.cadenceMs)) * 0.35),
+        0.28,
+        1
+      );
+      const slowedFlowStepFloor = (flowStepFloor / WIZ_DRIFT_SLOW_SCALE) * driftDamp;
+      const slowedFlowStepCap = (flowStepCap / WIZ_DRIFT_SLOW_SCALE) * driftDamp;
+      step = clamp(
+        (step / WIZ_DRIFT_SLOW_SCALE) * driftDamp,
+        slowedFlowStepFloor,
+        slowedFlowStepCap
+      );
       wizColorCursor = (wizColorCursor + step) % len;
 
       const baseIdx = Math.floor(wizColorCursor) % len;
@@ -9222,12 +9246,12 @@ function getModeSwitchBias() {
       const hueWave = (
         Math.sin(now / 900 + wizColorCursor * 0.82 + audioBandHigh * 1.8) * (0.38 + signal.motion * 1.15) +
         Math.sin(now / 1400 + audioBandLow * 1.6) * (0.18 + signal.drive * 0.58)
-      ) * flowTextureScale;
-      const satWave = Math.sin(now / 760 + audioBandMid * 2.1 + wizColorCursor * 0.2) * 0.026;
+      ) * flowTextureScale * driftDamp;
+      const satWave = Math.sin(now / 760 + audioBandMid * 2.1 + wizColorCursor * 0.2) * 0.026 * driftDamp;
       const valWave = (
         Math.sin(now / 520 + wizColorCursor * 0.74) * 0.03 +
         Math.sin(now / 1100 + audioBandLow * 1.8) * 0.014
-      );
+      ) * driftDamp;
       const targetHue = ((baseHsv.h + hueWave) % 360 + 360) % 360;
       if (!Number.isFinite(Number(wizFlowHueEma))) {
         wizFlowHueEma = targetHue;
@@ -9237,7 +9261,7 @@ function getModeSwitchBias() {
           (signal.isDrop ? 0.14 : (signal.isBeat ? 0.11 : 0.08)) +
           (signal.motion * 0.018) +
           (signal.wizBeatPulse * 0.014)
-        ) / WIZ_COLOR_SHIFT_SLOWDOWN,
+        ) / WIZ_DRIFT_SLOW_SCALE * driftDamp,
         WIZ_FLOW_HUE_STEP_MIN,
         WIZ_FLOW_HUE_STEP_MAX
       );
@@ -9272,7 +9296,7 @@ function getModeSwitchBias() {
           (signal.isDrop ? 0.0038 : (signal.isBeat ? 0.003 : 0.002)) +
           (signal.motion * 0.00035) +
           (signal.wizBeatPulse * 0.0003)
-        ) / WIZ_COLOR_SHIFT_SLOWDOWN,
+        ) / WIZ_DRIFT_SLOW_SCALE * driftDamp,
         WIZ_FLOW_COLOR_ALPHA_MIN,
         WIZ_FLOW_COLOR_ALPHA_MAX
       );
