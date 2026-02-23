@@ -36,6 +36,28 @@ const toNum = (v, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 const toBool = (value, fallback = false) => parseBooleanLoose(value, fallback);
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+const RESTART_DELAY_OPTIONS_MS = Object.freeze([250, 500, 1000, 1500, 2500, 5000, 10000, 20000]);
+const APP_ISOLATION_CHECK_INTERVAL_OPTIONS_MS = Object.freeze([60000, 120000, 300000, 600000, 900000, 1800000]);
+const AUDIO_RESTART_WINDOW_MS = 120000;
+const AUDIO_RESTART_MAX_ATTEMPTS = 12;
+const PROC_TAP_EXECUTABLE = process.platform === "win32" ? "py" : "python3";
+const FFMPEG_EXECUTABLE_CANDIDATES = Object.freeze(
+  process.platform === "win32"
+    ? [
+      path.join(PROJECT_ROOT, "runtime", "tools", "ffmpeg", "ffmpeg.exe"),
+      path.join(PROJECT_ROOT, ".runtime", "tools", "ffmpeg", "ffmpeg.exe"),
+      path.join(PROJECT_ROOT, "tools", "ffmpeg", "ffmpeg.exe"),
+      "ffmpeg.exe",
+      "ffmpeg"
+    ]
+    : [
+      path.join(PROJECT_ROOT, "runtime", "tools", "ffmpeg", "ffmpeg"),
+      path.join(PROJECT_ROOT, ".runtime", "tools", "ffmpeg", "ffmpeg"),
+      path.join(PROJECT_ROOT, "tools", "ffmpeg", "ffmpeg"),
+      "ffmpeg"
+    ]
+);
 const AUDIO_VERBOSE_LOGS = String(process.env.RAVE_AUDIO_VERBOSE_LOGS || "").trim() === "1";
 const PROCESS_LOOPBACK_LOCKS_PATH = path.join(__dirname, "audio.process-locks.json");
 const PROCESS_LOOPBACK_SILENCE_PROBE_MS = 2200;
@@ -192,6 +214,56 @@ function normalizeFfmpegPath(value, fallback = "ffmpeg") {
   return FFMPEG_BASENAME_RE.test(candidate) ? candidate : safeFallback;
 }
 
+function pickClosestAllowedMs(rawValue, allowedValues, fallbackValue) {
+  const fallback = Number.isFinite(Number(fallbackValue))
+    ? Number(fallbackValue)
+    : Number(allowedValues?.[0] || 0);
+  if (!Array.isArray(allowedValues) || !allowedValues.length) return fallback;
+  const candidate = Math.round(toNum(rawValue, fallback));
+  let best = Number(allowedValues[0]);
+  let bestDist = Math.abs(best - candidate);
+  for (const option of allowedValues) {
+    const numeric = Number(option);
+    if (!Number.isFinite(numeric)) continue;
+    const dist = Math.abs(numeric - candidate);
+    if (dist < bestDist) {
+      best = numeric;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+function normalizeRestartDelayMs(value, fallback = 1500) {
+  return pickClosestAllowedMs(value, RESTART_DELAY_OPTIONS_MS, fallback);
+}
+
+function normalizeAppIsolationCheckIntervalMs(value, fallback = 300000) {
+  return pickClosestAllowedMs(value, APP_ISOLATION_CHECK_INTERVAL_OPTIONS_MS, fallback);
+}
+
+function resolveFfmpegExecutablePath() {
+  for (const candidate of FFMPEG_EXECUTABLE_CANDIDATES) {
+    const value = String(candidate || "").trim();
+    if (!value) continue;
+    if (path.isAbsolute(value)) {
+      if (fs.existsSync(value)) return value;
+      continue;
+    }
+    return value;
+  }
+  return process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+}
+
+function buildProcTapCommandPrefix(pythonVersionValue) {
+  const args = [];
+  if (process.platform === "win32" && PROC_TAP_EXECUTABLE.toLowerCase() === "py") {
+    const pyVersion = normalizeProcTapPythonVersion(pythonVersionValue || "3.13", "3.13");
+    args.push(`-${pyVersion}`);
+  }
+  return { command: PROC_TAP_EXECUTABLE, prefixArgs: args };
+}
+
 module.exports = function createAudio(onLevel) {
   let stream = null;
   let running = false;
@@ -208,6 +280,8 @@ module.exports = function createAudio(onLevel) {
   let procTapProc = null;
   let procTapBufferCarry = Buffer.alloc(0);
   let activeInputSampleRate = 96000;
+  let restartWindowStartedAt = 0;
+  let restartAttemptsInWindow = 0;
 
   const cfg = {
     inputBackend: String(process.env.RAVE_AUDIO_INPUT_BACKEND || "auto").toLowerCase().trim(),
@@ -225,7 +299,7 @@ module.exports = function createAudio(onLevel) {
     autoLevelGate: clamp(toNum(process.env.RAVE_AUDIO_AUTO_LEVEL_GATE, 0.007), 0, 0.03),
     limiterThreshold: clamp(toNum(process.env.RAVE_AUDIO_LIMITER_THRESHOLD, 0.82), 0.4, 0.99),
     limiterKnee: clamp(toNum(process.env.RAVE_AUDIO_LIMITER_KNEE, 0.16), 0.02, 0.8),
-    restartMs: clamp(Math.round(toNum(process.env.RAVE_AUDIO_RESTART_MS, 1500)), 250, 20000),
+    restartMs: normalizeRestartDelayMs(process.env.RAVE_AUDIO_RESTART_MS, 1500),
     watchdogMs: clamp(Math.round(toNum(process.env.RAVE_AUDIO_WATCHDOG_MS, 3000)), 800, 30000),
     logEveryTicks: Math.max(10, toNum(process.env.RAVE_AUDIO_LOG_TICKS, 60)),
     bandLowHz: clamp(toNum(process.env.RAVE_AUDIO_BAND_LOW_HZ, 180), 60, 500),
@@ -254,10 +328,9 @@ module.exports = function createAudio(onLevel) {
       []
     ),
     ffmpegAppIsolationMultiSource: toBool(process.env.RAVE_AUDIO_FFMPEG_APP_ISO_MULTI_SOURCE, false),
-    ffmpegAppIsolationCheckMs: clamp(
-      Math.round(toNum(process.env.RAVE_AUDIO_FFMPEG_APP_ISO_CHECK_MS, 300000)),
-      60000,
-      1800000
+    ffmpegAppIsolationCheckMs: normalizeAppIsolationCheckIntervalMs(
+      process.env.RAVE_AUDIO_FFMPEG_APP_ISO_CHECK_MS,
+      300000
     ),
     procTapLauncher: normalizeProcTapLauncher(process.env.RAVE_AUDIO_PROCTAP_LAUNCHER || "py", "py"),
     procTapPythonVersion: normalizeProcTapPythonVersion(process.env.RAVE_AUDIO_PROCTAP_PY_VERSION || "3.13", "3.13"),
@@ -349,7 +422,7 @@ module.exports = function createAudio(onLevel) {
       ["autoLevelGate", raw => clamp(toNum(raw, cfg.autoLevelGate), 0, 0.03)],
       ["limiterThreshold", raw => clamp(toNum(raw, cfg.limiterThreshold), 0.4, 0.99)],
       ["limiterKnee", raw => clamp(toNum(raw, cfg.limiterKnee), 0.02, 0.8)],
-      ["restartMs", raw => clamp(Math.round(toNum(raw, cfg.restartMs)), 250, 20000)],
+      ["restartMs", raw => normalizeRestartDelayMs(raw, cfg.restartMs)],
       ["watchdogMs", raw => clamp(Math.round(toNum(raw, cfg.watchdogMs)), 800, 30000)],
       ["logEveryTicks", raw => clamp(Math.round(toNum(raw, cfg.logEveryTicks)), 10, 2000)],
       ["bandLowHz", raw => clamp(Math.round(toNum(raw, cfg.bandLowHz)), 60, 500)],
@@ -361,10 +434,7 @@ module.exports = function createAudio(onLevel) {
       ["ffmpegAppIsolationEnabled", raw => toBool(raw, cfg.ffmpegAppIsolationEnabled)],
       ["ffmpegAppIsolationStrict", raw => toBool(raw, cfg.ffmpegAppIsolationStrict)],
       ["ffmpegAppIsolationMultiSource", raw => toBool(raw, cfg.ffmpegAppIsolationMultiSource)],
-      [
-        "ffmpegAppIsolationCheckMs",
-        raw => clamp(Math.round(toNum(raw, cfg.ffmpegAppIsolationCheckMs)), 60000, 1800000)
-      ],
+      ["ffmpegAppIsolationCheckMs", raw => normalizeAppIsolationCheckIntervalMs(raw, cfg.ffmpegAppIsolationCheckMs)],
       ["procTapLauncher", raw => normalizeProcTapLauncher(raw, cfg.procTapLauncher || "py")],
       ["procTapPythonVersion", raw => normalizeProcTapPythonVersion(raw, cfg.procTapPythonVersion || "3.13")]
     ];
@@ -721,12 +791,9 @@ module.exports = function createAudio(onLevel) {
       });
     }
 
-    const launcher = normalizeProcTapLauncher(cfg.procTapLauncher || "py", "py");
-    const args = [];
-    if (launcher.toLowerCase() === "py") {
-      const pyVersion = normalizeProcTapPythonVersion(cfg.procTapPythonVersion || "3.13", "3.13");
-      args.push(`-${pyVersion}`);
-    }
+    const procTapCommand = buildProcTapCommandPrefix(cfg.procTapPythonVersion);
+    const launcher = procTapCommand.command;
+    const args = procTapCommand.prefixArgs.slice();
     args.push("-m", "proctap", "--list-audio-procs");
 
     return new Promise(resolve => {
@@ -1147,7 +1214,7 @@ module.exports = function createAudio(onLevel) {
 
   function stopAppIsolationTimer() {
     if (appIsolationRuntime.intervalTimer) {
-      clearTimeout(appIsolationRuntime.intervalTimer);
+      clearInterval(appIsolationRuntime.intervalTimer);
       appIsolationRuntime.intervalTimer = null;
     }
     appIsolationRuntime.intervalInFlight = false;
@@ -1157,26 +1224,17 @@ module.exports = function createAudio(onLevel) {
   function startAppIsolationTimer() {
     stopAppIsolationTimer();
     if (!running || !cfg.ffmpegAppIsolationEnabled) return;
-    const intervalMs = clamp(Math.round(toNum(cfg.ffmpegAppIsolationCheckMs, 300000)), 60000, 1800000);
-    const scheduleNext = () => {
+    const intervalMs = normalizeAppIsolationCheckIntervalMs(cfg.ffmpegAppIsolationCheckMs, 300000);
+    appIsolationRuntime.intervalTimer = setInterval(async () => {
       if (!running || !cfg.ffmpegAppIsolationEnabled) return;
-      appIsolationRuntime.intervalTimer = setTimeout(async () => {
-        appIsolationRuntime.intervalTimer = null;
-        if (!running || !cfg.ffmpegAppIsolationEnabled) return;
-        if (appIsolationRuntime.intervalInFlight) {
-          scheduleNext();
-          return;
-        }
-        appIsolationRuntime.intervalInFlight = true;
-        try {
-          await runAppIsolationScan({ reason: "timer", apply: true });
-        } catch {}
-        appIsolationRuntime.intervalInFlight = false;
-        scheduleNext();
-      }, intervalMs);
-      appIsolationRuntime.intervalTimer.unref?.();
-    };
-    scheduleNext();
+      if (appIsolationRuntime.intervalInFlight) return;
+      appIsolationRuntime.intervalInFlight = true;
+      try {
+        await runAppIsolationScan({ reason: "timer", apply: true });
+      } catch {}
+      appIsolationRuntime.intervalInFlight = false;
+    }, intervalMs);
+    appIsolationRuntime.intervalTimer.unref?.();
   }
 
   function resolveAudioBackend() {
@@ -1588,15 +1646,32 @@ module.exports = function createAudio(onLevel) {
     if (!running) return;
     if (restartTimer) return;
 
+    const now = Date.now();
+    if (!restartWindowStartedAt || (now - restartWindowStartedAt) > AUDIO_RESTART_WINDOW_MS) {
+      restartWindowStartedAt = now;
+      restartAttemptsInWindow = 0;
+    }
+
+    restartAttemptsInWindow += 1;
+    let restartDelayMs = normalizeRestartDelayMs(cfg.restartMs, 1500);
+    if (restartAttemptsInWindow > AUDIO_RESTART_MAX_ATTEMPTS) {
+      const budget = AUDIO_RESTART_MAX_ATTEMPTS;
+      lastError = `restart budget exceeded (${budget} attempts/${Math.round(AUDIO_RESTART_WINDOW_MS / 1000)}s)`;
+      console.error(`[AUDIO] ${lastError}; stream stopped to prevent restart thrash`);
+      stop();
+      emitSilenceSnapshot();
+      return;
+    }
+
     lastRestartReason = reason;
     stopWatchdog();
-    const restartDelayMs = clamp(Math.round(toNum(cfg.restartMs, 1500)), 250, 20000);
     console.warn(`[AUDIO] restart scheduled (${reason}) in ${restartDelayMs}ms`);
     restartTimer = setTimeout(() => {
       restartTimer = null;
       if (!running) return;
       openStream();
     }, restartDelayMs);
+    restartTimer.unref?.();
   }
 
   function emitSilenceSnapshot() {
@@ -1861,12 +1936,9 @@ module.exports = function createAudio(onLevel) {
       return false;
     }
 
-    const launcher = normalizeProcTapLauncher(cfg.procTapLauncher || "py", "py");
-    const args = [];
-    if (launcher.toLowerCase() === "py") {
-      const pyVersion = normalizeProcTapPythonVersion(cfg.procTapPythonVersion || "3.13", "3.13");
-      args.push(`-${pyVersion}`);
-    }
+    const procTapCommand = buildProcTapCommandPrefix(cfg.procTapPythonVersion);
+    const launcher = procTapCommand.command;
+    const args = procTapCommand.prefixArgs.slice();
     args.push("-m", "proctap");
     if (targetPid > 0) {
       args.push("--pid", String(targetPid));
@@ -1894,6 +1966,8 @@ module.exports = function createAudio(onLevel) {
     processLoopbackRuntime.streamStartedAt = Date.now();
     activeInputSampleRate = 48000;
     lastBackend = "proctap";
+    restartWindowStartedAt = Date.now();
+    restartAttemptsInWindow = 0;
     lastDeviceName = targetPid > 0
       ? `process:${targetApp || "pid"}#${targetPid}`
       : `process:${targetApp}`;
@@ -2051,9 +2125,10 @@ module.exports = function createAudio(onLevel) {
         `[AUDIO] using ffmpeg: ${lastDeviceName} (${channels}ch @ ${cfg.sampleRate}Hz, fpb=${cfg.framesPerBuffer}, sources=${ffmpegInputs.length})`
       );
 
+      const ffmpegExecutable = resolveFfmpegExecutablePath();
       let proc = null;
       try {
-        proc = spawn(normalizeFfmpegPath(cfg.ffmpegPath || "ffmpeg", "ffmpeg"), ffmpegArgs, {
+        proc = spawn(ffmpegExecutable, ffmpegArgs, {
           windowsHide: true,
           stdio: ["ignore", "pipe", "pipe"]
         });
@@ -2066,6 +2141,8 @@ module.exports = function createAudio(onLevel) {
 
       ffmpegProc = proc;
       ffmpegBufferCarry = Buffer.alloc(0);
+      restartWindowStartedAt = Date.now();
+      restartAttemptsInWindow = 0;
       const frameBytes = channels * 4;
 
       proc.stdout.on("data", chunk => {
@@ -2201,6 +2278,8 @@ module.exports = function createAudio(onLevel) {
     try {
       stream.start();
       lastDataAt = Date.now();
+      restartWindowStartedAt = Date.now();
+      restartAttemptsInWindow = 0;
       startWatchdog();
       console.log("[AUDIO] stream started");
     } catch (err) {
@@ -2214,6 +2293,8 @@ module.exports = function createAudio(onLevel) {
   function start() {
     if (running) return;
     running = true;
+    restartWindowStartedAt = 0;
+    restartAttemptsInWindow = 0;
     resetState();
     startAppIsolationTimer();
     if (cfg.ffmpegAppIsolationEnabled) {
@@ -2225,6 +2306,8 @@ module.exports = function createAudio(onLevel) {
   function stop() {
     if (!running) return;
     running = false;
+    restartWindowStartedAt = 0;
+    restartAttemptsInWindow = 0;
 
     if (restartTimer) {
       clearTimeout(restartTimer);

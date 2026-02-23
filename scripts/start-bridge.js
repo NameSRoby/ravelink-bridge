@@ -38,6 +38,11 @@ const bootstrapSystemDepsEnabled = String(
 const bootstrapOnlyMode = String(process.env.RAVELINK_BOOTSTRAP_ONLY || "").trim() === "1";
 
 function runCommand(command, args, options = {}) {
+  const normalizedCommand = String(command || "").trim();
+  const normalizedArgs = Array.isArray(args) ? args.map(value => String(value)) : [];
+  if (!normalizedCommand) {
+    return { status: 1, error: new Error("command is required") };
+  }
   const spawnOptions = {
     cwd: rootDir,
     encoding: "utf8",
@@ -45,20 +50,7 @@ function runCommand(command, args, options = {}) {
     windowsHide: true
   };
 
-  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(String(command))) {
-    const commandShell = "cmd.exe";
-    return spawnSync(commandShell, [
-      "/d",
-      "/s",
-      "/c",
-      String(command),
-      ...((Array.isArray(args) ? args : []).map(value => String(value)))
-    ], {
-      ...spawnOptions
-    });
-  }
-
-  const result = spawnSync(command, args, {
+  const result = spawnSync(normalizedCommand, normalizedArgs, {
     ...spawnOptions
   });
   return result;
