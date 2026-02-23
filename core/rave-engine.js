@@ -6747,7 +6747,7 @@ module.exports = function createRaveEngine(controls) {
   // Legacy brightness floor tuned for full range without premature "near-black" dips.
   const BRIGHTNESS_TIER_MIN = 0.026;
   const WIZ_BRIGHTNESS_TIER_MIN = 0.003;
-  const WIZ_COLOR_SHIFT_SLOWDOWN = 120.0;
+  const WIZ_COLOR_SHIFT_SLOWDOWN = 150.0;
   const WIZ_COLOR_SLOW_BASELINE = 6.0;
   const WIZ_PALETTE_SLOW_SCALE = Math.max(1, Math.sqrt(WIZ_COLOR_SHIFT_SLOWDOWN / WIZ_COLOR_SLOW_BASELINE));
   const WIZ_DRIFT_SLOW_SCALE = Math.max(1, Math.cbrt(WIZ_COLOR_SHIFT_SLOWDOWN / WIZ_COLOR_SLOW_BASELINE));
