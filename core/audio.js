@@ -143,6 +143,55 @@ function sanitizeAppName(value, fallback = "") {
   return raw.slice(0, 128);
 }
 
+const PROC_TAP_LAUNCHER_TOKEN_RE = /^(?:py|python(?:\d+(?:\.\d+)*)?)$/i;
+const PROC_TAP_LAUNCHER_BASENAME_RE = /^(?:py(?:thon)?(?:\d+(?:\.\d+)*)?)(?:\.exe)?$/i;
+const FFMPEG_BASENAME_RE = /^ffmpeg(?:\.exe)?$/i;
+const EXECUTABLE_UNSAFE_CHARS_RE = /[\u0000-\u001F\u007F"'`|&;<>()]/;
+
+function sanitizeExecutableInput(value, fallback = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return String(fallback || "").trim();
+  if (EXECUTABLE_UNSAFE_CHARS_RE.test(raw)) return String(fallback || "").trim();
+  return raw;
+}
+
+function normalizeProcTapLauncher(value, fallback = "py") {
+  const safeFallback = sanitizeExecutableInput(fallback, "py") || "py";
+  const candidate = sanitizeExecutableInput(value, safeFallback);
+  if (!candidate) return safeFallback;
+
+  const hasPathSegment = candidate.includes("/") || candidate.includes("\\");
+  if (path.isAbsolute(candidate) || hasPathSegment) {
+    const resolved = path.resolve(candidate);
+    if (!PROC_TAP_LAUNCHER_BASENAME_RE.test(path.basename(resolved))) return safeFallback;
+    return fs.existsSync(resolved) ? resolved : safeFallback;
+  }
+  return PROC_TAP_LAUNCHER_TOKEN_RE.test(candidate) ? candidate : safeFallback;
+}
+
+function normalizeProcTapPythonVersion(value, fallback = "3.13") {
+  const safeFallback = /^\d{1,2}(?:\.\d{1,2})?$/.test(String(fallback || "").trim())
+    ? String(fallback || "").trim()
+    : "3.13";
+  const candidate = String(value || "").trim();
+  if (!candidate) return safeFallback;
+  return /^\d{1,2}(?:\.\d{1,2})?$/.test(candidate) ? candidate : safeFallback;
+}
+
+function normalizeFfmpegPath(value, fallback = "ffmpeg") {
+  const safeFallback = sanitizeExecutableInput(fallback, "ffmpeg") || "ffmpeg";
+  const candidate = sanitizeExecutableInput(value, safeFallback);
+  if (!candidate) return safeFallback;
+
+  const hasPathSegment = candidate.includes("/") || candidate.includes("\\");
+  if (path.isAbsolute(candidate) || hasPathSegment) {
+    const resolved = path.resolve(candidate);
+    if (!FFMPEG_BASENAME_RE.test(path.basename(resolved))) return safeFallback;
+    return fs.existsSync(resolved) ? resolved : safeFallback;
+  }
+  return FFMPEG_BASENAME_RE.test(candidate) ? candidate : safeFallback;
+}
+
 module.exports = function createAudio(onLevel) {
   let stream = null;
   let running = false;
@@ -176,7 +225,7 @@ module.exports = function createAudio(onLevel) {
     autoLevelGate: clamp(toNum(process.env.RAVE_AUDIO_AUTO_LEVEL_GATE, 0.007), 0, 0.03),
     limiterThreshold: clamp(toNum(process.env.RAVE_AUDIO_LIMITER_THRESHOLD, 0.82), 0.4, 0.99),
     limiterKnee: clamp(toNum(process.env.RAVE_AUDIO_LIMITER_KNEE, 0.16), 0.02, 0.8),
-    restartMs: toNum(process.env.RAVE_AUDIO_RESTART_MS, 1500),
+    restartMs: clamp(Math.round(toNum(process.env.RAVE_AUDIO_RESTART_MS, 1500)), 250, 20000),
     watchdogMs: clamp(Math.round(toNum(process.env.RAVE_AUDIO_WATCHDOG_MS, 3000)), 800, 30000),
     logEveryTicks: Math.max(10, toNum(process.env.RAVE_AUDIO_LOG_TICKS, 60)),
     bandLowHz: clamp(toNum(process.env.RAVE_AUDIO_BAND_LOW_HZ, 180), 60, 500),
@@ -186,7 +235,7 @@ module.exports = function createAudio(onLevel) {
       process.env.RAVE_AUDIO_DEVICE_ID === undefined
         ? null
         : toNum(process.env.RAVE_AUDIO_DEVICE_ID, null),
-    ffmpegPath: String(process.env.RAVE_AUDIO_FFMPEG_PATH || "ffmpeg").trim() || "ffmpeg",
+    ffmpegPath: normalizeFfmpegPath(process.env.RAVE_AUDIO_FFMPEG_PATH || "ffmpeg", "ffmpeg"),
     ffmpegInputFormat: String(process.env.RAVE_AUDIO_FFMPEG_INPUT_FORMAT || "dshow").toLowerCase().trim() || "dshow",
     ffmpegInputDevice: String(process.env.RAVE_AUDIO_FFMPEG_INPUT_DEVICE || "").trim(),
     ffmpegInputDevices: normalizeFfmpegDeviceList(process.env.RAVE_AUDIO_FFMPEG_INPUT_DEVICES || "", []),
@@ -210,8 +259,8 @@ module.exports = function createAudio(onLevel) {
       60000,
       1800000
     ),
-    procTapLauncher: String(process.env.RAVE_AUDIO_PROCTAP_LAUNCHER || "py").trim() || "py",
-    procTapPythonVersion: String(process.env.RAVE_AUDIO_PROCTAP_PY_VERSION || "3.13").trim() || "3.13",
+    procTapLauncher: normalizeProcTapLauncher(process.env.RAVE_AUDIO_PROCTAP_LAUNCHER || "py", "py"),
+    procTapPythonVersion: normalizeProcTapPythonVersion(process.env.RAVE_AUDIO_PROCTAP_PY_VERSION || "3.13", "3.13"),
     procTapCaptureLocks: readProcessLoopbackLocks()
   };
 
@@ -248,6 +297,7 @@ module.exports = function createAudio(onLevel) {
     selectionKey: "",
     runningApps: [],
     intervalTimer: null,
+    intervalInFlight: false,
     scanPromise: null,
     recoveryTimer: null,
     recoveryDelayMs: APP_ISOLATION_RECOVERY_SCAN_MS
@@ -305,7 +355,7 @@ module.exports = function createAudio(onLevel) {
       ["bandLowHz", raw => clamp(Math.round(toNum(raw, cfg.bandLowHz)), 60, 500)],
       ["bandMidHz", raw => clamp(Math.round(toNum(raw, cfg.bandMidHz)), 700, 8000)],
       ["deviceMatch", raw => String(raw || "").toLowerCase()],
-      ["ffmpegPath", raw => String(raw || "").trim() || "ffmpeg"],
+      ["ffmpegPath", raw => normalizeFfmpegPath(raw, cfg.ffmpegPath || "ffmpeg")],
       ["ffmpegInputDevice", raw => String(raw || "").trim()],
       ["ffmpegUseWallclock", raw => toBool(raw, cfg.ffmpegUseWallclock)],
       ["ffmpegAppIsolationEnabled", raw => toBool(raw, cfg.ffmpegAppIsolationEnabled)],
@@ -314,7 +364,9 @@ module.exports = function createAudio(onLevel) {
       [
         "ffmpegAppIsolationCheckMs",
         raw => clamp(Math.round(toNum(raw, cfg.ffmpegAppIsolationCheckMs)), 60000, 1800000)
-      ]
+      ],
+      ["procTapLauncher", raw => normalizeProcTapLauncher(raw, cfg.procTapLauncher || "py")],
+      ["procTapPythonVersion", raw => normalizeProcTapPythonVersion(raw, cfg.procTapPythonVersion || "3.13")]
     ];
     for (const [key, transformer] of scalarPatchTransformers) {
       assignWhenDefined(key, transformer);
@@ -669,10 +721,10 @@ module.exports = function createAudio(onLevel) {
       });
     }
 
-    const launcher = String(cfg.procTapLauncher || "py").trim() || "py";
+    const launcher = normalizeProcTapLauncher(cfg.procTapLauncher || "py", "py");
     const args = [];
     if (launcher.toLowerCase() === "py") {
-      const pyVersion = String(cfg.procTapPythonVersion || "3.13").trim() || "3.13";
+      const pyVersion = normalizeProcTapPythonVersion(cfg.procTapPythonVersion || "3.13", "3.13");
       args.push(`-${pyVersion}`);
     }
     args.push("-m", "proctap", "--list-audio-procs");
@@ -1095,9 +1147,10 @@ module.exports = function createAudio(onLevel) {
 
   function stopAppIsolationTimer() {
     if (appIsolationRuntime.intervalTimer) {
-      clearInterval(appIsolationRuntime.intervalTimer);
+      clearTimeout(appIsolationRuntime.intervalTimer);
       appIsolationRuntime.intervalTimer = null;
     }
+    appIsolationRuntime.intervalInFlight = false;
     stopAppIsolationRecoveryTimer();
   }
 
@@ -1105,10 +1158,25 @@ module.exports = function createAudio(onLevel) {
     stopAppIsolationTimer();
     if (!running || !cfg.ffmpegAppIsolationEnabled) return;
     const intervalMs = clamp(Math.round(toNum(cfg.ffmpegAppIsolationCheckMs, 300000)), 60000, 1800000);
-    appIsolationRuntime.intervalTimer = setInterval(() => {
-      runAppIsolationScan({ reason: "timer", apply: true }).catch(() => {});
-    }, intervalMs);
-    appIsolationRuntime.intervalTimer.unref?.();
+    const scheduleNext = () => {
+      if (!running || !cfg.ffmpegAppIsolationEnabled) return;
+      appIsolationRuntime.intervalTimer = setTimeout(async () => {
+        appIsolationRuntime.intervalTimer = null;
+        if (!running || !cfg.ffmpegAppIsolationEnabled) return;
+        if (appIsolationRuntime.intervalInFlight) {
+          scheduleNext();
+          return;
+        }
+        appIsolationRuntime.intervalInFlight = true;
+        try {
+          await runAppIsolationScan({ reason: "timer", apply: true });
+        } catch {}
+        appIsolationRuntime.intervalInFlight = false;
+        scheduleNext();
+      }, intervalMs);
+      appIsolationRuntime.intervalTimer.unref?.();
+    };
+    scheduleNext();
   }
 
   function resolveAudioBackend() {
@@ -1522,12 +1590,13 @@ module.exports = function createAudio(onLevel) {
 
     lastRestartReason = reason;
     stopWatchdog();
-    console.warn(`[AUDIO] restart scheduled (${reason}) in ${cfg.restartMs}ms`);
+    const restartDelayMs = clamp(Math.round(toNum(cfg.restartMs, 1500)), 250, 20000);
+    console.warn(`[AUDIO] restart scheduled (${reason}) in ${restartDelayMs}ms`);
     restartTimer = setTimeout(() => {
       restartTimer = null;
       if (!running) return;
       openStream();
-    }, cfg.restartMs);
+    }, restartDelayMs);
   }
 
   function emitSilenceSnapshot() {
@@ -1792,10 +1861,10 @@ module.exports = function createAudio(onLevel) {
       return false;
     }
 
-    const launcher = String(cfg.procTapLauncher || "py").trim() || "py";
+    const launcher = normalizeProcTapLauncher(cfg.procTapLauncher || "py", "py");
     const args = [];
     if (launcher.toLowerCase() === "py") {
-      const pyVersion = String(cfg.procTapPythonVersion || "3.13").trim() || "3.13";
+      const pyVersion = normalizeProcTapPythonVersion(cfg.procTapPythonVersion || "3.13", "3.13");
       args.push(`-${pyVersion}`);
     }
     args.push("-m", "proctap");
@@ -1984,7 +2053,7 @@ module.exports = function createAudio(onLevel) {
 
       let proc = null;
       try {
-        proc = spawn(cfg.ffmpegPath || "ffmpeg", ffmpegArgs, {
+        proc = spawn(normalizeFfmpegPath(cfg.ffmpegPath || "ffmpeg", "ffmpeg"), ffmpegArgs, {
           windowsHide: true,
           stdio: ["ignore", "pipe", "pipe"]
         });
@@ -2211,7 +2280,9 @@ module.exports = function createAudio(onLevel) {
       "ffmpegAppIsolationPrimaryDevices",
       "ffmpegAppIsolationFallbackDevices",
       "ffmpegAppIsolationMultiSource",
-      "ffmpegAppIsolationCheckMs"
+      "ffmpegAppIsolationCheckMs",
+      "procTapLauncher",
+      "procTapPythonVersion"
     ]);
 
     let needsRestart = false;

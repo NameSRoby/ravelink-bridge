@@ -46,7 +46,7 @@ function runCommand(command, args, options = {}) {
   };
 
   if (process.platform === "win32" && /\.(cmd|bat)$/i.test(String(command))) {
-    const commandShell = process.env.ComSpec || "cmd.exe";
+    const commandShell = "cmd.exe";
     return spawnSync(commandShell, [
       "/d",
       "/s",

@@ -36,6 +36,7 @@ const {
 const { hsvToRgb255: convertHsvToRgb255 } = require("./core/utils/hsv-rgb");
 const { createServerColorUtils } = require("./core/server/color-utils");
 const { createRequestPatchUtils } = require("./core/server/request-patch-utils");
+const { rateLimit: expressRateLimit } = require("express-rate-limit");
 const {
   PALETTE_COLOR_COUNT_OPTIONS: SHARED_PALETTE_COLOR_COUNT_OPTIONS,
   PALETTE_FAMILY_ORDER: SHARED_PALETTE_FAMILY_ORDER,
@@ -1595,13 +1596,14 @@ function isHueLinkButtonPending(err) {
 
 async function fetchHueBridgeConfigByIp(ip, bridgeIdHint = "") {
   const target = normalizeHueBridgeIp(ip);
-  if (!target) return null;
+  if (!target || !isPrivateHueBridgeIp(target)) return null;
   const bridgeId = normalizeHueBridgeIdToken(bridgeIdHint);
   if (bridgeId) {
     rememberHueBridgeIdentity(target, bridgeId);
   }
   try {
-    const { data } = await axios.get(`https://${target}/api/0/config`, {
+    const bridgeConfigUrl = new URL("/api/0/config", `https://${target}`);
+    const { data } = await axios.get(bridgeConfigUrl.toString(), {
       timeout: 1800,
       maxRedirects: 0,
       httpsAgent: getHueRestHttpsAgent({
@@ -1611,17 +1613,6 @@ async function fetchHueBridgeConfigByIp(ip, bridgeIdHint = "") {
     });
     return data && typeof data === "object" ? data : null;
   } catch {
-    // Legacy bridge bootstrap fallback when bridgeId is unknown.
-    // Runtime send paths remain HTTPS-only.
-    if (!bridgeId) {
-      try {
-        const { data } = await axios.get(`http://${target}/api/0/config`, {
-          timeout: 1800,
-          maxRedirects: 0
-        });
-        return data && typeof data === "object" ? data : null;
-      } catch {}
-    }
     return null;
   }
 }
@@ -1907,6 +1898,34 @@ const modsConfigRateLimit = createIpRateLimiter({
   windowMs: 60000,
   max: 24,
   bucket: "mods_config"
+});
+const modsImportRateLimitStrict = expressRateLimit({
+  windowMs: 60000,
+  limit: 6,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: req => getRequestClientIp(req),
+  handler: (_req, res) => {
+    res.status(429).json({
+      ok: false,
+      error: "rate limit exceeded",
+      bucket: "mods_import"
+    });
+  }
+});
+const modsConfigRateLimitStrict = expressRateLimit({
+  windowMs: 60000,
+  limit: 24,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: req => getRequestClientIp(req),
+  handler: (_req, res) => {
+    res.status(429).json({
+      ok: false,
+      error: "rate limit exceeded",
+      bucket: "mods_config"
+    });
+  }
 });
 const modsReadRateLimit = createIpRateLimiter({
   windowMs: 10000,
@@ -10532,7 +10551,7 @@ function writeImportedModFiles(targetDir, records = []) {
   }
 }
 
-app.post("/mods/import", modsImportRateLimit, async (req, res) => {
+app.post("/mods/import", modsImportRateLimitStrict, modsImportRateLimit, async (req, res) => {
   if (!ensureModWriteRouteAllowed(req, res, "/mods/import")) return;
   const payload = req.body && typeof req.body === "object" ? req.body : {};
   const rawFiles = Array.isArray(payload.files) ? payload.files : [];
@@ -10689,7 +10708,7 @@ function normalizeModIdList(value) {
   return out;
 }
 
-app.post("/mods/config", modsConfigRateLimit, async (req, res) => {
+app.post("/mods/config", modsConfigRateLimitStrict, modsConfigRateLimit, async (req, res) => {
   if (!ensureModWriteRouteAllowed(req, res, "/mods/config")) return;
   const current = modLoader.list();
   const currentConfig = current?.config && typeof current.config === "object"
@@ -10903,27 +10922,53 @@ app.post("/hue/pair", huePairRateLimit, async (req, res) => {
   try {
     const HueSync = getHueSyncCtor();
 
-    let bridgeIp = String(payload.bridgeIp || "").trim();
-    let bridgeId = String(payload.bridgeId || "").trim().toUpperCase();
-
-    let discoveredBridge = null;
-    if (!bridgeIp || !bridgeId) {
-      const discovered = await HueSync.discover();
-      const bridges = (Array.isArray(discovered) ? discovered : [])
-        .map(normalizeBridgeDiscovery)
-        .filter(b => b.ip);
-
-      if (bridgeIp) {
-        discoveredBridge = bridges.find(b => b.ip === bridgeIp) || null;
-      } else {
-        discoveredBridge = bridges[0] || null;
-      }
-
-      if (!bridgeIp && discoveredBridge) bridgeIp = discoveredBridge.ip;
-      if (!bridgeId && discoveredBridge?.id) bridgeId = discoveredBridge.id;
+    const rawBridgeIpInput = String(payload.bridgeIp || "").trim();
+    const requestedBridgeIp = normalizeHueBridgeIp(rawBridgeIpInput);
+    const rawBridgeIdInput = String(payload.bridgeId || "").trim();
+    const requestedBridgeId = normalizeHueBridgeIdToken(rawBridgeIdInput).toUpperCase();
+    if (rawBridgeIpInput && !requestedBridgeIp) {
+      res.status(400).json({
+        ok: false,
+        paired: false,
+        error: "invalid_bridge_ip",
+        message: "bridgeIp must be a private/local IPv4 address"
+      });
+      return;
     }
 
-    if (!bridgeIp) {
+    const discovered = await HueSync.discover();
+    const bridges = (Array.isArray(discovered) ? discovered : [])
+      .map(normalizeBridgeDiscovery)
+      .filter(b => b.ip);
+
+    let discoveredBridge = null;
+    if (requestedBridgeIp) {
+      discoveredBridge = bridges.find(b => b.ip === requestedBridgeIp) || null;
+      if (!discoveredBridge) {
+        res.status(400).json({
+          ok: false,
+          paired: false,
+          error: "bridge_not_discovered",
+          message: "bridgeIp must match a Hue bridge discovered on the local network"
+        });
+        return;
+      }
+    } else if (requestedBridgeId) {
+      discoveredBridge = bridges.find(b => b.id === requestedBridgeId) || null;
+      if (!discoveredBridge) {
+        res.status(400).json({
+          ok: false,
+          paired: false,
+          error: "bridge_not_discovered",
+          message: "bridgeId must match a Hue bridge discovered on the local network"
+        });
+        return;
+      }
+    } else {
+      discoveredBridge = bridges[0] || null;
+    }
+
+    if (!discoveredBridge) {
       res.status(404).json({
         ok: false,
         paired: false,
@@ -10932,6 +10977,8 @@ app.post("/hue/pair", huePairRateLimit, async (req, res) => {
       });
       return;
     }
+    let bridgeIp = discoveredBridge.ip;
+    let bridgeId = requestedBridgeId || String(discoveredBridge.id || "").trim().toUpperCase();
     bridgeIp = normalizeHueBridgeIp(bridgeIp);
     if (!bridgeIp) {
       res.status(400).json({
