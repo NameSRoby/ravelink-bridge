@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.5.3 - Behavior Tuning + Routing/Packaging Hotfixes (2026-02-23)
+
+### What Users Will Notice
+- WiZ color transitions are significantly slower and more readable in flow scenes, with longer dwell per color and less rapid churn.
+- WiZ brightness now uses more of the full range (deeper lows + stronger peaks) while preserving beat/drop accents.
+- Palette behavior remains distinct across families with smoother intra-palette movement and less "random flicker" feel.
+- Installer flow now includes an explicit optional checkbox to run extra audio isolation tools during setup.
+
+### Reliability + Setup
+- Full syntax/test/audit pass completed before packaging (`node --check`, `npm test`, `npm audit --omit=dev`).
+- Release sanitize/export/build flow remains the baseline for all distributed artifacts.
+- No workflow reset required for existing users; this update is mostly behavior tuning and hotfix-level changes.
+
 ## v1.5.2 - Hotfix Rollup + Release Safety (2026-02-22)
 
 ### What Users Will Notice
@@ -124,7 +137,7 @@
 
 1. Open releases:
    - `https://github.com/NameSRoby/ravelink-bridge/releases`
-2. Download the latest `RaveLink-Bridge-Windows-v1.5.2.zip`.
+2. Download the latest `RaveLink-Bridge-Windows-v1.5.3.zip`.
 3. Extract the zip.
 4. Install dependencies if needed:
    - `npm install`

@@ -1,7 +1,7 @@
 # RaveLink Bridge Redistributable Notes
 
 This file mirrors high-level usage guidance for packaged/source redistribution.
-Release note: `v1.5.2` is a hotfix rollup focused on metric-reactive behavior, brightness stability, and safer release packaging.
+Release note: `v1.5.3` is a behavior-tuning + hotfix release focused on cleaner WiZ color pacing, fuller brightness range usage, and installer quality-of-life updates.
 
 Primary docs:
 - `README.md` (full setup + runtime usage)
@@ -10,10 +10,10 @@ Primary docs:
 ## Beginner Install Guide (Windows)
 
 1. Preferred when available, run installer:
-- `RaveLink-Bridge-Windows-v1.5.2-setup-installer.exe`
+- `RaveLink-Bridge-Windows-v1.5.3-setup-installer.exe`
 2. ZIP fallback:
-- Prefer `RaveLink-Bridge-Windows-v1.5.2-self-contained.zip` (no preinstalled Node required)
-- Legacy/minimal package: `RaveLink-Bridge-Windows-v1.5.2.zip`
+- Prefer `RaveLink-Bridge-Windows-v1.5.3-self-contained.zip` (no preinstalled Node required)
+- Legacy/minimal package: `RaveLink-Bridge-Windows-v1.5.3.zip`
 - Extract to a normal folder (for example `Desktop\RaveLink-Bridge`)
 - Double-click `RaveLink-Bridge.bat`
 3. Wait for the console to show the URL:
@@ -39,6 +39,7 @@ Primary docs:
 - Source/minimal builds still support full bootstrap when enabled.
 - Optional advanced Windows audio tools can be installed manually via:
   - `RaveLink-Bridge-Install-Optional-Audio-Tools.bat`
+- Installer builds also expose this as an optional setup task checkbox.
 
 ## Quick Launch
 

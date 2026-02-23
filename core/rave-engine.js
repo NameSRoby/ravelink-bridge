@@ -28,6 +28,12 @@
 const { parseBooleanLoose } = require("./utils/booleans");
 const { hsvToRgb255: convertHsvToRgb255 } = require("./utils/hsv-rgb");
 const { createRavePaletteColorTools } = require("./rave-engine/palette-color-tools");
+const {
+  PALETTE_COLOR_COUNT_OPTIONS,
+  PALETTE_FAMILY_DEFS,
+  PALETTE_FAMILY_ALIASES,
+  resolvePaletteFamilyIndexSpan
+} = require("./palette/family-spec");
 
 module.exports = function createRaveEngine(controls) {
   if (!controls || typeof controls.emit !== "function") {
@@ -247,7 +253,8 @@ module.exports = function createRaveEngine(controls) {
     FLOW_INTENSITY_MIN,
     FLOW_INTENSITY_MAX
   );
-  let wizSceneSync = parseBool(process.env.RAVE_WIZ_SCENE_SYNC, true);
+  // WiZ must run as an independent renderer; scene link/mimic is intentionally disabled.
+  let wizSceneSync = false;
 
   /* =========================
      TELEMETRY
@@ -274,8 +281,9 @@ module.exports = function createRaveEngine(controls) {
     scene: "idle_soft",
     sceneAgeMs: 0,
     genre: "auto",
-    paletteFamilies: "blue",
+    paletteFamilies: "red,green,blue",
     paletteColorsPerFamily: 3,
+    paletteFamilyColorCounts: { red: 3, yellow: 3, green: 3, cyan: 3, blue: 3 },
     paletteDisorder: false,
     paletteDisorderAggression: 0.35,
     paletteCycleMode: "on_trigger",
@@ -1905,6 +1913,51 @@ module.exports = function createRaveEngine(controls) {
       { r: 170, g: 80,  b: 255 }
     ]
   };
+
+  function hueBridgeValueToDeg(value) {
+    const wrapped = ((Number(value) || 0) % 65535 + 65535) % 65535;
+    return (wrapped / 65535) * 360;
+  }
+
+  function buildHueAlignedWizFlowPalette(sceneKey, fallbackPalette = []) {
+    const flowDef = FLOW_HUE_PALETTES[sceneKey];
+    if (!flowDef || !Array.isArray(flowDef.anchors) || !flowDef.anchors.length) {
+      return Array.isArray(fallbackPalette) ? fallbackPalette : [];
+    }
+    const sceneDef = SCENES[sceneKey] || SCENES.flow_wash || {};
+    const anchors = flowDef.anchors.map(hueBridgeValueToDeg);
+    const targetLength = Math.max(3, Math.min(4, anchors.length || 3));
+    const swingNorm = clamp((Number(flowDef.swing || 0)) / 7600, 0, 1);
+    const satBase = clamp((Number(sceneDef.sat || 188) / 254) * 0.92, 0.62, 0.98);
+    const valueBase = clamp(
+      (Number(sceneDef.briBase || 110) + (Number(sceneDef.briScale || 80) * 0.34)) / 254,
+      0.28,
+      0.94
+    );
+    const valueSpan = 0.07 + (swingNorm * 0.12);
+
+    const palette = [];
+    for (let i = 0; i < targetLength; i += 1) {
+      const hue = anchors[i % anchors.length];
+      const sat = clamp(
+        satBase +
+        (i % 2 === 0 ? 0.04 : -0.02) +
+        (swingNorm * 0.03),
+        0.58,
+        1
+      );
+      const value = clamp(
+        valueBase +
+        (i % 2 === 0 ? valueSpan : -(valueSpan * 0.58)),
+        0.22,
+        1
+      );
+      palette.push(hsvToRgb255(hue, sat, value));
+    }
+
+    return normalizeWizDistinctPalette(palette, targetLength);
+  }
+
   const SOFT_WIZ_SCENE_KEYS = Object.freeze(new Set([
     "idle_soft",
     "flow_ambient",
@@ -1913,8 +1966,11 @@ module.exports = function createRaveEngine(controls) {
     "flow_media"
   ]));
   for (const [sceneKey, palette] of Object.entries(WIZ_PALETTES)) {
+    const sourcePalette = sceneKey.startsWith("flow_")
+      ? buildHueAlignedWizFlowPalette(sceneKey, palette)
+      : palette;
     const softScene = SOFT_WIZ_SCENE_KEYS.has(sceneKey);
-    const tuned = tunePaletteArrayVibrancy(palette, {
+    const tuned = tunePaletteArrayVibrancy(sourcePalette, {
       satBoost: softScene ? 0.44 : 0.58,
       minSat: softScene ? 0.78 : 0.88,
       minValue: softScene ? 0.28 : 0.32,
@@ -1945,84 +2001,9 @@ module.exports = function createRaveEngine(controls) {
     );
   }
 
-  const MANUAL_PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5, 8, 12]);
-  const MANUAL_PALETTE_FAMILY_DEFS = Object.freeze({
-    red: Object.freeze({
-      id: "red",
-      label: "RED",
-      description: "Red-centered spectrum: narrow true-red at 1/3, broader adjacent tones at 5/8, cross-spectrum edge at 12.",
-      colors: Object.freeze([
-        Object.freeze({ r: 255, g: 120, b: 0 }),
-        Object.freeze({ r: 255, g: 96, b: 0 }),
-        Object.freeze({ r: 255, g: 72, b: 0 }),
-        Object.freeze({ r: 255, g: 48, b: 0 }),
-        Object.freeze({ r: 255, g: 24, b: 0 }),
-        Object.freeze({ r: 255, g: 0, b: 0 }),
-        Object.freeze({ r: 255, g: 0, b: 32 }),
-        Object.freeze({ r: 255, g: 0, b: 72 }),
-        Object.freeze({ r: 255, g: 0, b: 116 }),
-        Object.freeze({ r: 255, g: 0, b: 164 }),
-        Object.freeze({ r: 255, g: 24, b: 214 }),
-        Object.freeze({ r: 255, g: 56, b: 255 })
-      ])
-    }),
-    green: Object.freeze({
-      id: "green",
-      label: "GREEN",
-      description: "Green-centered spectrum: narrow true-green at 1/3, broader adjacent tones at 5/8, cyan-edge crossover at 12.",
-      colors: Object.freeze([
-        Object.freeze({ r: 200, g: 255, b: 0 }),
-        Object.freeze({ r: 160, g: 255, b: 0 }),
-        Object.freeze({ r: 120, g: 255, b: 0 }),
-        Object.freeze({ r: 80, g: 255, b: 0 }),
-        Object.freeze({ r: 40, g: 255, b: 0 }),
-        Object.freeze({ r: 0, g: 255, b: 0 }),
-        Object.freeze({ r: 0, g: 255, b: 36 }),
-        Object.freeze({ r: 0, g: 255, b: 82 }),
-        Object.freeze({ r: 0, g: 255, b: 132 }),
-        Object.freeze({ r: 0, g: 255, b: 184 }),
-        Object.freeze({ r: 0, g: 238, b: 232 }),
-        Object.freeze({ r: 0, g: 212, b: 255 })
-      ])
-    }),
-    blue: Object.freeze({
-      id: "blue",
-      label: "BLUE",
-      description: "Blue-centered spectrum: narrow true-blue at 1/3, broader adjacent tones at 5/8, purple-edge crossover at 12.",
-      colors: Object.freeze([
-        Object.freeze({ r: 0, g: 244, b: 255 }),
-        Object.freeze({ r: 0, g: 214, b: 255 }),
-        Object.freeze({ r: 0, g: 178, b: 255 }),
-        Object.freeze({ r: 0, g: 140, b: 255 }),
-        Object.freeze({ r: 0, g: 98, b: 255 }),
-        Object.freeze({ r: 0, g: 56, b: 255 }),
-        Object.freeze({ r: 0, g: 20, b: 255 }),
-        Object.freeze({ r: 44, g: 0, b: 255 }),
-        Object.freeze({ r: 88, g: 0, b: 255 }),
-        Object.freeze({ r: 132, g: 0, b: 255 }),
-        Object.freeze({ r: 182, g: 0, b: 255 }),
-        Object.freeze({ r: 234, g: 0, b: 255 })
-      ])
-    })
-  });
-  const MANUAL_PALETTE_FAMILY_INDEX_SPAN = Object.freeze({
-    1: Object.freeze([5]),
-    3: Object.freeze([4, 5, 6]),
-    5: Object.freeze([3, 4, 5, 6, 7]),
-    8: Object.freeze([2, 3, 4, 5, 6, 7, 8, 9]),
-    12: Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
-  });
-  const MANUAL_PALETTE_FAMILY_ALIASES = Object.freeze({
-    magenta: "red",
-    purple: "red",
-    pink: "red",
-    amber: "green",
-    yellow: "green",
-    lime: "green",
-    cyan: "blue",
-    aqua: "blue",
-    teal: "blue"
-  });
+  const MANUAL_PALETTE_COLOR_COUNT_OPTIONS = PALETTE_COLOR_COUNT_OPTIONS;
+  const MANUAL_PALETTE_FAMILY_DEFS = PALETTE_FAMILY_DEFS;
+  const MANUAL_PALETTE_FAMILY_ALIASES = PALETTE_FAMILY_ALIASES;
   const MANUAL_PALETTE_FAMILY_IDS = Object.freeze(Object.keys(MANUAL_PALETTE_FAMILY_DEFS));
   const MANUAL_PALETTE_CYCLE_MODE_ORDER = Object.freeze([
     "on_trigger",
@@ -2072,6 +2053,13 @@ module.exports = function createRaveEngine(controls) {
   const MANUAL_PALETTE_VIVIDNESS_LEVEL_OPTIONS = Object.freeze([0, 1, 2, 3, 4]);
   const DEFAULT_MANUAL_PALETTE_CONFIG = Object.freeze({
     colorsPerFamily: 3,
+    familyColorCounts: Object.freeze({
+      red: 3,
+      yellow: 3,
+      green: 3,
+      cyan: 3,
+      blue: 3
+    }),
     families: Object.freeze(["red", "green", "blue"]),
     disorder: false,
     disorderAggression: 0.35,
@@ -2100,6 +2088,45 @@ module.exports = function createRaveEngine(controls) {
     const fallbackParsed = Number(fallback);
     if (MANUAL_PALETTE_COLOR_COUNT_OPTIONS.includes(fallbackParsed)) return fallbackParsed;
     return DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily;
+  }
+
+  function buildManualPaletteUniformColorCounts(colorCount) {
+    const count = normalizeManualPaletteColorCount(
+      colorCount,
+      DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+    );
+    const out = {};
+    for (const familyId of MANUAL_PALETTE_FAMILY_IDS) {
+      out[familyId] = count;
+    }
+    return out;
+  }
+
+  function normalizeManualPaletteFamilyColorCounts(
+    value,
+    fallback = DEFAULT_MANUAL_PALETTE_CONFIG.familyColorCounts,
+    fallbackColorCount = DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+  ) {
+    const fallbackCount = normalizeManualPaletteColorCount(
+      fallbackColorCount,
+      DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+    );
+    const source = value && typeof value === "object" && !Array.isArray(value)
+      ? value
+      : {};
+    const fallbackMap = fallback && typeof fallback === "object" && !Array.isArray(fallback)
+      ? fallback
+      : {};
+    const out = {};
+    for (const familyId of MANUAL_PALETTE_FAMILY_IDS) {
+      const raw = Object.prototype.hasOwnProperty.call(source, familyId)
+        ? source[familyId]
+        : Object.prototype.hasOwnProperty.call(fallbackMap, familyId)
+          ? fallbackMap[familyId]
+          : fallbackCount;
+      out[familyId] = normalizeManualPaletteColorCount(raw, fallbackCount);
+    }
+    return out;
   }
 
   function normalizeManualPaletteDisorderAggression(value, fallback = DEFAULT_MANUAL_PALETTE_CONFIG.disorderAggression) {
@@ -2291,6 +2318,28 @@ module.exports = function createRaveEngine(controls) {
       : ["red"];
   }
 
+  function resolveManualPaletteColorCountForFamily(
+    config = {},
+    familyId,
+    fallback = DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+  ) {
+    const familyKey = String(familyId || "").trim().toLowerCase();
+    const fallbackCount = normalizeManualPaletteColorCount(
+      config?.colorsPerFamily,
+      fallback
+    );
+    if (!MANUAL_PALETTE_FAMILY_IDS.includes(familyKey)) {
+      return fallbackCount;
+    }
+    const counts = config?.familyColorCounts && typeof config.familyColorCounts === "object"
+      ? config.familyColorCounts
+      : null;
+    if (!counts || !Object.prototype.hasOwnProperty.call(counts, familyKey)) {
+      return fallbackCount;
+    }
+    return normalizeManualPaletteColorCount(counts[familyKey], fallbackCount);
+  }
+
   function resolveManualPaletteVividnessProfile(level = DEFAULT_MANUAL_PALETTE_CONFIG.vividness) {
     const vividness = normalizeManualPaletteVividness(level, DEFAULT_MANUAL_PALETTE_CONFIG.vividness);
     const satBoostScaleByLevel = [0.72, 0.9, 1, 1.16, 1.32];
@@ -2324,13 +2373,64 @@ module.exports = function createRaveEngine(controls) {
     const colors = Array.isArray(family.colors) ? family.colors.slice() : [];
     if (!colors.length) return [];
     const targetCount = normalizeManualPaletteColorCount(colorsPerFamily, DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily);
-    const span = MANUAL_PALETTE_FAMILY_INDEX_SPAN[targetCount] || MANUAL_PALETTE_FAMILY_INDEX_SPAN[3];
+    const span = resolvePaletteFamilyIndexSpan(familyId, targetCount);
     const picked = span
       .map(idx => colors[idx])
       .filter(Boolean);
     const sourcePalette = picked.length
       ? picked
       : colors.slice(0, Math.max(1, Math.min(targetCount, colors.length)));
+    const contrastedSourcePalette = sourcePalette.map((color, index) => {
+      const hsv = rgbToHsv(color);
+      const density = Math.max(1, sourcePalette.length);
+      const ultraDensityLocal = density >= 12;
+      const highDensityLocal = density >= 8 && density < 12;
+      const mediumDensityLocal = density >= 5 && density < 8;
+      const valueAmp = ultraDensityLocal
+        ? 0.18
+        : (highDensityLocal ? 0.16 : (mediumDensityLocal ? 0.18 : 0.2));
+      const satAmp = ultraDensityLocal
+        ? 0.095
+        : (highDensityLocal ? 0.082 : (mediumDensityLocal ? 0.105 : 0.11));
+      const zig = index % 2 === 0 ? 1 : -1;
+      const phase = density <= 1 ? 0 : (index / (density - 1));
+      const progress = phase - 0.5;
+      const wave = Math.sin((phase * Math.PI * 2) + (ultraDensityLocal ? (Math.PI / 6) : 0));
+      const triStep = (index % 3) - 1;
+      const localValueStagger = ultraDensityLocal
+        ? (triStep * 0.028)
+        : (highDensityLocal ? (triStep * 0.02) : (mediumDensityLocal ? (triStep * 0.014) : 0));
+      const localSatStagger = ultraDensityLocal
+        ? (triStep * 0.014)
+        : (highDensityLocal ? (triStep * 0.01) : (mediumDensityLocal ? (triStep * 0.008) : 0));
+      const value = clamp(
+        hsv.v +
+        (zig * valueAmp * 0.42) +
+        (wave * valueAmp * 0.36) +
+        (progress * 0.05) +
+        localValueStagger,
+        0.24,
+        1
+      );
+      const sat = clamp(
+        hsv.s +
+        (zig * satAmp * 0.36) +
+        (wave * satAmp * 0.46) -
+        (progress * 0.05) -
+        localSatStagger,
+        0.62,
+        1
+      );
+      const hueNudgeAmp = ultraDensityLocal
+        ? 2.2
+        : (highDensityLocal ? 1.8 : (mediumDensityLocal ? 1.2 : 0));
+      const hue = normalizeManualPaletteHueDeg(
+        hsv.h +
+        (zig * hueNudgeAmp * 0.38) +
+        (wave * hueNudgeAmp * 0.62)
+      );
+      return hsvToRgb255(hue, sat, value);
+    });
     const ultraDensity = targetCount >= 12;
     const highDensity = targetCount >= 8 && targetCount < 12;
     const mediumDensity = targetCount >= 5 && targetCount < 8;
@@ -2351,12 +2451,12 @@ module.exports = function createRaveEngine(controls) {
           ? 0.9
           : 0.91;
     const baseMinValue = narrowDensity ? 0.38 : 0.32;
-    return tunePaletteArrayVibrancy(sourcePalette, {
+    return tunePaletteArrayVibrancy(contrastedSourcePalette, {
       satBoost: clamp((baseSatBoost * profile.satBoostScale) + profile.satBoostAdd, 0, 1),
       minSat: clamp(baseMinSat + profile.minSatDelta, 0, 1),
       minValue: clamp(baseMinValue + profile.minValueDelta, 0, 1),
       maxValue: 1,
-      softEvery: narrowDensity ? 0 : (ultraDensity ? 6 : (highDensity ? 5 : (mediumDensity ? 4 : 0))),
+      softEvery: narrowDensity ? 0 : (ultraDensity ? 8 : (highDensity ? 5 : (mediumDensity ? 4 : 0))),
       softSatBoost: clamp((0.26 * profile.softSatScale) + profile.softSatAdd, 0, 1),
       softMinSat: clamp(0.76 + profile.softMinSatDelta, 0, 1),
       softMinValue: clamp(0.3 + profile.softMinValueDelta, 0, 1),
@@ -2367,6 +2467,11 @@ module.exports = function createRaveEngine(controls) {
   let manualPaletteColorsPerFamily = normalizeManualPaletteColorCount(
     process.env.RAVE_MANUAL_PALETTE_COLORS_PER_FAMILY,
     DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+  );
+  let manualPaletteFamilyColorCounts = normalizeManualPaletteFamilyColorCounts(
+    process.env.RAVE_MANUAL_PALETTE_FAMILY_COLOR_COUNTS,
+    DEFAULT_MANUAL_PALETTE_CONFIG.familyColorCounts,
+    manualPaletteColorsPerFamily
   );
   let manualPaletteFamilies = normalizeManualPaletteFamilies(
     process.env.RAVE_MANUAL_PALETTE_FAMILIES,
@@ -2441,6 +2546,7 @@ module.exports = function createRaveEngine(controls) {
   function getManualPaletteGlobalConfig() {
     return {
       colorsPerFamily: manualPaletteColorsPerFamily,
+      familyColorCounts: { ...manualPaletteFamilyColorCounts },
       families: manualPaletteFamilies.slice(),
       disorder: Boolean(manualPaletteDisorder),
       disorderAggression: manualPaletteDisorderAggression,
@@ -2462,10 +2568,25 @@ module.exports = function createRaveEngine(controls) {
     const safeFallback = fallback && typeof fallback === "object"
       ? fallback
       : DEFAULT_MANUAL_PALETTE_CONFIG;
+    const fallbackColorsPerFamily = normalizeManualPaletteColorCount(
+      safeFallback.colorsPerFamily,
+      DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+    );
+    const colorsPerFamily = normalizeManualPaletteColorCount(
+      raw.colorsPerFamily,
+      fallbackColorsPerFamily
+    );
+    const familyColorCountsFallback = normalizeManualPaletteFamilyColorCounts(
+      safeFallback.familyColorCounts,
+      DEFAULT_MANUAL_PALETTE_CONFIG.familyColorCounts,
+      fallbackColorsPerFamily
+    );
     return {
-      colorsPerFamily: normalizeManualPaletteColorCount(
-        raw.colorsPerFamily,
-        normalizeManualPaletteColorCount(safeFallback.colorsPerFamily, DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily)
+      colorsPerFamily,
+      familyColorCounts: normalizeManualPaletteFamilyColorCounts(
+        raw.familyColorCounts,
+        familyColorCountsFallback,
+        colorsPerFamily
       ),
       families: normalizeManualPaletteFamilies(
         raw.families,
@@ -2578,6 +2699,7 @@ module.exports = function createRaveEngine(controls) {
   function applyManualPaletteTelemetry() {
     telemetry.paletteFamilies = manualPaletteFamilies.join(",");
     telemetry.paletteColorsPerFamily = manualPaletteColorsPerFamily;
+    telemetry.paletteFamilyColorCounts = { ...manualPaletteFamilyColorCounts };
     telemetry.paletteDisorder = Boolean(manualPaletteDisorder);
     telemetry.paletteDisorderAggression = manualPaletteDisorderAggression;
     telemetry.paletteCycleMode = manualPaletteCycleMode;
@@ -2601,6 +2723,14 @@ module.exports = function createRaveEngine(controls) {
       updated.colorsPerFamily = normalizeManualPaletteColorCount(
         patch.colorsPerFamily,
         current.colorsPerFamily
+      );
+      updated.familyColorCounts = buildManualPaletteUniformColorCounts(updated.colorsPerFamily);
+    }
+    if (hasOwn(patch, "familyColorCounts")) {
+      updated.familyColorCounts = normalizeManualPaletteFamilyColorCounts(
+        patch.familyColorCounts,
+        updated.familyColorCounts || current.familyColorCounts,
+        updated.colorsPerFamily || current.colorsPerFamily
       );
     }
     if (hasOwn(patch, "families")) {
@@ -2698,6 +2828,7 @@ module.exports = function createRaveEngine(controls) {
 
     const globalCurrent = {
       colorsPerFamily: manualPaletteColorsPerFamily,
+      familyColorCounts: manualPaletteFamilyColorCounts,
       families: manualPaletteFamilies,
       disorder: manualPaletteDisorder,
       disorderAggression: manualPaletteDisorderAggression,
@@ -2714,6 +2845,7 @@ module.exports = function createRaveEngine(controls) {
     };
     const globalUpdated = applyManualPaletteConfigPatch({ ...globalCurrent }, next, globalCurrent);
     manualPaletteColorsPerFamily = globalUpdated.colorsPerFamily;
+    manualPaletteFamilyColorCounts = { ...globalUpdated.familyColorCounts };
     manualPaletteFamilies = globalUpdated.families;
     manualPaletteDisorder = globalUpdated.disorder;
     manualPaletteDisorderAggression = globalUpdated.disorderAggression;
@@ -2742,6 +2874,10 @@ module.exports = function createRaveEngine(controls) {
     const bb = normalizeManualPaletteHueDeg(b);
     const delta = Math.abs(aa - bb);
     return delta > 180 ? (360 - delta) : delta;
+  }
+
+  function shortestHueDeltaCircularDeg(fromHue, toHue) {
+    return ((normalizeManualPaletteHueDeg(toHue) - normalizeManualPaletteHueDeg(fromHue) + 540) % 360) - 180;
   }
 
   function rotateManualPaletteColors(colors = [], shift = 0) {
@@ -2854,15 +2990,24 @@ module.exports = function createRaveEngine(controls) {
       config && typeof config === "object" ? config : getManualPaletteGlobalConfig(),
       getManualPaletteGlobalConfig()
     );
+    const selectedFamilies = normalizeManualPaletteFamilies(
+      paletteConfig.families,
+      DEFAULT_MANUAL_PALETTE_CONFIG.families
+    );
+    const familyCountFingerprint = selectedFamilies
+      .map(familyId => `${familyId}:${resolveManualPaletteColorCountForFamily(
+        paletteConfig,
+        familyId,
+        paletteConfig.colorsPerFamily
+      )}`)
+      .join(",");
     const cacheKey = [
       String(normalizeManualPaletteColorCount(
         paletteConfig.colorsPerFamily,
         DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
       )),
-      normalizeManualPaletteFamilies(
-        paletteConfig.families,
-        DEFAULT_MANUAL_PALETTE_CONFIG.families
-      ).join(","),
+      familyCountFingerprint,
+      selectedFamilies.join(","),
       paletteConfig.disorder ? "1" : "0",
       String(normalizeManualPaletteVividness(
         paletteConfig.vividness,
@@ -2874,16 +3019,15 @@ module.exports = function createRaveEngine(controls) {
     }
 
     const sequence = [];
-    const selectedFamilies = normalizeManualPaletteFamilies(
-      paletteConfig.families,
-      DEFAULT_MANUAL_PALETTE_CONFIG.families
-    );
     const familySegments = selectedFamilies
-      .map(familyId => buildManualPaletteColorsForFamily(
-        familyId,
-        paletteConfig.colorsPerFamily,
-        paletteConfig.vividness
-      ))
+      .map(familyId => {
+        const count = resolveManualPaletteColorCountForFamily(
+          paletteConfig,
+          familyId,
+          paletteConfig.colorsPerFamily
+        );
+        return buildManualPaletteColorsForFamily(familyId, count, paletteConfig.vividness);
+      })
       .filter(segment => Array.isArray(segment) && segment.length > 0);
     const flowSegments = !paletteConfig.disorder && familySegments.length >= 2
       ? orientManualPaletteFamiliesForOrderedFlow(familySegments)
@@ -2899,7 +3043,12 @@ module.exports = function createRaveEngine(controls) {
       }
     }
     if (!sequence.length) {
-      const fallback = buildManualPaletteColorsForFamily("red", 3, paletteConfig.vividness);
+      const fallbackCount = resolveManualPaletteColorCountForFamily(
+        paletteConfig,
+        "red",
+        DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+      );
+      const fallback = buildManualPaletteColorsForFamily("red", fallbackCount, paletteConfig.vividness);
       for (const color of fallback) {
         sequence.push({
           r: clamp255(color.r),
@@ -2916,25 +3065,73 @@ module.exports = function createRaveEngine(controls) {
     return sequence;
   }
 
-  function getManualPaletteGroupSize(config = null, length = 1) {
+  function getManualPaletteGroupLengths(config = null) {
     const normalizedConfig = normalizeManualPaletteConfigSnapshot(
       config && typeof config === "object" ? config : getManualPaletteGlobalConfig(),
       getManualPaletteGlobalConfig()
     );
-    const requestedSize = normalizeManualPaletteColorCount(
-      normalizedConfig.colorsPerFamily,
-      DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+    const selectedFamilies = normalizeManualPaletteFamilies(
+      normalizedConfig.families,
+      DEFAULT_MANUAL_PALETTE_CONFIG.families
     );
-    const len = Math.max(1, Number(length) || 1);
-    return clamp(requestedSize, 1, len);
+    const lengths = selectedFamilies.map(familyId => resolveManualPaletteColorCountForFamily(
+      normalizedConfig,
+      familyId,
+      normalizedConfig.colorsPerFamily
+    ));
+    if (lengths.length) return lengths;
+    return [
+      normalizeManualPaletteColorCount(
+        normalizedConfig.colorsPerFamily,
+        DEFAULT_MANUAL_PALETTE_CONFIG.colorsPerFamily
+      )
+    ];
   }
 
-  function normalizeManualPaletteGroupBase(index, length, groupSize) {
+  function buildManualPaletteGroupLayout(config = null, length = 1) {
     const len = Math.max(1, Number(length) || 1);
-    const size = clamp(Math.round(Number(groupSize) || 1), 1, len);
+    const requestedLengths = getManualPaletteGroupLengths(config);
+    const layout = [];
+    let cursor = 0;
+    for (const requestedLength of requestedLengths) {
+      if (cursor >= len) break;
+      const remaining = len - cursor;
+      const size = clamp(Math.round(Number(requestedLength) || 1), 1, remaining);
+      layout.push({ start: cursor, length: size });
+      cursor += size;
+    }
+    if (!layout.length) {
+      return [{ start: 0, length: len }];
+    }
+    if (cursor < len) {
+      layout[layout.length - 1].length += (len - cursor);
+    }
+    return layout;
+  }
+
+  function getManualPaletteGroupIndexForLayout(index, layout = [], length = 1) {
+    const len = Math.max(1, Number(length) || 1);
+    const safeLayout = Array.isArray(layout) && layout.length
+      ? layout
+      : [{ start: 0, length: len }];
     const base = ((Number(index) || 0) % len + len) % len;
-    const group = Math.floor(base / size);
-    return clamp(group * size, 0, Math.max(0, len - 1));
+    for (let i = 0; i < safeLayout.length; i += 1) {
+      const group = safeLayout[i];
+      const start = clamp(Math.round(Number(group.start) || 0), 0, len - 1);
+      const size = clamp(Math.round(Number(group.length) || 1), 1, Math.max(1, len - start));
+      if (base >= start && base < (start + size)) return i;
+    }
+    return Math.max(0, safeLayout.length - 1);
+  }
+
+  function getManualPaletteGroupBaseForLayout(groupIndex, layout = [], length = 1) {
+    const len = Math.max(1, Number(length) || 1);
+    const safeLayout = Array.isArray(layout) && layout.length
+      ? layout
+      : [{ start: 0, length: len }];
+    const idx = clamp(Math.round(Number(groupIndex) || 0), 0, safeLayout.length - 1);
+    const group = safeLayout[idx];
+    return clamp(Math.round(Number(group.start) || 0), 0, len - 1);
   }
 
   function pickManualPaletteNextIndex(currentIndex, length, paletteConfig = null, options = {}) {
@@ -2947,13 +3144,13 @@ module.exports = function createRaveEngine(controls) {
     );
     const scope = String(options?.scope || "color").trim().toLowerCase();
     if (scope === "group") {
-      const groupSize = getManualPaletteGroupSize(config, len);
-      const groupCount = Math.max(1, Math.ceil(len / groupSize));
+      const groupLayout = buildManualPaletteGroupLayout(config, len);
+      const groupCount = Math.max(1, groupLayout.length);
       if (groupCount <= 1) return 0;
-      const currentGroup = clamp(Math.floor(base / groupSize), 0, groupCount - 1);
+      const currentGroup = getManualPaletteGroupIndexForLayout(base, groupLayout, len);
       const step = Boolean(options?.isDrop) && groupCount > 2 ? 2 : 1;
       const nextGroup = (currentGroup + step) % groupCount;
-      return normalizeManualPaletteGroupBase(nextGroup * groupSize, len, groupSize);
+      return getManualPaletteGroupBaseForLayout(nextGroup, groupLayout, len);
     }
     if (!config.disorder) return (base + 1) % len;
     const isBeat = Boolean(options.isBeat);
@@ -2979,9 +3176,21 @@ module.exports = function createRaveEngine(controls) {
       config && typeof config === "object" ? config : getManualPaletteGlobalConfig(),
       getManualPaletteGlobalConfig()
     );
+    const normalizedFamilies = normalizeManualPaletteFamilies(
+      normalized.families,
+      DEFAULT_MANUAL_PALETTE_CONFIG.families
+    );
+    const familyCountFingerprint = normalizedFamilies
+      .map(familyId => `${familyId}:${resolveManualPaletteColorCountForFamily(
+        normalized,
+        familyId,
+        normalized.colorsPerFamily
+      )}`)
+      .join(",");
     return [
       String(normalized.colorsPerFamily),
-      normalizeManualPaletteFamilies(normalized.families, DEFAULT_MANUAL_PALETTE_CONFIG.families).join(","),
+      familyCountFingerprint,
+      normalizedFamilies.join(","),
       normalized.disorder ? "1" : "0",
       String(Math.round(normalizeManualPaletteDisorderAggression(normalized.disorderAggression, 0.35) * 1000)),
       normalizeManualPaletteCycleMode(normalized.cycleMode, DEFAULT_MANUAL_PALETTE_CONFIG.cycleMode),
@@ -3241,27 +3450,38 @@ module.exports = function createRaveEngine(controls) {
       paletteConfig && typeof paletteConfig === "object" ? paletteConfig : getManualPaletteConfigForBrand(brandKey),
       getManualPaletteConfigForBrand(brandKey)
     );
-    const groupSize = getManualPaletteGroupSize(config, len);
-    const groupCount = Math.max(1, Math.ceil(len / groupSize));
+    const groupLayout = buildManualPaletteGroupLayout(config, len);
+    const groupCount = Math.max(1, groupLayout.length);
     const signal = buildManualPaletteCycleSignal(options.sceneName, options.isBeat, options.isDrop);
     const fingerprint = getManualPaletteRuntimeFingerprint(config);
+    const baseGroupIndex = getManualPaletteGroupIndexForLayout(baseIndex, groupLayout, len);
+    const baseGroupStart = getManualPaletteGroupBaseForLayout(baseGroupIndex, groupLayout, len);
     if (state.fingerprint !== fingerprint || Number(state.length) !== len) {
-      state.index = normalizeManualPaletteGroupBase(baseIndex, len, groupSize);
+      state.index = baseGroupStart;
       state.colorOffset = 0;
       state.length = len;
       state.fingerprint = fingerprint;
       state.lastAdvanceAt = signal.nowMs;
       state.waitStartAt = 0;
       state.lastSignal = null;
-      state.lastSpectrumIndex = clamp(Math.floor(state.index / groupSize), 0, Math.max(0, groupCount - 1));
+      state.lastSpectrumIndex = baseGroupIndex;
       state.lastSpectrumSwitchAt = 0;
     }
-    let index = normalizeManualPaletteGroupBase(state.index, len, groupSize);
+    let index = getManualPaletteGroupBaseForLayout(
+      getManualPaletteGroupIndexForLayout(state.index, groupLayout, len),
+      groupLayout,
+      len
+    );
+    const currentGroupIndex = getManualPaletteGroupIndexForLayout(index, groupLayout, len);
+    const currentGroupMeta = groupLayout[currentGroupIndex] || { start: index, length: Math.max(1, len - index) };
     const mode = normalizeManualPaletteCycleMode(config.cycleMode, DEFAULT_MANUAL_PALETTE_CONFIG.cycleMode);
-    const orderedOffsetStep = Boolean(options.isDrop) && groupSize > 2 ? 2 : 1;
+    const orderedOffsetStep = Boolean(options.isDrop) && currentGroupMeta.length > 2 ? 2 : 1;
     const groupAdvanceSteps = clamp(Math.round(Number(options.advanceStep) || 1), 1, 4);
     const applyGroupColorOffset = () => {
-      const groupSpan = Math.max(1, Math.min(groupSize, len - index));
+      const groupIndex = getManualPaletteGroupIndexForLayout(index, groupLayout, len);
+      const group = groupLayout[groupIndex] || { start: 0, length: len };
+      index = clamp(Math.round(Number(group.start) || 0), 0, len - 1);
+      const groupSpan = Math.max(1, Math.min(group.length, len - index));
       let offset = clamp(Math.round(Number(state.colorOffset) || 0), 0, Math.max(0, groupSpan - 1));
       if (groupSpan > 1) {
         if (config.disorder) {
@@ -3281,12 +3501,12 @@ module.exports = function createRaveEngine(controls) {
         offset = 0;
       }
       state.colorOffset = offset;
-      return normalizeManualPaletteGroupBase(index, len, groupSize) + offset;
+      return index + offset;
     };
 
     if (mode === "spectrum_mapper") {
       const groupIndex = pickManualPaletteSpectrumIndex(groupCount, config, signal, state);
-      index = normalizeManualPaletteGroupBase(groupIndex * groupSize, len, groupSize);
+      index = getManualPaletteGroupBaseForLayout(groupIndex, groupLayout, len);
       state.index = index;
       state.lastSpectrumIndex = clamp(groupIndex, 0, Math.max(0, groupCount - 1));
       state.lastAdvanceAt = signal.nowMs;
@@ -3294,7 +3514,7 @@ module.exports = function createRaveEngine(controls) {
       return {
         emitIndex,
         index,
-        advanced: index !== normalizeManualPaletteGroupBase(baseIndex, len, groupSize)
+        advanced: index !== baseGroupStart
       };
     }
 
@@ -3321,7 +3541,7 @@ module.exports = function createRaveEngine(controls) {
           index = pickManualPaletteNextIndex(index, len, config, { ...options, scope: "group" });
         }
         state.index = index;
-        state.lastSpectrumIndex = clamp(Math.floor(index / groupSize), 0, Math.max(0, groupCount - 1));
+        state.lastSpectrumIndex = getManualPaletteGroupIndexForLayout(index, groupLayout, len);
       }
       const emitIndex = applyGroupColorOffset();
       return {
@@ -3340,7 +3560,7 @@ module.exports = function createRaveEngine(controls) {
       }
       state.index = index;
       state.lastAdvanceAt = signal.nowMs;
-      state.lastSpectrumIndex = clamp(Math.floor(index / groupSize), 0, Math.max(0, groupCount - 1));
+      state.lastSpectrumIndex = getManualPaletteGroupIndexForLayout(index, groupLayout, len);
       advanced = true;
     }
     const emitIndex = applyGroupColorOffset();
@@ -6410,6 +6630,8 @@ module.exports = function createRaveEngine(controls) {
   let brightnessDriveEma = 0;
   let brightnessSilentFrames = 0;
   let lastWizScene = null;
+  let wizFlowHueEma = null;
+  let wizFlowColorEma = null;
   const manualPaletteCycleStateByBrand = {
     hue: {
       index: 0,
@@ -6434,25 +6656,6 @@ module.exports = function createRaveEngine(controls) {
       lastSpectrumSwitchAt: 0
     }
   };
-  const WIZ_FLOW_DESYNC_ALIAS = Object.freeze({
-    flow_wash: "flow_house",
-    flow_edm: "flow_trance",
-    flow_hiphop: "flow_rnb",
-    flow_metal: "flow_storm",
-    flow_ambient: "flow_glacier",
-    flow_house: "flow_wash",
-    flow_trance: "flow_edm",
-    flow_dnb: "flow_techno",
-    flow_pop: "flow_sunset",
-    flow_rock: "flow_metal",
-    flow_rnb: "flow_hiphop",
-    flow_media: "flow_glacier",
-    flow_techno: "flow_dnb",
-    flow_cyberpunk: "flow_storm",
-    flow_sunset: "flow_pop",
-    flow_glacier: "flow_media",
-    flow_storm: "flow_cyberpunk"
-  });
   const SCENE_LOCK_ALIASES = Object.freeze({
     flow: "flow",
     idle: "idle_soft",
@@ -6541,8 +6744,9 @@ module.exports = function createRaveEngine(controls) {
     };
   }
 
-  const BRIGHTNESS_TIER_MIN = 0.03;
-  const WIZ_BRIGHTNESS_TIER_MIN = 0.015;
+  // Legacy brightness floor tuned for full range without premature "near-black" dips.
+  const BRIGHTNESS_TIER_MIN = 0.026;
+  const WIZ_BRIGHTNESS_TIER_MIN = 0.003;
   const BRIGHTNESS_TIER_LOW = 0.34;
   const BRIGHTNESS_TIER_MEDIUM = 0.68;
   const BRIGHTNESS_TIER_HIGH = 1.00;
@@ -6668,18 +6872,18 @@ module.exports = function createRaveEngine(controls) {
       0,
       1
     );
-    if (peakLevel > 0.8) {
+    if (peakLevel > 0.82) {
       const peakBoost = lerp(
         BRIGHTNESS_TIER_MEDIUM,
         BRIGHTNESS_TIER_HIGH,
-        smoothStep(0.8, 1, peakLevel)
+        smoothStep(0.82, 1, peakLevel)
       );
       percent = Math.max(percent, peakBoost);
     }
 
     const rawPercent = clamp(percent, BRIGHTNESS_TIER_MIN, BRIGHTNESS_TIER_HIGH);
     const percentAlpha = rawPercent >= brightnessPercentSmoothed
-      ? clamp(0.24 + peakLevel * 0.14, 0.2, 0.44)
+      ? clamp(0.24 + peakLevel * 0.12, 0.2, 0.44)
       : (sustainedSilent ? 0.34 : 0.2);
     brightnessPercentSmoothed = lerp(brightnessPercentSmoothed, rawPercent, percentAlpha);
     const resolvedPercent = clamp(brightnessPercentSmoothed, BRIGHTNESS_TIER_MIN, BRIGHTNESS_TIER_HIGH);
@@ -6803,7 +7007,7 @@ module.exports = function createRaveEngine(controls) {
       (telemetry.beat ? 0.09 : 0) +
       (telemetry.drop ? 0.22 : 0),
       0,
-      0.22
+      0.24
     );
     let target = source * volumeTier.percent;
     if (volumeTier.tier === "silent") {
@@ -6814,10 +7018,24 @@ module.exports = function createRaveEngine(controls) {
     }
     const accentedTarget = clamp(target, minFloor, 254);
     if (!(hueBrightnessSmoothed > 0)) hueBrightnessSmoothed = accentedTarget;
+    const riseDiff = Math.max(0, accentedTarget - hueBrightnessSmoothed);
+    const transientSurge = clamp(
+      rhythm.relTransient * 0.22 +
+      rhythm.relFlux * 0.14 +
+      (telemetry.beat ? 0.08 : 0) +
+      (telemetry.drop ? 0.16 : 0),
+      0,
+      0.34
+    );
     const blend = accentedTarget >= hueBrightnessSmoothed
-      ? clamp(0.32 + rhythm.rhythm * 0.24, 0.24, 0.72)
+      ? clamp(0.32 + rhythm.rhythm * 0.24 + transientSurge, 0.24, 0.86)
       : clamp(0.24 + (1 - rhythm.rhythm) * 0.16, 0.16, 0.52);
     hueBrightnessSmoothed = lerp(hueBrightnessSmoothed, accentedTarget, blend);
+    // Prevent "stuck low" feel on sharp loud events by forcing a minimum upward catch-up.
+    if (riseDiff > 10 && transientSurge > 0.14) {
+      const kick = Math.max(5, riseDiff * 0.22);
+      hueBrightnessSmoothed = Math.min(254, hueBrightnessSmoothed + kick);
+    }
     const output = Math.round(clamp(hueBrightnessSmoothed, 1, 254));
     telemetry.hueBrightnessOut = clamp(output / 254, 0, 1);
     return output;
@@ -6851,14 +7069,14 @@ module.exports = function createRaveEngine(controls) {
       const bodyScale = clamp(
         0.78 + (sourceLevel * 0.56) + (rhythm.rhythm * 0.12),
         0.72,
-        1.36
+        1.34
       );
       target = volumeTier.percent * bodyScale * (1 + accent * 0.18);
       if (!telemetry.beat && !telemetry.drop && sourceLevel < 0.14) {
         target = Math.min(target, 0.16 + sourceLevel * 0.55);
       }
     }
-    if (telemetry.drop) target = Math.max(target, 0.9);
+    if (telemetry.drop) target = Math.max(target, 0.88);
     return clamp(target, WIZ_BRIGHTNESS_TIER_MIN, 1);
   }
 
@@ -7020,21 +7238,17 @@ function normalizeSceneLock(sceneName) {
 }
 
 function setWizSceneSync(enabled) {
-  wizSceneSync = Boolean(enabled);
+  void enabled;
+  wizSceneSync = false;
   telemetry.sceneSync = wizSceneSync;
   telemetry.wizSceneSync = wizSceneSync;
   return wizSceneSync;
 }
 
-function getDesyncedFlowScene(sceneName) {
-  const key = String(sceneName || "").trim().toLowerCase();
-  return WIZ_FLOW_DESYNC_ALIAS[key] || key || "flow_wash";
-}
-
 function resolveWizScene(now = Date.now()) {
   if (forcedSceneInput === "flow") {
     const flowScene = resolveFlowScene(now);
-    return wizSceneSync ? flowScene : getDesyncedFlowScene(flowScene);
+    return flowScene;
   }
 
   if (forcedScene && forcedScene !== FLOW_DYNAMIC_LOCK) {
@@ -7044,7 +7258,7 @@ function resolveWizScene(now = Date.now()) {
   const behavior = String(telemetry.behavior || "idle").trim().toLowerCase();
   if (behavior === "flow") {
     const flowScene = resolveFlowScene(now);
-    return wizSceneSync ? flowScene : getDesyncedFlowScene(flowScene);
+    return flowScene;
   }
 
   return BEHAVIOR_SCENE_DEFAULTS[behavior] || "idle_soft";
@@ -8382,11 +8596,12 @@ function getModeSwitchBias() {
         const drift = Number(flowHue.drift) || 0;
         const stepBase = Number(flowHue.step) || Math.max(40, Math.round(scene.hueStep * 0.22));
         const step = stepBase * (1 + scaledMotion * 1.35) * flowHueScale * (1 - calmHold * 0.42);
+        const warpGain = 1 + (isBeat ? 0.16 : 0) + (telemetry.drop ? 0.24 : 0);
         const reactiveWarp = (
-          Math.sin(now / 42 + phase * 0.66) * (180 + scaledMotion * 1180) +
-          Math.sin(now / 68 + audioBandLow * 6.28) * (90 + audioBandLow * 520) +
-          Math.sin(now / 56 + audioBandHigh * 5.1) * (70 + audioBandHigh * 470)
-        ) * flowHueScale * (1 - calmHold * 0.55);
+          Math.sin(now / 96 + phase * 0.44 + audioBandLow * 2.6) * (72 + scaledMotion * 420) +
+          Math.sin(now / 148 + audioBandMid * 3.2) * (46 + audioBandMid * 210) +
+          Math.sin(now / 188 + audioBandHigh * 3.6) * (34 + audioBandHigh * 170)
+        ) * flowHueScale * (1 - calmHold * 0.55) * warpGain;
         hue = (
           anchor +
           Math.sin(phase * 0.33) * swing +
@@ -8401,7 +8616,7 @@ function getModeSwitchBias() {
           (now / scene.hueTimeDiv) +
           Math.sin(phase * 0.35) * scene.hueSwing +
           phase * step +
-          Math.sin(now / 44 + phase * 0.62) * (180 + scaledMotion * 1100) * flowHueScale * (1 - calmHold * 0.55)
+          Math.sin(now / 88 + phase * 0.56) * (70 + scaledMotion * 440) * flowHueScale * (1 - calmHold * 0.55)
         ) % 65535;
       }
       if (hue < 0) hue += 65535;
@@ -8653,33 +8868,44 @@ function getModeSwitchBias() {
     const sinceLastAdvance = lastWizPaletteAdvanceAt > 0
       ? Math.max(0, signal.now - lastWizPaletteAdvanceAt)
       : Number.POSITIVE_INFINITY;
-    const cadenceFloorMs = signal.flowScene ? 70 : (signal.pulseScene ? 92 : 130);
-    const cadenceCeilMs = signal.flowScene ? 420 : (signal.pulseScene ? 640 : 1100);
+    // Keep a visible dwell per palette color; very short floors can feel like flicker on WiZ.
+    const cadenceFloorMs = signal.flowScene ? 8000 : (signal.pulseScene ? 240 : 280);
+    const cadenceCeilMs = signal.flowScene ? 16000 : (signal.pulseScene ? 860 : 1320);
     let cadenceMs = (
-      (signal.pulseScene ? 180 : (signal.flowScene ? 132 : 240)) +
-      (signal.calmHold * (signal.pulseScene ? 250 : (signal.flowScene ? 190 : 560))) +
-      (intervalMs * (signal.flowScene ? 0.66 : 0.94)) -
-      (signal.motion * (signal.pulseScene ? 120 : (signal.flowScene ? 96 : 140))) -
-      (signal.drive * (signal.flowScene ? 58 : 72))
+      (signal.pulseScene ? 240 : (signal.flowScene ? 900 : 300)) +
+      (signal.calmHold * (signal.pulseScene ? 300 : (signal.flowScene ? 1200 : 640))) +
+      (intervalMs * (signal.flowScene ? 1.6 : 1.12)) -
+      (signal.motion * (signal.pulseScene ? 72 : (signal.flowScene ? 10 : 94))) -
+      (signal.drive * (signal.flowScene ? 6 : 44))
     );
     cadenceMs = clamp(cadenceMs, cadenceFloorMs, cadenceCeilMs);
-    const eventAdvance = signal.isDrop ||
-      signal.isBeat ||
-      signal.build ||
+    const eventMinGapMs = signal.isDrop
+      ? 1500
+      : (signal.flowScene ? 24000 : (signal.pulseScene ? 520 : 560));
+    const strongBeat = signal.isBeat && (
+      signal.beatConfidence > (signal.flowScene ? 0.88 : 0.74) ||
+      signal.wizBeatPulse > (signal.flowScene ? 0.95 : 0.84)
+    );
+    const strongBuild = signal.build && signal.motion > (signal.flowScene ? 0.62 : 0.68);
+    const eventAdvance = (
+      signal.isDrop ||
+      strongBeat ||
+      strongBuild ||
       (signal.pulseScene
-        ? signal.pulseHit
-        : (signal.wizBeatPulse > (signal.flowScene ? 0.58 : 0.66) && signal.beatConfidence > 0.4));
+        ? (signal.pulseHit && signal.wizBeatPulse > 0.68)
+        : (signal.wizBeatPulse > (signal.flowScene ? 0.96 : 0.88) && signal.beatConfidence > 0.75))
+    ) && sinceLastAdvance >= eventMinGapMs;
     const dueByCadence = sinceLastAdvance >= cadenceMs;
     const keepAliveAdvance = signal.flowScene
       ? (
         signal.motion > (0.16 + signal.calmHold * 0.14) &&
-        sinceLastAdvance >= Math.max(90, cadenceMs * 0.58)
+        sinceLastAdvance >= Math.max(18000, cadenceMs * 7.2)
       )
-      : (!signal.pulseScene && sinceLastAdvance >= Math.max(760, cadenceMs * 2.4));
+      : (!signal.pulseScene && sinceLastAdvance >= Math.max(1100, cadenceMs * 2.8));
     const hardLivenessAdvance = sinceLastAdvance >= (
       signal.flowScene
-        ? 720
-        : (signal.pulseScene ? 980 : 1400)
+        ? 38000
+        : (signal.pulseScene ? 1500 : 1800)
     );
     const shouldAdvance = Boolean(
       eventAdvance ||
@@ -8688,10 +8914,8 @@ function getModeSwitchBias() {
       hardLivenessAdvance
     );
     let step = 1;
-    if (signal.isDrop) step += 1;
-    else if (signal.isBeat && signal.motion > 0.52) step += 1;
-    if (signal.build && !signal.flowScene) step += 1;
-    if (signal.risk > 1.05 && signal.isBeat) step += 1;
+    if (signal.isDrop) step = 2;
+    else if (signal.pulseScene && signal.isBeat && signal.motion > 0.74) step = 2;
     return {
       sinceLastAdvance,
       cadenceMs,
@@ -8700,7 +8924,7 @@ function getModeSwitchBias() {
       keepAliveAdvance,
       hardLivenessAdvance,
       shouldAdvance,
-      step: clamp(Math.round(step), 1, 4)
+      step: clamp(Math.round(step), 1, 2)
     };
   }
 
@@ -8729,24 +8953,24 @@ function getModeSwitchBias() {
     );
     const rawBrightness = signal.flowScene
       ? clamp(
-        getWizBrightness(now) * clamp(0.96 + flowIntensity * 0.08 + signal.wizBeatPulse * 0.04, 0.84, 1.2),
-        0.01,
+        getWizBrightness(now) * clamp(0.94 + flowIntensity * 0.14 + signal.wizBeatPulse * 0.1, 0.72, 1.38),
+        0.003,
         1
       )
       : getWizBrightness(now);
     const flowBeatAccent = signal.flowScene
       ? (
         signal.isDrop
-          ? 0.06
-          : (signal.isBeat ? (0.03 + signal.beatConfidence * 0.02) : 0)
+          ? 0.1
+          : (signal.isBeat ? (0.05 + signal.beatConfidence * 0.03) : 0)
       )
       : 0;
     let brightnessTarget = clamp(
       rawBrightness +
-      flowBeatAccent * 0.9 +
-      (signal.wizBeatPulse * 0.06) +
-      (signal.isDrop ? 0.08 : 0),
-      0.01,
+      flowBeatAccent * 1.05 +
+      (signal.wizBeatPulse * 0.2) +
+      (signal.isDrop ? 0.26 : 0),
+      0.003,
       1
     );
     const quietIdle = Boolean(
@@ -8757,9 +8981,9 @@ function getModeSwitchBias() {
     );
     if (quietIdle) {
       const quietCap = clamp(
-        WIZ_BRIGHTNESS_TIER_MIN + ((1 - signal.calmHold) * 0.08),
+        WIZ_BRIGHTNESS_TIER_MIN + ((1 - signal.calmHold) * 0.045),
         WIZ_BRIGHTNESS_TIER_MIN,
-        0.12
+        0.09
       );
       brightnessTarget = Math.min(brightnessTarget, quietCap);
     }
@@ -8771,26 +8995,78 @@ function getModeSwitchBias() {
       const strobeWave = 0.76 + (Math.sin((now / strobeFreqDiv) + (wizBeatStep * 0.42)) * 0.24);
       const pulseFloor = clamp(0.14 + signal.wizBeatPulse * 0.22 + (signal.isDrop ? 0.12 : 0), 0.12, 0.62);
       if (strobeActive) {
-        brightnessTarget = clamp(Math.max(brightnessTarget, pulseFloor * 0.92) * strobeWave, 0.08, 1);
+        brightnessTarget = clamp(Math.max(brightnessTarget, pulseFloor * 0.92) * strobeWave, 0.02, 1);
       } else {
         const settle = 0.78 + Math.sin(now / 160 + wizPhase * 0.2) * 0.12;
-        brightnessTarget = clamp(Math.max(brightnessTarget, pulseFloor * 0.9) * settle, 0.1, 1);
+        brightnessTarget = clamp(Math.max(brightnessTarget, pulseFloor * 0.9) * settle, 0.025, 1);
       }
     }
     if (!(wizBrightnessSmoothed > 0)) wizBrightnessSmoothed = brightnessTarget;
+    const riseDiff = Math.max(0, brightnessTarget - wizBrightnessSmoothed);
+    const fallDiff = Math.max(0, wizBrightnessSmoothed - brightnessTarget);
+    const transientSurge = clamp(
+      (signal.wizBeatPulse * 0.22) +
+      (signal.beatConfidence * 0.16) +
+      (signal.isBeat ? 0.12 : 0) +
+      (signal.isDrop ? 0.22 : 0) +
+      (audioBandLow * 0.1) +
+      (audioBandMid * 0.06),
+      0,
+      0.56
+    );
     const brightnessBlend = signal.pulseScene
       ? (
         brightnessTarget >= wizBrightnessSmoothed
-          ? clamp(0.3 + lowEndCue * 0.1 + (signal.isBeat ? 0.06 : 0), 0.24, 0.56)
-          : clamp(0.28 + (1 - lowEndCue) * 0.12 + signal.calmHold * 0.1, 0.2, 0.56)
+          ? clamp(
+            0.56 +
+            (lowEndCue * 0.18) +
+            transientSurge +
+            (signal.isDrop ? 0.08 : 0),
+            0.5,
+            0.95
+          )
+          : clamp(
+            0.5 +
+            ((1 - lowEndCue) * 0.16) +
+            (signal.calmHold * 0.18) +
+            (transientSurge * 0.28),
+            0.42,
+            0.9
+          )
       )
       : (
         brightnessTarget >= wizBrightnessSmoothed
-          ? clamp(0.24 + lowEndCue * 0.1 + (signal.isBeat ? 0.05 : 0), 0.2, 0.46)
-          : clamp(0.24 + (1 - lowEndCue) * 0.12 + signal.calmHold * 0.12, 0.18, 0.56)
+          ? clamp(
+            0.48 +
+            (lowEndCue * 0.16) +
+            transientSurge +
+            (signal.isDrop ? 0.06 : 0),
+            0.4,
+            0.9
+          )
+          : clamp(
+            0.42 +
+            ((1 - lowEndCue) * 0.14) +
+            (signal.calmHold * 0.18) +
+            (transientSurge * 0.24),
+            0.34,
+            0.84
+          )
       );
     wizBrightnessSmoothed = lerp(wizBrightnessSmoothed, brightnessTarget, brightnessBlend);
-    return clamp(wizBrightnessSmoothed, 0.01, 1);
+    if (riseDiff > 0.08 && transientSurge > 0.14) {
+      const catchUp = Math.max(0.03, riseDiff * 0.28);
+      wizBrightnessSmoothed = Math.min(1, wizBrightnessSmoothed + catchUp);
+    }
+    if (
+      fallDiff > 0.09 &&
+      !signal.isDrop &&
+      signal.calmHold > 0.34
+    ) {
+      const settleDrop = Math.max(0.025, fallDiff * 0.24);
+      wizBrightnessSmoothed = Math.max(WIZ_BRIGHTNESS_TIER_MIN, wizBrightnessSmoothed - settleDrop);
+    }
+    return clamp(wizBrightnessSmoothed, 0.0025, 1);
   }
 
   function emitWiz(now, isBeat) {
@@ -8826,6 +9102,8 @@ function getModeSwitchBias() {
         wizColorCursor = wizColorIndex;
       }
       lastWizScene = signal.scene;
+      wizFlowHueEma = null;
+      wizFlowColorEma = null;
       lastWizPaletteAdvanceAt = now;
     }
 
@@ -8863,39 +9141,45 @@ function getModeSwitchBias() {
     } else if (signal.flowScene) {
       const len = Math.max(1, palette.length);
       const flowEnergy = clamp(flowIntensity, FLOW_INTENSITY_MIN, FLOW_INTENSITY_MAX);
-      const flowSpeedScale = 0.62 + flowEnergy * 0.58;
-      const flowTextureScale = 0.68 + flowEnergy * 0.62;
-      const speedBase = (0.016 + signal.drive * 0.11 + signal.motion * 0.2 + signal.risk * 0.03) * flowSpeedScale;
-      const phraseBoost = signal.build ? 0.03 : 0;
-      const beatBoost = signal.isBeat ? (0.05 + signal.motion * 0.08 + signal.risk * 0.03) : 0;
-      const dropBoost = signal.isDrop ? 0.1 : 0;
-      const intervalScale = clamp(interval / 165, 0.5, 2.1);
-      let step = Math.max(0.012, (speedBase + phraseBoost + beatBoost + dropBoost) * intervalScale * 0.44);
+      const flowSpeedScale = 0.2 + flowEnergy * 0.16;
+      const flowTextureScale = 0.54 + flowEnergy * 0.46;
+      const speedBase = (0.004 + signal.drive * 0.016 + signal.motion * 0.03 + signal.risk * 0.006) * flowSpeedScale;
+      const phraseBoost = signal.build ? 0.003 : 0;
+      const beatBoost = signal.isBeat ? (0.003 + signal.motion * 0.005 + signal.risk * 0.002) : 0;
+      const dropBoost = signal.isDrop ? 0.007 : 0;
+      const intervalScale = clamp(interval / 360, 0.35, 1.3);
+      let step = Math.max(0.00003, (speedBase + phraseBoost + beatBoost + dropBoost) * intervalScale * 0.005);
       if (!signal.isBeat && !signal.isDrop && signal.motion < 0.24) {
-        step *= 0.55;
+        step *= 0.4;
       }
       if (signal.isBeat && !signal.isDrop) {
-        step += 0.045 + signal.motion * 0.03;
+        step += 0.00003 + signal.motion * 0.00006;
       } else if (signal.isDrop) {
-        step += 0.09 + signal.motion * 0.05;
+        step += 0.00006 + signal.motion * 0.0001;
       }
       const flowStepFloor = signal.isDrop
-        ? 0.056
+        ? 0.00018
         : (
           signal.isBeat
-            ? 0.038
-            : (signal.calmHold > 0.72 ? 0.028 : 0.018)
+            ? 0.00009
+            : (signal.calmHold > 0.72 ? 0.000045 : 0.000035)
         );
-      step = Math.max(step, flowStepFloor);
+      const flowStepCap = Math.max(
+        flowStepFloor + 0.00008,
+        signal.isDrop
+          ? 0.00032
+          : (signal.isBeat ? 0.00022 : (signal.motion > 0.44 ? 0.00018 : 0.00014))
+      );
+      step = clamp(step, flowStepFloor, flowStepCap);
       wizColorCursor = (wizColorCursor + step) % len;
 
       const baseIdx = Math.floor(wizColorCursor) % len;
       const nextIdx = (baseIdx + 1) % len;
       const mixT = wizColorCursor - Math.floor(wizColorCursor);
       const crossfadeWindow = clamp(
-        0.1 + signal.motion * 0.06 + (signal.isDrop ? 0.04 : 0),
-        0.08,
-        0.18
+        0.12 + signal.motion * 0.07 + (signal.isDrop ? 0.04 : 0),
+        0.1,
+        0.22
       );
       const steppedMixT = mixT <= (1 - crossfadeWindow)
         ? 0
@@ -8907,36 +9191,71 @@ function getModeSwitchBias() {
         clamp(0.84 + (signal.drive * 0.14) + (signal.wizBeatPulse * 0.12), 0.7, 1)
       );
       const spectralMix = clamp(
-        0.03 +
-        (signal.motion * 0.07) +
-        (signal.wizBeatPulse * 0.1) +
-        (signal.isDrop ? 0.08 : 0) -
-        (signal.calmHold * 0.14),
-        0.02,
-        0.22
+        0.02 +
+        (signal.motion * 0.05) +
+        (signal.wizBeatPulse * 0.07) +
+        (signal.isDrop ? 0.05 : 0) -
+        (signal.calmHold * 0.12),
+        0.015,
+        0.12
       );
       const baseColor = blendColor(paletteBlend, spectralColor, spectralMix);
-      const texture = (
-        2 +
-        signal.motion * 6 +
-        Math.max(0, signal.drive - 0.16) * 3 +
-        signal.risk * 2
+      const baseHsv = rgbToHsv(baseColor);
+      const hueWave = (
+        Math.sin(now / 900 + wizColorCursor * 0.82 + audioBandHigh * 1.8) * (0.38 + signal.motion * 1.15) +
+        Math.sin(now / 1400 + audioBandLow * 1.6) * (0.18 + signal.drive * 0.58)
       ) * flowTextureScale;
-      const waveR =
-        Math.sin(now / 260 + wizColorCursor * 1.35 + audioBandHigh * 4.2) * texture +
-        Math.sin(now / 760 + audioBandLow * 3.5) * (0.8 + signal.drive * 1.2);
-      const waveG =
-        Math.sin(now / 300 + wizColorCursor * 1.05 + audioBandMid * 2.6) * texture +
-        Math.sin(now / 820 + audioBandHigh * 3.2) * (0.8 + signal.motion * 1.2);
-      const waveB =
-        Math.sin(now / 240 + wizColorCursor * 1.55 + audioBandLow * 3.8) * texture +
-        Math.sin(now / 700 + audioBandMid * 2.2) * (0.8 + signal.drive * 1);
+      const satWave = Math.sin(now / 760 + audioBandMid * 2.1 + wizColorCursor * 0.2) * 0.026;
+      const valWave = (
+        Math.sin(now / 520 + wizColorCursor * 0.74) * 0.03 +
+        Math.sin(now / 1100 + audioBandLow * 1.8) * 0.014
+      );
+      const targetHue = ((baseHsv.h + hueWave) % 360 + 360) % 360;
+      if (!Number.isFinite(Number(wizFlowHueEma))) {
+        wizFlowHueEma = targetHue;
+      }
+      const hueStepCap = clamp(
+        (signal.isDrop ? 0.14 : (signal.isBeat ? 0.11 : 0.08)) +
+        (signal.motion * 0.018) +
+        (signal.wizBeatPulse * 0.014),
+        0.03,
+        0.17
+      );
+      const hueDelta = shortestHueDeltaCircularDeg(wizFlowHueEma, targetHue);
+      const hue = normalizeManualPaletteHueDeg(
+        wizFlowHueEma + clamp(hueDelta, -hueStepCap, hueStepCap)
+      );
+      wizFlowHueEma = hue;
+      const sat = clamp(
+        baseHsv.s +
+        satWave +
+        signal.wizBeatPulse * 0.03 -
+        signal.calmHold * 0.06,
+        0.62,
+        1
+      );
+      const val = clamp(
+        baseHsv.v +
+        valWave +
+        signal.motion * 0.04 +
+        (signal.isDrop ? 0.06 : 0),
+        0.18,
+        1
+      );
 
-      color = {
-        r: clamp255(baseColor.r + waveR),
-        g: clamp255(baseColor.g + waveG),
-        b: clamp255(baseColor.b + waveB)
-      };
+      const targetColor = hsvToRgb255(hue, sat, val);
+      if (!wizFlowColorEma || typeof wizFlowColorEma !== "object") {
+        wizFlowColorEma = targetColor;
+      }
+      const flowColorAlpha = clamp(
+        (signal.isDrop ? 0.0038 : (signal.isBeat ? 0.003 : 0.002)) +
+        (signal.motion * 0.00035) +
+        (signal.wizBeatPulse * 0.0003),
+        0.001,
+        0.0048
+      );
+      color = blendColor(wizFlowColorEma, targetColor, flowColorAlpha);
+      wizFlowColorEma = color;
       paletteAdvanced = baseIdx !== wizColorIndex;
       wizColorIndex = baseIdx;
       if (paletteAdvanced || advanceDecision.shouldAdvance) {
@@ -9029,18 +9348,33 @@ function getModeSwitchBias() {
       energy,
       rateMs: signal.pulseScene
         ? Math.max(68, Math.round(interval * (signal.isDrop ? 0.86 : 1.12)))
-        : Math.min(
-          interval,
-          signal.rawDrums > 0.24
-            ? 110
-            : (signal.rawActivity > 0.32 ? 128 : interval)
+        : (
+          signal.flowScene
+            ? clamp(
+              Math.round(interval * 8.5 + signal.calmHold * 480),
+              1700,
+              3200
+            )
+            : Math.min(
+              interval,
+              signal.rawDrums > 0.24
+                ? 110
+                : (signal.rawActivity > 0.32 ? 128 : interval)
+            )
         ),
       forceRate: overclockLevel >= 3,
       forceDelta: signal.pulseScene
         ? signal.pulseHit
         : (
           signal.flowScene
-            ? true
+            ? (
+              signal.isDrop ||
+              (signal.isBeat && signal.beatConfidence > 0.998) ||
+              signal.motion > 0.993 ||
+              signal.wizBeatPulse > 0.999 ||
+              paletteAdvanced ||
+              advanceDecision.shouldAdvance
+            )
             : (
               signal.motion > 0.24 ||
               signal.wizBeatPulse > 0.46 ||
@@ -9149,6 +9483,8 @@ function getModeSwitchBias() {
       brightnessDriveEma = 0;
       brightnessSilentFrames = 0;
       lastWizScene = null;
+      wizFlowHueEma = null;
+      wizFlowColorEma = null;
       for (const brandKey of MANUAL_PALETTE_SUPPORTED_BRANDS) {
         const cycleState = getManualPaletteCycleState(brandKey);
         if (!cycleState) continue;
@@ -9411,7 +9747,7 @@ function getModeSwitchBias() {
     },
 
     getWizSceneSync() {
-      return wizSceneSync;
+      return false;
     },
 
     setMetaAutoEnabled(enabled) {

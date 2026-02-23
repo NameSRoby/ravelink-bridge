@@ -36,6 +36,14 @@ const {
 const { hsvToRgb255: convertHsvToRgb255 } = require("./core/utils/hsv-rgb");
 const { createServerColorUtils } = require("./core/server/color-utils");
 const { createRequestPatchUtils } = require("./core/server/request-patch-utils");
+const {
+  PALETTE_COLOR_COUNT_OPTIONS: SHARED_PALETTE_COLOR_COUNT_OPTIONS,
+  PALETTE_FAMILY_ORDER: SHARED_PALETTE_FAMILY_ORDER,
+  PALETTE_FAMILY_ALIASES: SHARED_PALETTE_FAMILY_ALIASES,
+  PALETTE_FAMILY_DEFS: SHARED_PALETTE_FAMILY_DEFS,
+  PALETTE_PRESETS: SHARED_PALETTE_PRESETS,
+  resolvePaletteFamilyIndexSpan: resolveSharedPaletteFamilyIndexSpan
+} = require("./core/palette/family-spec");
 let unsafeExposeSensitiveLogsRuntime = String(process.env.RAVELINK_UNSAFE_LOG_SECRETS || "").trim() === "1";
 
 function setUnsafeExposeSensitiveLogsRuntime(enabled) {
@@ -106,7 +114,8 @@ process.on("unhandledRejection", err => {
 
 const express = require("express");
 const axios = require("axios");
-const http = require("http");
+const https = require("https");
+const tls = require("tls");
 const net = require("net");
 const fs = require("fs");
 const path = require("path");
@@ -267,20 +276,10 @@ const STANDALONE_STATE_CONFIG_DEFAULT = Object.freeze({
   version: 1,
   fixtures: Object.freeze({})
 });
-const PALETTE_COLOR_COUNT_OPTIONS = Object.freeze([1, 3, 5, 8, 12]);
+const PALETTE_COLOR_COUNT_OPTIONS = SHARED_PALETTE_COLOR_COUNT_OPTIONS;
 const PALETTE_SUPPORTED_BRANDS = Object.freeze(["hue", "wiz"]);
-const PALETTE_FAMILY_ORDER = Object.freeze(["red", "green", "blue"]);
-const PALETTE_FAMILY_ALIASES = Object.freeze({
-  magenta: "red",
-  purple: "red",
-  pink: "red",
-  amber: "green",
-  yellow: "green",
-  lime: "green",
-  cyan: "blue",
-  aqua: "blue",
-  teal: "blue"
-});
+const PALETTE_FAMILY_ORDER = SHARED_PALETTE_FAMILY_ORDER;
+const PALETTE_FAMILY_ALIASES = SHARED_PALETTE_FAMILY_ALIASES;
 const PALETTE_CYCLE_MODE_ORDER = Object.freeze([
   "on_trigger",
   "timed_cycle",
@@ -329,6 +328,13 @@ const PALETTE_BRIGHTNESS_FOLLOW_AMOUNT_MAX = 2;
 const PALETTE_VIVIDNESS_LEVEL_OPTIONS = Object.freeze([0, 1, 2, 3, 4]);
 const PALETTE_CONFIG_DEFAULT = Object.freeze({
   colorsPerFamily: 3,
+  familyColorCounts: Object.freeze({
+    red: 3,
+    yellow: 3,
+    green: 3,
+    cyan: 3,
+    blue: 3
+  }),
   families: Object.freeze(["red", "green", "blue"]),
   disorder: false,
   disorderAggression: 0.35,
@@ -343,69 +349,7 @@ const PALETTE_CONFIG_DEFAULT = Object.freeze({
   spectrumMapMode: "auto",
   spectrumFeatureMap: PALETTE_DEFAULT_SPECTRUM_FEATURE_MAP
 });
-const PALETTE_FAMILY_DEFS = Object.freeze({
-  red: Object.freeze({
-    id: "red",
-    label: "RED",
-    colors: Object.freeze([
-      Object.freeze({ r: 255, g: 120, b: 0 }),
-      Object.freeze({ r: 255, g: 96, b: 0 }),
-      Object.freeze({ r: 255, g: 72, b: 0 }),
-      Object.freeze({ r: 255, g: 48, b: 0 }),
-      Object.freeze({ r: 255, g: 24, b: 0 }),
-      Object.freeze({ r: 255, g: 0, b: 0 }),
-      Object.freeze({ r: 255, g: 0, b: 32 }),
-      Object.freeze({ r: 255, g: 0, b: 72 }),
-      Object.freeze({ r: 255, g: 0, b: 116 }),
-      Object.freeze({ r: 255, g: 0, b: 164 }),
-      Object.freeze({ r: 255, g: 24, b: 214 }),
-      Object.freeze({ r: 255, g: 56, b: 255 })
-    ])
-  }),
-  green: Object.freeze({
-    id: "green",
-    label: "GREEN",
-    colors: Object.freeze([
-      Object.freeze({ r: 200, g: 255, b: 0 }),
-      Object.freeze({ r: 160, g: 255, b: 0 }),
-      Object.freeze({ r: 120, g: 255, b: 0 }),
-      Object.freeze({ r: 80, g: 255, b: 0 }),
-      Object.freeze({ r: 40, g: 255, b: 0 }),
-      Object.freeze({ r: 0, g: 255, b: 0 }),
-      Object.freeze({ r: 0, g: 255, b: 36 }),
-      Object.freeze({ r: 0, g: 255, b: 82 }),
-      Object.freeze({ r: 0, g: 255, b: 132 }),
-      Object.freeze({ r: 0, g: 255, b: 184 }),
-      Object.freeze({ r: 0, g: 238, b: 232 }),
-      Object.freeze({ r: 0, g: 212, b: 255 })
-    ])
-  }),
-  blue: Object.freeze({
-    id: "blue",
-    label: "BLUE",
-    colors: Object.freeze([
-      Object.freeze({ r: 0, g: 244, b: 255 }),
-      Object.freeze({ r: 0, g: 214, b: 255 }),
-      Object.freeze({ r: 0, g: 178, b: 255 }),
-      Object.freeze({ r: 0, g: 140, b: 255 }),
-      Object.freeze({ r: 0, g: 98, b: 255 }),
-      Object.freeze({ r: 0, g: 56, b: 255 }),
-      Object.freeze({ r: 0, g: 20, b: 255 }),
-      Object.freeze({ r: 44, g: 0, b: 255 }),
-      Object.freeze({ r: 88, g: 0, b: 255 }),
-      Object.freeze({ r: 132, g: 0, b: 255 }),
-      Object.freeze({ r: 182, g: 0, b: 255 }),
-      Object.freeze({ r: 234, g: 0, b: 255 })
-    ])
-  })
-});
-const PALETTE_FAMILY_INDEX_SPAN = Object.freeze({
-  1: Object.freeze([5]),
-  3: Object.freeze([4, 5, 6]),
-  5: Object.freeze([3, 4, 5, 6, 7]),
-  8: Object.freeze([2, 3, 4, 5, 6, 7, 8, 9]),
-  12: Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
-});
+const PALETTE_FAMILY_DEFS = SHARED_PALETTE_FAMILY_DEFS;
 const PALETTE_FIXTURE_OVERRIDES_DEFAULT = Object.freeze({
   version: 1,
   fixtures: Object.freeze({})
@@ -494,6 +438,93 @@ function isPrivateHueBridgeIp(ip) {
 
 function normalizeHueBridgeIp(ip) {
   return normalizePrivateOrLoopbackIpv4(ip);
+}
+
+const hueRestHttpsAgentByBridge = new Map();
+const hueBridgeIdByIp = new Map();
+
+function resolveHueRestCaPath() {
+  const candidates = [];
+  if (process.env.RAVE_HUE_CA_CERT_PATH) {
+    candidates.push(String(process.env.RAVE_HUE_CA_CERT_PATH));
+  }
+  try {
+    const hueSyncPkg = require.resolve("hue-sync/package.json");
+    const hueSyncDir = path.dirname(hueSyncPkg);
+    candidates.push(path.join(hueSyncDir, "signify.pem"));
+  } catch {}
+  candidates.push(path.join(__dirname, "node_modules", "hue-sync", "signify.pem"));
+  return candidates.find(candidate => candidate && fs.existsSync(candidate)) || "";
+}
+
+const hueRestCaPath = resolveHueRestCaPath();
+let hueRestCaPem = "";
+if (hueRestCaPath) {
+  try {
+    hueRestCaPem = fs.readFileSync(hueRestCaPath, "utf8");
+  } catch {}
+}
+
+function normalizeHueBridgeIdToken(value) {
+  const token = String(value || "").trim().toLowerCase();
+  return token.replace(/[^a-f0-9:-]/g, "");
+}
+
+function rememberHueBridgeIdentity(bridgeIp, bridgeId) {
+  const ip = normalizeHueBridgeIp(bridgeIp);
+  const id = normalizeHueBridgeIdToken(bridgeId);
+  if (!ip || !id) return;
+  hueBridgeIdByIp.set(ip, id);
+}
+
+function resolveHueBridgeIdentityForTarget(target = {}) {
+  const bridgeIp = normalizeHueBridgeIp(target?.bridgeIp || "");
+  const directBridgeId = normalizeHueBridgeIdToken(target?.bridgeId || "");
+  if (bridgeIp && directBridgeId) {
+    rememberHueBridgeIdentity(bridgeIp, directBridgeId);
+    return directBridgeId;
+  }
+  if (bridgeIp && hueBridgeIdByIp.has(bridgeIp)) {
+    return hueBridgeIdByIp.get(bridgeIp);
+  }
+  return directBridgeId;
+}
+
+function getHueRestHttpsAgent(target = {}) {
+  const bridgeIp = normalizeHueBridgeIp(target?.bridgeIp || "");
+  const bridgeId = resolveHueBridgeIdentityForTarget(target);
+  const key = bridgeId || bridgeIp || "default";
+  if (hueRestHttpsAgentByBridge.has(key)) {
+    return hueRestHttpsAgentByBridge.get(key);
+  }
+
+  const options = {
+    keepAlive: true,
+    maxSockets: 32,
+    keepAliveMsecs: 1000,
+    rejectUnauthorized: true
+  };
+  if (hueRestCaPem) {
+    options.ca = hueRestCaPem;
+  }
+  if (bridgeId) {
+    options.servername = bridgeId;
+    options.checkServerIdentity = (_host, cert) =>
+      tls.checkServerIdentity(bridgeId, cert);
+  }
+
+  const agent = new https.Agent(options);
+  hueRestHttpsAgentByBridge.set(key, agent);
+  return agent;
+}
+
+function destroyHueRestHttpsAgents() {
+  for (const agent of hueRestHttpsAgentByBridge.values()) {
+    try {
+      agent.destroy();
+    } catch {}
+  }
+  hueRestHttpsAgentByBridge.clear();
 }
 
 function isLoopbackRequest(req) {
@@ -1010,6 +1041,42 @@ function normalizePaletteColorCount(value, fallback = PALETTE_CONFIG_DEFAULT.col
   return PALETTE_CONFIG_DEFAULT.colorsPerFamily;
 }
 
+function buildPaletteUniformColorCounts(colorCount) {
+  const count = normalizePaletteColorCount(colorCount, PALETTE_CONFIG_DEFAULT.colorsPerFamily);
+  const out = {};
+  for (const familyId of PALETTE_FAMILY_ORDER) {
+    out[familyId] = count;
+  }
+  return out;
+}
+
+function normalizePaletteFamilyColorCounts(
+  value,
+  fallback = PALETTE_CONFIG_DEFAULT.familyColorCounts,
+  fallbackColorCount = PALETTE_CONFIG_DEFAULT.colorsPerFamily
+) {
+  const fallbackCount = normalizePaletteColorCount(
+    fallbackColorCount,
+    PALETTE_CONFIG_DEFAULT.colorsPerFamily
+  );
+  const source = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+  const fallbackMap = fallback && typeof fallback === "object" && !Array.isArray(fallback)
+    ? fallback
+    : {};
+  const out = {};
+  for (const familyId of PALETTE_FAMILY_ORDER) {
+    const raw = Object.prototype.hasOwnProperty.call(source, familyId)
+      ? source[familyId]
+      : Object.prototype.hasOwnProperty.call(fallbackMap, familyId)
+        ? fallbackMap[familyId]
+        : fallbackCount;
+    out[familyId] = normalizePaletteColorCount(raw, fallbackCount);
+  }
+  return out;
+}
+
 function normalizePaletteDisorderAggression(value, fallback = PALETTE_CONFIG_DEFAULT.disorderAggression) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return Number(fallback) || PALETTE_CONFIG_DEFAULT.disorderAggression;
@@ -1202,15 +1269,47 @@ function normalizePaletteFamilies(value, fallback = PALETTE_CONFIG_DEFAULT.famil
   return normalizePaletteFamilies(fallbackList, PALETTE_FAMILY_ORDER);
 }
 
+function resolvePaletteColorCountForFamily(
+  config = {},
+  familyId,
+  fallback = PALETTE_CONFIG_DEFAULT.colorsPerFamily
+) {
+  const familyKey = String(familyId || "").trim().toLowerCase();
+  const fallbackCount = normalizePaletteColorCount(config?.colorsPerFamily, fallback);
+  if (!PALETTE_FAMILY_ORDER.includes(familyKey)) return fallbackCount;
+  const counts = config?.familyColorCounts && typeof config.familyColorCounts === "object"
+    ? config.familyColorCounts
+    : null;
+  if (!counts || !Object.prototype.hasOwnProperty.call(counts, familyKey)) {
+    return fallbackCount;
+  }
+  return normalizePaletteColorCount(counts[familyKey], fallbackCount);
+}
+
 function normalizePaletteConfigSnapshot(source = {}, fallback = PALETTE_CONFIG_DEFAULT) {
   const raw = source && typeof source === "object" ? source : {};
   const safeFallback = fallback && typeof fallback === "object"
     ? fallback
     : PALETTE_CONFIG_DEFAULT;
+  const fallbackColorsPerFamily = normalizePaletteColorCount(
+    safeFallback.colorsPerFamily,
+    PALETTE_CONFIG_DEFAULT.colorsPerFamily
+  );
+  const colorsPerFamily = normalizePaletteColorCount(
+    raw.colorsPerFamily,
+    fallbackColorsPerFamily
+  );
+  const familyColorCountsFallback = normalizePaletteFamilyColorCounts(
+    safeFallback.familyColorCounts,
+    PALETTE_CONFIG_DEFAULT.familyColorCounts,
+    fallbackColorsPerFamily
+  );
   return {
-    colorsPerFamily: normalizePaletteColorCount(
-      raw.colorsPerFamily,
-      normalizePaletteColorCount(safeFallback.colorsPerFamily, PALETTE_CONFIG_DEFAULT.colorsPerFamily)
+    colorsPerFamily,
+    familyColorCounts: normalizePaletteFamilyColorCounts(
+      raw.familyColorCounts,
+      familyColorCountsFallback,
+      colorsPerFamily
     ),
     families: normalizePaletteFamilies(
       raw.families,
@@ -1494,16 +1593,35 @@ function isHueLinkButtonPending(err) {
   );
 }
 
-async function fetchHueBridgeConfigByIp(ip) {
+async function fetchHueBridgeConfigByIp(ip, bridgeIdHint = "") {
   const target = normalizeHueBridgeIp(ip);
   if (!target) return null;
+  const bridgeId = normalizeHueBridgeIdToken(bridgeIdHint);
+  if (bridgeId) {
+    rememberHueBridgeIdentity(target, bridgeId);
+  }
   try {
-    const { data } = await axios.get(`http://${target}/api/0/config`, {
+    const { data } = await axios.get(`https://${target}/api/0/config`, {
       timeout: 1800,
-      maxRedirects: 0
+      maxRedirects: 0,
+      httpsAgent: getHueRestHttpsAgent({
+        bridgeIp: target,
+        bridgeId
+      })
     });
     return data && typeof data === "object" ? data : null;
   } catch {
+    // Legacy bridge bootstrap fallback when bridgeId is unknown.
+    // Runtime send paths remain HTTPS-only.
+    if (!bridgeId) {
+      try {
+        const { data } = await axios.get(`http://${target}/api/0/config`, {
+          timeout: 1800,
+          maxRedirects: 0
+        });
+        return data && typeof data === "object" ? data : null;
+      } catch {}
+    }
     return null;
   }
 }
@@ -1514,8 +1632,12 @@ async function fetchHueBridgeConfigByIp(ip) {
 const app = express();
 const MUTATING_HTTP_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ALLOW_REMOTE_WRITE_RUNTIME = String(process.env.RAVELINK_ALLOW_REMOTE_WRITE || "").trim() === "1";
+const ALLOW_REMOTE_MOD_WRITE_RUNTIME =
+  String(process.env.RAVELINK_ALLOW_REMOTE_MOD_WRITE || "").trim() === "1";
 const ALLOW_REMOTE_PRIVILEGED_READ_RUNTIME =
   String(process.env.RAVELINK_ALLOW_REMOTE_PRIVILEGED_READ || "").trim() === "1";
+const ENABLE_LEGACY_COLOR_GET_RUNTIME =
+  String(process.env.RAVELINK_ENABLE_LEGACY_COLOR_GET || "").trim() === "1";
 const LOOPBACK_HOST_ALIASES = new Set(["127.0.0.1", "localhost", "::1"]);
 const PRIVILEGED_READ_ROUTES = new Set([
   "/fixtures",
@@ -1959,11 +2081,6 @@ const pendingHueStateByZone = new Map();
 const pendingHueSyncStateByZone = new Map();
 let hueNoTargetLogAt = 0;
 let wizNoTargetLogAt = 0;
-const hueHttpAgent = new http.Agent({
-  keepAlive: true,
-  maxSockets: 32,
-  keepAliveMsecs: 1000
-});
 
 const hueTelemetry = {
   sent: 0,
@@ -2008,6 +2125,7 @@ let hueRecoveryTimer = null;
 const HUE_RECOVERY_COOLDOWN_MS = 3000;
 const HUE_RECOVERY_MAX_COOLDOWN_MS = 60000;
 const HUE_RECOVERY_TIMEOUT_BACKOFF_MS = 30000;
+const HUE_RECOVERY_TIMEOUT_SUPPRESS_STREAK = 2;
 const HUE_RECOVERY_FAST_RETRY_STREAK_LIMIT = 1;
 const HUE_RECOVERY_START_DELAY_MS = 300;
 const HUE_RECOVERY_SOCKET_START_DELAY_MS = 1400;
@@ -2046,7 +2164,7 @@ const TRANSPORT_RATE_CAPS = Object.freeze({
     }),
     entertainment: Object.freeze({
       defaultMs: 96,
-      safeMinMs: 72,
+      safeMinMs: 76,
       safeMaxMs: 260,
       unsafeMinMs: 40,
       unsafeMaxMs: 600,
@@ -2056,7 +2174,7 @@ const TRANSPORT_RATE_CAPS = Object.freeze({
   wiz: Object.freeze({
     default: Object.freeze({
       defaultMs: 120,
-      safeMinMs: 85,
+      safeMinMs: 102,
       safeMaxMs: 320,
       unsafeMinMs: 45,
       unsafeMaxMs: 600,
@@ -2068,6 +2186,8 @@ const HUE_REST_SINGLE_FIXTURE_SAFE_MIN_MS = 170;
 const HUE_REST_FAST_TRANSITION_RATE_MS = 190;
 const HUE_REST_MEDIUM_TRANSITION_RATE_MS = 280;
 const HUE_REST_SLOW_TRANSITION_RATE_MS = 420;
+const WIZ_SINGLE_FIXTURE_SAFE_MIN_MS = 92;
+const WIZ_FANOUT_SAFE_MIN_MS = 100;
 
 function areHardwareRateLimitsEnabled() {
   return audioReactivityMapRuntime?.hardwareRateLimitsEnabled !== false;
@@ -2126,6 +2246,18 @@ function shouldForceHueRestScheduling(zone = "hue") {
   return false;
 }
 
+function getWizAdaptiveSafeMinMs(zone = "wiz") {
+  const zoneKey = normalizeRouteZoneToken(zone, "wiz");
+  const targets = listEngineFixtures("wiz", zoneKey);
+  if (targets.length <= 1) {
+    return WIZ_SINGLE_FIXTURE_SAFE_MIN_MS;
+  }
+  if (targets.length >= 7) {
+    return WIZ_FANOUT_SAFE_MIN_MS;
+  }
+  return Number(TRANSPORT_RATE_CAPS.wiz.default.safeMinMs || 85);
+}
+
 function buildHueScheduleOptions(options = {}, zone = "hue") {
   const input = options && typeof options === "object" ? options : {};
   const forceRestProfile = input.forceRestProfile === true;
@@ -2169,7 +2301,7 @@ function tuneHueRestTransitionForLatency(state, effectiveRateMs = 260, options =
   if (!Number.isFinite(current)) return source;
 
   let cap = Math.max(0, Math.round(current));
-  if (effectiveRateMs <= HUE_REST_FAST_TRANSITION_RATE_MS) cap = 0;
+  if (effectiveRateMs <= HUE_REST_FAST_TRANSITION_RATE_MS) cap = 1;
   else if (effectiveRateMs <= HUE_REST_MEDIUM_TRANSITION_RATE_MS) cap = 1;
   else if (effectiveRateMs <= HUE_REST_SLOW_TRANSITION_RATE_MS) cap = 2;
   if (flowMode) {
@@ -2186,10 +2318,14 @@ function tuneHueRestTransitionForLatency(state, effectiveRateMs = 260, options =
   };
 }
 
-function buildWizScheduleOptions(options = {}) {
+function buildWizScheduleOptions(options = {}, zone = "wiz") {
   const input = options && typeof options === "object" ? options : {};
   const profile = TRANSPORT_RATE_CAPS.wiz.default;
-  const minIntervalMs = clampIntervalMsForProfile(input.minIntervalMs, profile);
+  const minIntervalMs = clampIntervalMsForProfile(
+    input.minIntervalMs,
+    profile,
+    { safeMinMs: getWizAdaptiveSafeMinMs(zone) }
+  );
   const rawMaxSilence = Number(input.maxSilenceMs);
   const fallbackMaxSilence = Number(profile.maxSilenceMs || (minIntervalMs * 4));
   const maxSilenceMs = Math.max(
@@ -2404,9 +2540,12 @@ async function flushHue(zone = "hue") {
       }
       ops.push(
         axios.put(
-          `http://${target.bridgeIp}/api/${target.username}/lights/${target.lightId}/state`,
+          `https://${target.bridgeIp}/api/${target.username}/lights/${target.lightId}/state`,
           fixtureState,
-          { timeout: 1500, httpAgent: hueHttpAgent }
+          {
+            timeout: 1500,
+            httpsAgent: getHueRestHttpsAgent(target)
+          }
         )
       );
     }
@@ -2811,9 +2950,7 @@ function isHueRecoveryTimeoutFailure(message = "") {
   if (!lower) return false;
   return (
     lower.includes("dtls connect timeout") ||
-    lower.includes("handshake timed out") ||
-    lower.includes("original-start") ||
-    lower.includes("forced-start")
+    lower.includes("handshake timed out")
   );
 }
 
@@ -2941,7 +3078,11 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
             `[HUE][ENT] auto-recover pending (${reason}): ${pendingReason} | retry in ${cooldown}ms`
           );
         }
-        if (isHueRecoveryTimeoutFailure(pendingReasonRaw) && !bypassSuppression) {
+        if (
+          isHueRecoveryTimeoutFailure(pendingReasonRaw) &&
+          !bypassSuppression &&
+          hueRecoveryTimeoutStreak >= HUE_RECOVERY_TIMEOUT_SUPPRESS_STREAK
+        ) {
           hueRecoverySuppressedByTimeout = true;
           hueRecoverySuppressedReason = pendingReason;
           hueRecoverySuppressedAt = Date.now();
@@ -2953,6 +3094,10 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
           console.warn(
             `[HUE][ENT] auto-recover suspended for current rave session after timeout: ${pendingReason}`
           );
+        } else if (isHueRecoveryTimeoutFailure(pendingReasonRaw) && !bypassSuppression) {
+          console.warn(
+            `[HUE][ENT] timeout recovery streak ${hueRecoveryTimeoutStreak}/${HUE_RECOVERY_TIMEOUT_SUPPRESS_STREAK}; keeping auto-recover active`
+          );
         }
       }
     } catch (err) {
@@ -2961,7 +3106,11 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
       const cooldown = computeHueRecoveryCooldown(reason, errorDetail);
       hueRecoveryNextAt = Date.now() + cooldown;
       console.warn(`[HUE][ENT] auto-recover failed (${reason}):`, errorDetail);
-      if (isHueRecoveryTimeoutFailure(errorDetail) && !bypassSuppression) {
+      if (
+        isHueRecoveryTimeoutFailure(errorDetail) &&
+        !bypassSuppression &&
+        hueRecoveryTimeoutStreak >= HUE_RECOVERY_TIMEOUT_SUPPRESS_STREAK
+      ) {
         hueRecoverySuppressedByTimeout = true;
         hueRecoverySuppressedReason = errorDetail;
         hueRecoverySuppressedAt = Date.now();
@@ -2972,6 +3121,10 @@ function scheduleHueEntertainmentRecovery(reason = "unspecified") {
         );
         console.warn(
           `[HUE][ENT] auto-recover suspended for current rave session after timeout: ${errorDetail}`
+        );
+      } else if (isHueRecoveryTimeoutFailure(errorDetail) && !bypassSuppression) {
+        console.warn(
+          `[HUE][ENT] timeout recovery streak ${hueRecoveryTimeoutStreak}/${HUE_RECOVERY_TIMEOUT_SUPPRESS_STREAK}; keeping auto-recover active`
         );
       }
     } finally {
@@ -3084,9 +3237,12 @@ async function runAutomationEvent(eventName, seqId = automationEventSeq) {
   const results = await Promise.allSettled(
     targets.map(target =>
       axios.put(
-        `http://${target.bridgeIp}/api/${target.username}/lights/${target.lightId}/state`,
+        `https://${target.bridgeIp}/api/${target.username}/lights/${target.lightId}/state`,
         payload,
-        { timeout: 1800, httpAgent: hueHttpAgent }
+        {
+          timeout: 1800,
+          httpsAgent: getHueRestHttpsAgent(target)
+        }
       )
     )
   );
@@ -3737,7 +3893,7 @@ function buildFixtureModeInteroperabilityReport(options = {}) {
       issues.push({ id, severity: "error", code: "engine_custom_conflict", message: "engineEnabled and customEnabled cannot both be true" });
     }
     if (!engineEnabled && !twitchEnabled && !customEnabled) {
-      issues.push({ id, severity: "error", code: "no_mode_enabled", message: "fixture has no enabled routing mode" });
+      issues.push({ id, severity: "warn", code: "no_mode_enabled", message: "fixture has no enabled routing mode (idle)" });
     }
     if (engineEnabled && engineBinding !== brand) {
       issues.push({ id, severity: "error", code: "engine_binding_mismatch", message: `engineBinding must be '${brand}' when engineEnabled=true` });
@@ -3800,7 +3956,7 @@ function buildFixtureModeInteroperabilityReport(options = {}) {
 
 function enqueueWiz(state, zone = "wiz", options = {}) {
   const scheduler = getWizScheduler(zone);
-  const scheduleOptions = buildWizScheduleOptions(options);
+  const scheduleOptions = buildWizScheduleOptions(options, zone);
   if (!scheduler.shouldSend(state, scheduleOptions)) {
     wizTelemetry.skippedScheduler++;
     return;
@@ -3870,6 +4026,7 @@ const fixturePaletteSequenceCache = new Map();
 const PALETTE_SEQUENCE_CACHE_MAX = 192;
 const PALETTE_PATCH_FIELDS = Object.freeze([
   "colorsPerFamily",
+  "familyColorCounts",
   "families",
   "disorder",
   "disorderAggression",
@@ -3896,6 +4053,14 @@ function hasPalettePatchFields(patch = {}) {
 function applyPaletteConfigPatch(updated, current, next) {
   if (hasPatchKey(next, "colorsPerFamily")) {
     updated.colorsPerFamily = normalizePaletteColorCount(next.colorsPerFamily, current.colorsPerFamily);
+    updated.familyColorCounts = buildPaletteUniformColorCounts(updated.colorsPerFamily);
+  }
+  if (hasPatchKey(next, "familyColorCounts")) {
+    updated.familyColorCounts = normalizePaletteFamilyColorCounts(
+      next.familyColorCounts,
+      updated.familyColorCounts || current.familyColorCounts,
+      updated.colorsPerFamily || current.colorsPerFamily
+    );
   }
   if (hasPatchKey(next, "families")) {
     updated.families = normalizePaletteFamilies(next.families, current.families);
@@ -4175,7 +4340,7 @@ function buildPaletteFamilyColors(familyId, colorsPerFamily, vividnessLevel = PA
   const colors = Array.isArray(family.colors) ? family.colors.slice() : [];
   if (!colors.length) return [];
   const count = normalizePaletteColorCount(colorsPerFamily, PALETTE_CONFIG_DEFAULT.colorsPerFamily);
-  const span = PALETTE_FAMILY_INDEX_SPAN[count] || PALETTE_FAMILY_INDEX_SPAN[3];
+  const span = resolveSharedPaletteFamilyIndexSpan(familyId, count);
   const picked = span
     .map(idx => colors[idx])
     .filter(Boolean);
@@ -4226,6 +4391,10 @@ function paletteHueDistanceDeg(a, b) {
   const bb = normalizePaletteHueDeg(b);
   const delta = Math.abs(aa - bb);
   return delta > 180 ? (360 - delta) : delta;
+}
+
+function shortestHueDeltaDeg(fromHue, toHue) {
+  return ((normalizePaletteHueDeg(toHue) - normalizePaletteHueDeg(fromHue) + 540) % 360) - 180;
 }
 
 function rotatePaletteColors(colors = [], shift = 0) {
@@ -4331,14 +4500,25 @@ function orientPaletteFamiliesForOrderedFlow(segments = []) {
 
 function buildPaletteSequence(config = {}) {
   const normalized = normalizePaletteConfigSnapshot(config, PALETTE_CONFIG_DEFAULT);
+  const selectedFamilies = normalizePaletteFamilies(
+    normalized.families,
+    PALETTE_CONFIG_DEFAULT.families
+  );
   const cacheKey = getPaletteConfigFingerprint(normalized);
   if (fixturePaletteSequenceCache.has(cacheKey)) {
     return fixturePaletteSequenceCache.get(cacheKey).map(color => ({ ...color }));
   }
 
   const out = [];
-  const familySegments = normalizePaletteFamilies(normalized.families, PALETTE_CONFIG_DEFAULT.families)
-    .map(familyId => buildPaletteFamilyColors(familyId, normalized.colorsPerFamily, normalized.vividness))
+  const familySegments = selectedFamilies
+    .map(familyId => {
+      const count = resolvePaletteColorCountForFamily(
+        normalized,
+        familyId,
+        normalized.colorsPerFamily
+      );
+      return buildPaletteFamilyColors(familyId, count, normalized.vividness);
+    })
     .filter(segment => Array.isArray(segment) && segment.length > 0);
   const flowSegments = !normalized.disorder && familySegments.length >= 2
     ? orientPaletteFamiliesForOrderedFlow(familySegments)
@@ -4354,7 +4534,12 @@ function buildPaletteSequence(config = {}) {
     }
   }
   if (!out.length) {
-    return buildPaletteFamilyColors("red", 3, normalized.vividness).map(color => ({
+    const fallbackCount = resolvePaletteColorCountForFamily(
+      normalized,
+      "red",
+      PALETTE_CONFIG_DEFAULT.colorsPerFamily
+    );
+    return buildPaletteFamilyColors("red", fallbackCount, normalized.vividness).map(color => ({
       r: clampRgb255(color.r),
       g: clampRgb255(color.g),
       b: clampRgb255(color.b)
@@ -4370,9 +4555,21 @@ function buildPaletteSequence(config = {}) {
 
 function getPaletteConfigFingerprint(config = {}) {
   const normalized = normalizePaletteConfigSnapshot(config, PALETTE_CONFIG_DEFAULT);
+  const normalizedFamilies = normalizePaletteFamilies(
+    normalized.families,
+    PALETTE_CONFIG_DEFAULT.families
+  );
+  const familyCountFingerprint = normalizedFamilies
+    .map(familyId => `${familyId}:${resolvePaletteColorCountForFamily(
+      normalized,
+      familyId,
+      normalized.colorsPerFamily
+    )}`)
+    .join(",");
   return [
     String(normalized.colorsPerFamily),
-    normalizePaletteFamilies(normalized.families, PALETTE_CONFIG_DEFAULT.families).join(","),
+    familyCountFingerprint,
+    normalizedFamilies.join(","),
     normalized.disorder ? "1" : "0",
     String(Math.round(normalizePaletteDisorderAggression(normalized.disorderAggression, 0.35) * 1000)),
     normalizePaletteCycleMode(normalized.cycleMode, PALETTE_CONFIG_DEFAULT.cycleMode),
@@ -4418,18 +4615,73 @@ function getPaletteSignalFeatureValue(signal = null, featureKey = "rms") {
   return clampNumber(src[field], 0, 1, 0);
 }
 
-function resolvePaletteGroupSize(config = {}, sequenceLength = 1) {
-  const len = Math.max(1, Number(sequenceLength) || 1);
-  const requested = normalizePaletteColorCount(config.colorsPerFamily, PALETTE_CONFIG_DEFAULT.colorsPerFamily);
-  return clampNumber(requested, 1, len, 1);
+function getPaletteGroupLengths(config = null) {
+  const normalizedConfig = normalizePaletteConfigSnapshot(
+    config && typeof config === "object" ? config : PALETTE_CONFIG_DEFAULT,
+    PALETTE_CONFIG_DEFAULT
+  );
+  const selectedFamilies = normalizePaletteFamilies(
+    normalizedConfig.families,
+    PALETTE_CONFIG_DEFAULT.families
+  );
+  const lengths = selectedFamilies.map(familyId => resolvePaletteColorCountForFamily(
+    normalizedConfig,
+    familyId,
+    normalizedConfig.colorsPerFamily
+  ));
+  if (lengths.length) return lengths;
+  return [
+    normalizePaletteColorCount(
+      normalizedConfig.colorsPerFamily,
+      PALETTE_CONFIG_DEFAULT.colorsPerFamily
+    )
+  ];
 }
 
-function normalizePaletteGroupBaseIndex(index, sequenceLength, groupSize) {
-  const len = Math.max(1, Number(sequenceLength) || 1);
-  const size = clampNumber(Math.round(Number(groupSize) || 1), 1, len, 1);
+function buildPaletteGroupLayout(config = null, length = 1) {
+  const len = Math.max(1, Number(length) || 1);
+  const requestedLengths = getPaletteGroupLengths(config);
+  const layout = [];
+  let cursor = 0;
+  for (const requestedLength of requestedLengths) {
+    if (cursor >= len) break;
+    const remaining = len - cursor;
+    const size = clampNumber(Math.round(Number(requestedLength) || 1), 1, remaining, 1);
+    layout.push({ start: cursor, length: size });
+    cursor += size;
+  }
+  if (!layout.length) {
+    return [{ start: 0, length: len }];
+  }
+  if (cursor < len) {
+    layout[layout.length - 1].length += (len - cursor);
+  }
+  return layout;
+}
+
+function getPaletteGroupIndexForLayout(index, layout = [], length = 1) {
+  const len = Math.max(1, Number(length) || 1);
+  const safeLayout = Array.isArray(layout) && layout.length
+    ? layout
+    : [{ start: 0, length: len }];
   const base = ((Number(index) || 0) % len + len) % len;
-  const group = Math.floor(base / size);
-  return clampNumber(group * size, 0, Math.max(0, len - 1), 0);
+  for (let i = 0; i < safeLayout.length; i += 1) {
+    const group = safeLayout[i];
+    const start = clampNumber(Math.round(Number(group.start) || 0), 0, Math.max(0, len - 1), 0);
+    const size = clampNumber(Math.round(Number(group.length) || 1), 1, Math.max(1, len - start), 1);
+    if (base >= start && base < (start + size)) return i;
+  }
+  return Math.max(0, safeLayout.length - 1);
+}
+
+function getPaletteGroupBaseForLayout(groupIndex, layout = [], length = 1) {
+  const len = Math.max(1, Number(length) || 1);
+  const safeLayout = Array.isArray(layout) && layout.length
+    ? layout
+    : [{ start: 0, length: len }];
+  const idx = clampNumber(Math.round(Number(groupIndex) || 0), 0, Math.max(0, safeLayout.length - 1), 0);
+  const group = safeLayout[idx];
+  return clampNumber(Math.round(Number(group.start) || 0), 0, Math.max(0, len - 1), 0);
 }
 
 function pickFixturePaletteNextIndex(currentIndex, sequenceLength, config = {}, intent = {}) {
@@ -4438,13 +4690,13 @@ function pickFixturePaletteNextIndex(currentIndex, sequenceLength, config = {}, 
   if (len <= 1) return 0;
   const scope = String(intent?.scope || "color").trim().toLowerCase();
   if (scope === "group") {
-    const groupSize = resolvePaletteGroupSize(config, len);
-    const groupCount = Math.max(1, Math.ceil(len / groupSize));
+    const groupLayout = buildPaletteGroupLayout(config, len);
+    const groupCount = Math.max(1, groupLayout.length);
     if (groupCount <= 1) return 0;
-    const currentGroup = clampNumber(Math.floor(index / groupSize), 0, groupCount - 1, 0);
+    const currentGroup = getPaletteGroupIndexForLayout(index, groupLayout, len);
     const step = Boolean(intent?.drop) && groupCount > 2 ? 2 : 1;
     const nextGroup = (currentGroup + step) % groupCount;
-    return normalizePaletteGroupBaseIndex(nextGroup * groupSize, len, groupSize);
+    return getPaletteGroupBaseForLayout(nextGroup, groupLayout, len);
   }
   const isBeat = Boolean(intent?.beat);
   const isDrop = Boolean(intent?.drop);
@@ -4904,13 +5156,20 @@ function pickFixturePaletteColor(fixtureId, brandKey, intent = {}, configOverrid
   }
 
   const mode = normalizePaletteCycleMode(config.cycleMode, PALETTE_CONFIG_DEFAULT.cycleMode);
-  const groupSize = resolvePaletteGroupSize(config, sequence.length);
-  const groupCount = Math.max(1, Math.ceil(sequence.length / groupSize));
-  let index = normalizePaletteGroupBaseIndex(Number(state.index) || 0, sequence.length, groupSize);
+  const groupLayout = buildPaletteGroupLayout(config, sequence.length);
+  const groupCount = Math.max(1, groupLayout.length);
+  let index = getPaletteGroupBaseForLayout(
+    getPaletteGroupIndexForLayout(Number(state.index) || 0, groupLayout, sequence.length),
+    groupLayout,
+    sequence.length
+  );
   const motionProfile = resolveFixturePaletteMotionProfile(id, brandKey, intent, signal, state);
   const applyGroupColorOffset = () => {
-    const baseIndex = normalizePaletteGroupBaseIndex(index, sequence.length, groupSize);
-    const groupSpan = Math.max(1, Math.min(groupSize, sequence.length - index));
+    const groupIndex = getPaletteGroupIndexForLayout(index, groupLayout, sequence.length);
+    const group = groupLayout[groupIndex] || { start: 0, length: sequence.length };
+    const baseIndex = clampNumber(Math.round(Number(group.start) || 0), 0, Math.max(0, sequence.length - 1), 0);
+    index = baseIndex;
+    const groupSpan = Math.max(1, Math.min(group.length, sequence.length - baseIndex));
     let offset = clampNumber(Math.round(Number(state.colorOffset) || 0), 0, Math.max(0, groupSpan - 1), 0);
     let phase = Number(state.colorPhase);
     if (!Number.isFinite(phase)) phase = offset;
@@ -5041,7 +5300,7 @@ function pickFixturePaletteColor(fixtureId, brandKey, intent = {}, configOverrid
   let emitIndex = index;
   if (mode === "spectrum_mapper") {
     const groupIndex = pickFixtureSpectrumPaletteIndex(groupCount, config, signal, state);
-    index = normalizePaletteGroupBaseIndex(groupIndex * groupSize, sequence.length, groupSize);
+    index = getPaletteGroupBaseForLayout(groupIndex, groupLayout, sequence.length);
     state.index = index;
     state.lastSpectrumIndex = clampNumber(groupIndex, 0, Math.max(0, groupCount - 1), 0);
     state.lastAdvanceAt = nowMs;
@@ -5058,7 +5317,7 @@ function pickFixturePaletteColor(fixtureId, brandKey, intent = {}, configOverrid
     if (shouldAdvance) {
       index = pickFixturePaletteNextIndex(index, sequence.length, config, { ...intent, scope: "group" });
       state.index = index;
-      state.lastSpectrumIndex = clampNumber(Math.floor(index / groupSize), 0, Math.max(0, groupCount - 1), 0);
+      state.lastSpectrumIndex = getPaletteGroupIndexForLayout(index, groupLayout, sequence.length);
     }
     emitIndex = applyGroupColorOffset();
   } else {
@@ -5067,9 +5326,13 @@ function pickFixturePaletteColor(fixtureId, brandKey, intent = {}, configOverrid
     if (triggerAdvance) {
       const nextIndex = pickFixturePaletteNextIndex(index, sequence.length, config, { ...intent, scope: "group" });
       state.index = nextIndex;
-      index = normalizePaletteGroupBaseIndex(nextIndex, sequence.length, groupSize);
+      index = getPaletteGroupBaseForLayout(
+        getPaletteGroupIndexForLayout(nextIndex, groupLayout, sequence.length),
+        groupLayout,
+        sequence.length
+      );
       state.lastAdvanceAt = nowMs;
-      state.lastSpectrumIndex = clampNumber(Math.floor(index / groupSize), 0, Math.max(0, groupCount - 1), 0);
+      state.lastSpectrumIndex = getPaletteGroupIndexForLayout(index, groupLayout, sequence.length);
     }
     emitIndex = applyGroupColorOffset();
   }
@@ -6365,6 +6628,7 @@ function clearFixtureRoutingOverridesAtomic(patch = {}) {
           engine.setPaletteConfig?.({
             brand: requestedBrand,
             colorsPerFamily: paletteBrandBefore.colorsPerFamily,
+            familyColorCounts: paletteBrandBefore.familyColorCounts,
             families: paletteBrandBefore.families,
             disorder: paletteBrandBefore.disorder,
             disorderAggression: paletteBrandBefore.disorderAggression,
@@ -6473,7 +6737,7 @@ const standaloneRuntime = createStandaloneRuntime({
   fixtureRegistry,
   createWizAdapter,
   axios,
-  hueHttpAgent,
+  getHueHttpsAgentForFixture: fixture => getHueRestHttpsAgent(fixture),
   parseBoolean: parseBooleanLoose,
   normalizeStandaloneState,
   nextStandaloneAnimatedState,
@@ -6820,6 +7084,20 @@ function bootEngine(reason = "boot") {
             hueRateProfile
           );
           const turboRate = effectiveRateMs <= 170;
+          const hueTriggerBoost = clamp(
+            Math.max(
+              Number(mappedIntent.audioDrums || 0),
+              Number(mappedIntent.audioBody || 0) * 0.86,
+              Number(mappedIntent.audioMotion || 0) * 0.9,
+              mappedIntent.drop ? 0.92 : 0,
+              mappedIntent.beat ? 0.62 : 0
+            ),
+            0,
+            1
+          );
+          const highRateReactive =
+            effectiveRateMs <= 124 &&
+            hueTriggerBoost >= 0.24;
           const intentDeltaScale = Number(mappedIntent.deltaScale);
           const zones = resolveIntentZones(mappedIntent, "hue", "hue");
           for (const zone of zones) {
@@ -6836,10 +7114,16 @@ function bootEngine(reason = "boot") {
                 maxSilenceMs: requestedMaxSilenceMs > 0
                   ? requestedMaxSilenceMs
                   : hueRateProfile.maxSilenceMs,
-                forceDelta: Boolean(mappedIntent.forceRate || mappedIntent.forceDelta),
+                forceDelta: Boolean(
+                  mappedIntent.forceRate ||
+                  mappedIntent.forceDelta ||
+                  highRateReactive ||
+                  hueTriggerBoost >= 0.48
+                ),
                 deltaScale: Number.isFinite(intentDeltaScale)
                   ? intentDeltaScale
-                  : (turboRate ? 0.5 : 1),
+                  : (highRateReactive ? 0.46 : (turboRate ? 0.54 : 0.94)),
+                triggerBoost: hueTriggerBoost,
                 paletteIntent: mappedIntent
               }
             );
@@ -6888,15 +7172,17 @@ function bootEngine(reason = "boot") {
                 maxSilenceMs: requestedMaxSilenceMs > 0
                   ? requestedMaxSilenceMs
                   : wizRateProfile.maxSilenceMs,
-                forceDelta: Boolean(mappedIntent.forceRate || mappedIntent.forceDelta || dropActive || beatActive),
+                // Keep WiZ cadence aligned with engine intent; avoid auto-forcing delta
+                // on every beat, which can cause color flicker and overly short dwell.
+                forceDelta: Boolean(mappedIntent.forceRate || mappedIntent.forceDelta),
                 deltaScale: Number.isFinite(Number(mappedIntent.deltaScale))
                   ? Number(mappedIntent.deltaScale)
-                  : (veryHighRate ? 0.5 : (highRate ? 0.62 : 0.92)),
+                  : (veryHighRate ? 0.76 : (highRate ? 0.92 : 1.08)),
                 paletteIntent: mappedIntent,
                 tx: {
                   // UDP is lossy; repeat key beats/drops for better visual lock.
-                  repeats: dropActive ? (veryHighRate ? 2 : 3) : beatActive ? (veryHighRate ? 1 : 2) : 1,
-                  repeatDelayMs: highRate ? 12 : 18,
+                  repeats: dropActive ? 2 : 1,
+                  repeatDelayMs: highRate ? 14 : 20,
                   isDrop: dropActive,
                   isBeat: beatActive,
                   minIntervalMs: effectiveRateMs
@@ -7231,7 +7517,13 @@ const wizReactiveDynamics = {
   beatPulse: 0,
   lastTickAt: 0,
   brightnessEma: 0,
-  hueEma: null
+  hueEma: null,
+  colorEma: null
+};
+const hueReactiveDynamics = {
+  lastTickAt: 0,
+  hueEma: null,
+  satEma: null
 };
 console.log(
   `[AUDIO] reactivity map loaded (dropEnabled=${audioReactivityMapRuntime.dropEnabled}, ` +
@@ -7252,6 +7544,10 @@ function resetAudioReactivityEnvelopes() {
   wizReactiveDynamics.lastTickAt = 0;
   wizReactiveDynamics.brightnessEma = 0;
   wizReactiveDynamics.hueEma = null;
+  wizReactiveDynamics.colorEma = null;
+  hueReactiveDynamics.lastTickAt = 0;
+  hueReactiveDynamics.hueEma = null;
+  hueReactiveDynamics.satEma = null;
 }
 
 function getAudioReactivitySourceCatalogSnapshot() {
@@ -7556,10 +7852,17 @@ function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
   if (!intent || typeof intent !== "object") return intent;
   if (!intent.state || typeof intent.state !== "object") return intent;
   const profile = getAudioReactivityDrive("hue", telemetry);
-  if (!profile.enabled) return { ...intent, drop: false };
+  if (!profile.enabled) {
+    hueReactiveDynamics.hueEma = null;
+    hueReactiveDynamics.satEma = null;
+    return { ...intent, drop: false };
+  }
   const motionProfile = getAudioTelemetryMotionProfile(telemetry);
   const raw = getRawPercussiveBody(telemetry);
   const dropActive = Boolean(audioReactivityMapRuntime.dropEnabled && intent.drop);
+  const beatActive = Boolean(intent.beat);
+  const now = Date.now();
+  hueReactiveDynamics.lastTickAt = now;
 
   const statePatch = { ...intent.state };
   const baseBri = clampNumber(statePatch.bri, 1, 254, 160);
@@ -7629,9 +7932,24 @@ function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
       (raw.drums * 8) -
       (clamp01(profile.vocalOverhang, 0) * 8)
     );
-    statePatch.sat = Math.max(1, Math.min(254, satBase + satBoost));
+    const satTarget = Math.max(1, Math.min(254, satBase + satBoost));
+    if (!(hueReactiveDynamics.satEma > 0)) {
+      hueReactiveDynamics.satEma = satTarget;
+    }
+    const satAlpha = clampNumber(
+      0.14 +
+      (raw.drums * 0.14) +
+      (raw.activity * 0.1) +
+      (dropActive ? 0.18 : 0) +
+      (beatActive ? 0.08 : 0),
+      0.1,
+      0.64,
+      0.22
+    );
+    hueReactiveDynamics.satEma += (satTarget - hueReactiveDynamics.satEma) * satAlpha;
+    statePatch.sat = Math.max(1, Math.min(254, Math.round(hueReactiveDynamics.satEma)));
   }
-  const baseRateMs = clampNumber(intent.rateMs, 55, 1200, 0);
+  const baseRateMs = clampNumber(intent.rateMs, 56, 1200, 0);
   const rhythmRateSignal = clampNumber(
     Math.max(
       raw.drums,
@@ -7644,28 +7962,74 @@ function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
     1,
     0
   );
-  const rhythmTargetRateMs = Math.round(240 - (rhythmRateSignal * 150));
+  const rhythmTargetRateMs = Math.round(242 - (rhythmRateSignal * 150));
   let nextRateMs = baseRateMs > 0
-    ? clampNumber(Math.min(baseRateMs, rhythmTargetRateMs), 55, 1200, baseRateMs)
+    ? clampNumber(Math.min(baseRateMs, rhythmTargetRateMs), 56, 1200, baseRateMs)
     : intent.rateMs;
   if (dropActive) {
     nextRateMs = Math.min(nextRateMs, 82);
   } else if (rhythmRateSignal > 0.72) {
-    nextRateMs = Math.min(nextRateMs, 102);
+    nextRateMs = Math.min(nextRateMs, 100);
   } else if (rhythmRateSignal > 0.5) {
-    nextRateMs = Math.min(nextRateMs, 132);
+    nextRateMs = Math.min(nextRateMs, 126);
+  }
+  if (statePatch.on !== false && Number.isFinite(Number(statePatch.hue))) {
+    const baseHueDeg = normalizePaletteHueDeg((Number(statePatch.hue) / 65535) * 360);
+    if (!Number.isFinite(Number(hueReactiveDynamics.hueEma))) {
+      hueReactiveDynamics.hueEma = baseHueDeg;
+    }
+    const signalStrength = clampNumber(
+      Math.max(
+        raw.drums * 0.9,
+        raw.activity * 0.78,
+        profile.transient * 0.72,
+        profile.peak * 0.62,
+        dropActive ? 1 : 0,
+        beatActive ? 0.68 : 0
+      ),
+      0,
+      1,
+      0
+    );
+    const fastRateSignal = clampNumber((172 - nextRateMs) / 116, 0, 1, 0);
+    const hueAlpha = clampNumber(
+      0.1 +
+      (signalStrength * 0.22) +
+      (fastRateSignal * 0.14) +
+      (dropActive ? 0.08 : 0) +
+      (beatActive ? 0.04 : 0),
+      0.08,
+      0.62,
+      0.2
+    );
+    const maxStepDeg = clampNumber(
+      5 +
+      (signalStrength * 22) +
+      (fastRateSignal * 16) +
+      (dropActive ? 12 : 0),
+      4,
+      46,
+      12
+    );
+    const hueDelta = shortestHueDeltaDeg(hueReactiveDynamics.hueEma, baseHueDeg);
+    const hueStep = clampNumber(hueDelta * hueAlpha, -maxStepDeg, maxStepDeg, 0);
+    hueReactiveDynamics.hueEma = normalizePaletteHueDeg(hueReactiveDynamics.hueEma + hueStep);
+    let stabilizedHue = Math.round((hueReactiveDynamics.hueEma / 360) * 65535) % 65535;
+    if (stabilizedHue < 0) stabilizedHue += 65535;
+    statePatch.hue = stabilizedHue;
   }
   const quietMaxSilenceMs = null;
-  const forcedDeltaByBody = raw.drums > 0.2 || raw.activity > 0.28 || profile.transient > 0.22;
+  const forcedDeltaByBody = raw.drums > 0.24 || raw.activity > 0.32 || profile.transient > 0.26;
   const baseDeltaScale = clampNumber(
     Number(intent.deltaScale),
     0.35,
     1.2,
     Boolean(intent.forceDelta) ? 0.72 : 1
   );
+  const deltaFloor = nextRateMs <= 105 ? 0.36 : 0.42;
   const nextDeltaScale = clampNumber(
-    baseDeltaScale - (raw.drums * 0.32) - (raw.activity * 0.18),
-    0.4,
+    baseDeltaScale - (raw.drums * 0.28) - (raw.activity * 0.16),
+    deltaFloor,
     1.05,
     baseDeltaScale
   );
@@ -7690,7 +8054,14 @@ function applyHueIntentAudioReactivity(intent = {}, telemetry = null) {
 function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   if (!intent || typeof intent !== "object") return intent;
   const profile = getAudioReactivityDrive("wiz", telemetry);
-  if (!profile.enabled) return { ...intent, drop: false };
+  if (!profile.enabled) {
+    wizReactiveDynamics.beatPulse = 0;
+    wizReactiveDynamics.lastTickAt = 0;
+    wizReactiveDynamics.brightnessEma = 0;
+    wizReactiveDynamics.hueEma = null;
+    wizReactiveDynamics.colorEma = null;
+    return { ...intent, drop: false };
+  }
   const motionProfile = getAudioTelemetryMotionProfile(telemetry);
   const raw = getRawPercussiveBody(telemetry);
   const sceneName = String(
@@ -7739,7 +8110,7 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
     );
   }
   const beatPulse = clamp01(wizReactiveDynamics.beatPulse, 0);
-  const baseBrightness = clampNumber(next.brightness, 0.06, 1, 0.65);
+  const baseBrightness = clampNumber(next.brightness, 0.004, 1, 0.65);
   const boundedDrive = Math.max(
     0.2,
     Math.min(
@@ -7759,21 +8130,21 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
       (raw.drums * 0.12) -
       (motionProfile.quietMix * 0.08) -
       (motionProfile.hushMix * 0.04),
-    0.08,
-    0.72,
+    0.01,
+    0.78,
     0.28
   );
-  const floor = Math.max(0.03, Math.min(0.62, baseBrightness * floorPercent));
+  const floor = Math.max(0.002, Math.min(0.58, baseBrightness * floorPercent));
   let brightness = floor + ((baseBrightness - floor) * Math.min(1.04, boundedDrive));
   brightness += beatPulse * (
     pulseScene
-      ? (0.13 + (profile.character * 0.08))
-      : (0.074 + (profile.character * 0.05))
+      ? (0.2 + (profile.character * 0.12))
+      : (0.12 + (profile.character * 0.08))
   );
   if (boundedDrive > 1.04) {
     const extra = Math.min(1, (boundedDrive - 1.04) / 0.41);
     const headroom = Math.max(0, 1 - baseBrightness);
-    brightness = baseBrightness + (headroom * extra * (0.62 + (profile.character * 0.38)));
+    brightness = baseBrightness + (headroom * extra * (0.78 + (profile.character * 0.5)));
   }
   const highEvidence = clampNumber(
     (driveNorm * 0.58) +
@@ -7797,78 +8168,93 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
   if (dropActive) {
     brightness = Math.max(
       brightness,
-      baseBrightness * (1.12 + (profile.character * 0.06))
+      baseBrightness * (1.2 + (profile.character * 0.08))
     );
-    if (highEvidence >= 0.68 || (boundedDrive >= 1.04 && brightness >= 0.88)) {
+    if (highEvidence >= 0.68 || (boundedDrive >= 1.08 && brightness >= 0.84)) {
       brightness = 1;
-    } else if (highEvidence >= 0.58) {
+    } else if (highEvidence >= 0.52) {
       brightness = Math.max(brightness, 0.95);
     }
   } else if (beatActive && boundedDrive >= 1.04) {
     brightness = Math.max(
       brightness,
-      baseBrightness * (1.05 + (profile.character * 0.04))
+      baseBrightness * (1.1 + (profile.character * 0.06))
     );
-    if (highEvidence >= 0.78 || (boundedDrive >= 1.16 && brightness >= 0.9)) {
-      brightness = 1;
-    } else if (highEvidence >= 0.66) {
-      brightness = Math.max(brightness, 0.92);
+    if (highEvidence >= 0.76 || (boundedDrive >= 1.14 && brightness >= 0.86)) {
+      brightness = Math.max(brightness, 1);
+    } else if (highEvidence >= 0.62) {
+      brightness = Math.max(brightness, 0.93);
     }
   }
   if (pulseScene) {
     if (dropActive) {
-      brightness = Math.max(brightness, 0.92);
+      brightness = Math.max(brightness, 0.98);
     } else if (beatActive) {
-      brightness = Math.max(brightness, 0.82);
+      brightness = Math.max(brightness, 0.9);
     } else if (beatPulse > 0.54) {
-      brightness = Math.max(brightness, 0.62 + beatPulse * 0.22);
+      brightness = Math.max(brightness, 0.72 + beatPulse * 0.3);
     }
   }
   if (!dropActive) {
     const quietDimmer = Math.max(
-      0.3,
+      0.05,
       pulseScene
         ? 1 - (motionProfile.quietMix * 0.1) - (motionProfile.hushMix * 0.12) + (beatPulse * 0.14) + (raw.drums * 0.18)
         : 1 - (motionProfile.quietMix * 0.18) - (motionProfile.hushMix * 0.22) + (beatPulse * 0.1) + (raw.drums * 0.22) + (raw.body * 0.12)
     );
     brightness *= quietDimmer;
     if (!beatActive && drumAttack < 0.24 && lowEvidence > 0.84) {
-      const quietCap = 0.14 + ((1 - lowEvidence) * 0.18);
+      const quietCap = 0.03 + ((1 - lowEvidence) * 0.1);
       brightness = Math.min(brightness, quietCap);
     }
-    if (highEvidence >= 0.9 && brightness >= 0.84) {
-      brightness = 1;
-    }
+    if (highEvidence >= 0.74 && brightness >= 0.7) brightness = Math.max(brightness, 1);
+    brightness = Math.min(brightness, 1);
   }
-  const brightnessTarget = Math.max(0.03, Math.min(1, brightness));
+  const brightnessTarget = Math.max(0.003, Math.min(1, brightness));
   if (!(wizReactiveDynamics.brightnessEma > 0)) {
     wizReactiveDynamics.brightnessEma = brightnessTarget;
   }
+  const prevBrightnessEma = wizReactiveDynamics.brightnessEma;
   const riseAlpha = clampNumber(
-    (pulseScene ? 0.42 : 0.3) +
-      (beatPulse * (pulseScene ? 0.2 : 0.12)) +
-      (dropActive ? (pulseScene ? 0.18 : 0.14) : 0) +
-      (raw.drums * 0.16) +
-      (raw.body * 0.1),
-    0.16,
-    0.86,
-    0.38
+    (pulseScene ? 0.66 : 0.58) +
+      (beatPulse * (pulseScene ? 0.2 : 0.14)) +
+      (dropActive ? (pulseScene ? 0.22 : 0.18) : 0) +
+      (raw.drums * 0.2) +
+      (raw.body * 0.12),
+    0.42,
+    0.98,
+    0.64
   );
   const fallAlpha = clampNumber(
-    (pulseScene ? 0.24 : 0.12) +
-      ((1 - clamp01(motionProfile.motion, 0)) * (pulseScene ? 0.05 : 0.06)) +
-      (raw.drums * 0.06),
-    0.06,
-    0.34,
-    0.16
+    (pulseScene ? 0.5 : 0.42) +
+      ((1 - clamp01(motionProfile.motion, 0)) * (pulseScene ? 0.12 : 0.16)) +
+      (raw.drums * 0.1) +
+      (raw.activity * 0.08),
+    0.32,
+    0.86,
+    0.48
   );
   const brightnessAlpha = brightnessTarget >= wizReactiveDynamics.brightnessEma
     ? riseAlpha
     : fallAlpha;
   wizReactiveDynamics.brightnessEma += (brightnessTarget - wizReactiveDynamics.brightnessEma) * brightnessAlpha;
-  next.brightness = Math.max(0.03, Math.min(1, wizReactiveDynamics.brightnessEma));
-  const minRateMs = pulseScene ? 68 : 55;
-  const baseRateMs = clampNumber(next.rateMs, minRateMs, 1200, 0);
+  const riseDiff = Math.max(0, brightnessTarget - prevBrightnessEma);
+  const fallDiff = Math.max(0, prevBrightnessEma - brightnessTarget);
+  if (
+    riseDiff > 0.06 &&
+    (dropActive || beatActive || drumAttack > 0.3 || profile.transient > 0.24)
+  ) {
+    const attackKick = Math.max(0.02, riseDiff * 0.38);
+    wizReactiveDynamics.brightnessEma = Math.min(1, wizReactiveDynamics.brightnessEma + attackKick);
+  }
+  if (fallDiff > 0.07 && !dropActive) {
+    const releaseKick = Math.max(0.018, fallDiff * (pulseScene ? 0.3 : 0.34));
+    wizReactiveDynamics.brightnessEma = Math.max(0.003, wizReactiveDynamics.brightnessEma - releaseKick);
+  }
+  next.brightness = Math.max(0.003, Math.min(1, wizReactiveDynamics.brightnessEma));
+  const minRateMs = pulseScene ? 84 : (flowScene ? 1200 : 72);
+  const maxRateMs = flowScene ? 3800 : 1200;
+  const baseRateMs = clampNumber(next.rateMs, minRateMs, maxRateMs, 0);
   const rhythmRateSignal = clampNumber(
     Math.max(
       raw.drums,
@@ -7882,18 +8268,26 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
     1,
     0
   );
-  const rhythmTargetRateMs = Math.round((pulseScene ? 188 : 205) - (rhythmRateSignal * (pulseScene ? 118 : 130)));
+  const rhythmTargetRateMs = Math.round(
+    pulseScene
+      ? (210 - (rhythmRateSignal * 100))
+      : (
+        flowScene
+          ? (3000 - (rhythmRateSignal * 380))
+          : (234 - (rhythmRateSignal * 108))
+      )
+  );
   next.rateMs = baseRateMs > 0
-    ? clampNumber(Math.min(baseRateMs, rhythmTargetRateMs), minRateMs, 1200, baseRateMs)
+    ? clampNumber(Math.min(baseRateMs, rhythmTargetRateMs), minRateMs, maxRateMs, baseRateMs)
     : next.rateMs;
   if (dropActive) {
-    next.rateMs = Math.min(next.rateMs, pulseScene ? 72 : 84);
+    next.rateMs = Math.min(next.rateMs, pulseScene ? 88 : (flowScene ? 1800 : 100));
   } else if (rhythmRateSignal > 0.72) {
-    next.rateMs = Math.min(next.rateMs, pulseScene ? 82 : 96);
+    next.rateMs = Math.min(next.rateMs, pulseScene ? 96 : (flowScene ? 2200 : 112));
   } else if (rhythmRateSignal > 0.5) {
-    next.rateMs = Math.min(next.rateMs, pulseScene ? 92 : 112);
+    next.rateMs = Math.min(next.rateMs, pulseScene ? 106 : (flowScene ? 2600 : 126));
   }
-  const saturationBoost = 1;
+  const saturationBoost = 0.72;
   if (next.color && typeof next.color === "object") {
     if (pulseScene || flowScene) {
       if (flowScene) {
@@ -7911,74 +8305,156 @@ function applyWizIntentAudioReactivity(intent = {}, telemetry = null) {
         )
       };
     } else {
-    const currentHsv = rgbToHsv255(next.color);
-    const pulseHueNudge = dropActive
-      ? (6 + (profile.character * 4))
-      : beatActive
-        ? (2 + (beatPulse * 2))
-        : 0;
-    const rawTargetHue = ((currentHsv.h + pulseHueNudge) % 360 + 360) % 360;
-    if (!Number.isFinite(Number(wizReactiveDynamics.hueEma))) {
-      wizReactiveDynamics.hueEma = currentHsv.h;
-    }
-    const hueDelta = ((rawTargetHue - wizReactiveDynamics.hueEma + 540) % 360) - 180;
-    const hueAlpha = clampNumber(
-      pulseScene
-        ? (
-          dropActive
-            ? 0.22
-            : beatActive
-              ? (0.1 + (beatPulse * 0.08))
-              : 0.03
+      const currentHsv = rgbToHsv255(next.color);
+      const hueNudge = dropActive
+        ? (2.8 + (profile.character * 2.2))
+        : beatActive
+          ? (1.1 + (beatPulse * 1.6))
+          : (
+            drumAttack > 0.34
+              ? (0.5 + (drumAttack * 0.9))
+              : 0
+          );
+      const rawTargetHue = normalizePaletteHueDeg(currentHsv.h + hueNudge);
+      if (!Number.isFinite(Number(wizReactiveDynamics.hueEma))) {
+        wizReactiveDynamics.hueEma = currentHsv.h;
+      }
+      const hueSignal = clampNumber(
+        Math.max(
+          drumAttack * 0.9,
+          raw.drums * 0.84,
+          raw.activity * 0.58,
+          beatPulse * 0.86,
+          dropActive ? 1 : 0,
+          beatActive ? 0.66 : 0
+        ),
+        0,
+        1,
+        0
+      );
+      const settleBias = (!dropActive && !beatActive && drumAttack < 0.28) ? 0.12 : 0;
+      const hueAlpha = clampNumber(
+        0.035 + (hueSignal * 0.08) + (settleBias * 0.45),
+        0.03,
+        0.2,
+        0.07
+      );
+      const maxHueStep = clampNumber(
+        1.2 + (hueSignal * 3.6) + (dropActive ? 1.1 : 0),
+        1,
+        7,
+        2.4
+      );
+      const hueDelta = shortestHueDeltaDeg(wizReactiveDynamics.hueEma, rawTargetHue);
+      const hueStep = clampNumber(hueDelta * hueAlpha, -maxHueStep, maxHueStep, 0);
+      let nextHue = normalizePaletteHueDeg(wizReactiveDynamics.hueEma + hueStep);
+      const maxDriftFromBase = clampNumber(
+        dropActive
+          ? (6 + (profile.character * 1.4))
+          : (
+            beatActive
+              ? (4 + (beatPulse * 1.8))
+              : (drumAttack > 0.34 ? 2.8 : 1.8)
+          ),
+        1.4,
+        8,
+        3
+      );
+      const driftFromBase = shortestHueDeltaDeg(currentHsv.h, nextHue);
+      nextHue = normalizePaletteHueDeg(
+        currentHsv.h + clampNumber(driftFromBase, -maxDriftFromBase, maxDriftFromBase, 0)
+      );
+      wizReactiveDynamics.hueEma = nextHue;
+      const satFloor = clampNumber(
+        0.88 + (profile.character * 0.08) + (beatPulse * 0.06),
+        0.86,
+        0.99,
+        0.9
+      );
+      const valueFloor = clampNumber(
+        Math.max(0.2, (next.brightness * 0.44)) + (beatPulse * 0.06),
+        0.16,
+        0.56,
+        0.24
+      );
+      next.color = {
+        ...boostRgbSaturation(
+          hsvToRgb255(
+            nextHue,
+            Math.max(currentHsv.s, satFloor),
+            Math.max(currentHsv.v, valueFloor)
+          ),
+          saturationBoost
         )
-        : (
-          dropActive
-            ? 0.13
-            : beatActive
-              ? (0.05 + (beatPulse * 0.04))
-              : 0.015
-        ),
-      0.015,
-      0.24,
-      0.06
-    );
-    wizReactiveDynamics.hueEma = ((wizReactiveDynamics.hueEma + (hueDelta * hueAlpha)) % 360 + 360) % 360;
-    const shiftedHue = wizReactiveDynamics.hueEma;
-    const satFloor = clampNumber(
-      0.9 + (profile.character * 0.08) + (beatPulse * 0.08),
-      0.88,
-      0.99,
-      0.92
-    );
-    const valueFloor = clampNumber(
-      Math.max(0.2, (next.brightness * 0.44)) + (beatPulse * 0.08),
-      0.16,
-      0.56,
-      0.24
-    );
-    next.color = {
-      ...boostRgbSaturation(
-        hsvToRgb255(
-          shiftedHue,
-          Math.max(currentHsv.s, satFloor),
-          Math.max(currentHsv.v, valueFloor)
-        ),
-        saturationBoost
-      )
-    };
+      };
     }
   }
-  const forcedDeltaByBody = raw.drums > 0.2 || raw.activity > 0.28 || drumAttack > 0.3;
+  if (next.color && typeof next.color === "object") {
+    const targetColor = {
+      r: clampRgb255(next.color.r),
+      g: clampRgb255(next.color.g),
+      b: clampRgb255(next.color.b)
+    };
+    if (pulseScene) {
+      wizReactiveDynamics.colorEma = null;
+    } else {
+      const prevColor = wizReactiveDynamics.colorEma && typeof wizReactiveDynamics.colorEma === "object"
+        ? wizReactiveDynamics.colorEma
+        : targetColor;
+      const colorMotion = clampNumber(
+        Math.max(motionProfile.motion, raw.activity, beatPulse * 0.72),
+        0,
+        1,
+        0
+      );
+      const colorSignal = clampNumber(
+        Math.max(colorMotion, beatPulse * 0.84, dropActive ? 1 : 0, beatActive ? 0.62 : 0),
+        0,
+        1,
+        colorMotion
+      );
+      const riseAlpha = clampNumber(
+        flowScene ? (0.1 + colorSignal * 0.18) : (0.08 + colorSignal * 0.16),
+        0.07,
+        0.34,
+        0.14
+      );
+      const fallAlpha = clampNumber(
+        flowScene ? (0.08 + (1 - colorSignal) * 0.08) : (0.06 + (1 - colorSignal) * 0.08),
+        0.05,
+        0.22,
+        0.1
+      );
+      const blendChannel = (current, target) => {
+        const alpha = target >= current ? riseAlpha : fallAlpha;
+        return current + ((target - current) * alpha);
+      };
+      const smoothedColor = {
+        r: blendChannel(prevColor.r, targetColor.r),
+        g: blendChannel(prevColor.g, targetColor.g),
+        b: blendChannel(prevColor.b, targetColor.b)
+      };
+      wizReactiveDynamics.colorEma = smoothedColor;
+      next.color = {
+        r: clampRgb255(Math.round(smoothedColor.r)),
+        g: clampRgb255(Math.round(smoothedColor.g)),
+        b: clampRgb255(Math.round(smoothedColor.b))
+      };
+    }
+  }
+  const forcedDeltaByBody = raw.drums > 0.29 || raw.activity > 0.38 || drumAttack > 0.42;
   const baseDeltaScale = clampNumber(
     Number(next.deltaScale),
     0.35,
     1.2,
-    pulseScene ? 1 : (flowScene ? 0.9 : 0.92)
+    pulseScene ? 1 : (flowScene ? 0.94 : 0.96)
   );
-  next.forceDelta = Boolean(next.forceDelta || dropActive || beatActive || forcedDeltaByBody);
+  // Do not force every beat by default; preserve enough hold time so WiZ colors read clearly.
+  const beatForce = pulseScene ? beatActive : false;
+  next.forceDelta = Boolean(next.forceDelta || dropActive || beatForce || forcedDeltaByBody);
   next.deltaScale = clampNumber(
-    baseDeltaScale - (raw.drums * 0.34) - (raw.activity * 0.2),
-    0.4,
+    baseDeltaScale - (raw.drums * 0.28) - (raw.activity * 0.16),
+    0.56,
     1.04,
     baseDeltaScale
   );
@@ -8239,9 +8715,12 @@ async function sendHueStateToFixtures(fixtures = [], state = {}) {
   if (!fixtures.length) return;
   const ops = fixtures.map(target =>
     axios.put(
-      `http://${target.bridgeIp}/api/${target.username}/lights/${target.lightId}/state`,
+      `https://${target.bridgeIp}/api/${target.username}/lights/${target.lightId}/state`,
       state,
-      { timeout: 1800, httpAgent: hueHttpAgent }
+      {
+        timeout: 1800,
+        httpsAgent: getHueRestHttpsAgent(target)
+      }
     )
   );
   const results = await Promise.allSettled(ops);
@@ -8673,7 +9152,17 @@ function handleColorRequest(req, res) {
     });
 }
 
-app.get("/color", handleColorRequest);
+if (ENABLE_LEGACY_COLOR_GET_RUNTIME) {
+  app.get("/color", handleColorRequest);
+} else {
+  app.get("/color", (_, res) => {
+    res.status(405).json({
+      ok: false,
+      error: "method_not_allowed",
+      detail: "Use POST /color. Set RAVELINK_ENABLE_LEGACY_COLOR_GET=1 to re-enable legacy GET compatibility."
+    });
+  });
+}
 app.post("/color", handleColorRequest);
 
 function parsePaletteFamiliesInput(raw) {
@@ -8691,10 +9180,40 @@ function parsePaletteFamiliesInput(raw) {
   return null;
 }
 
+function parsePaletteFamilyColorCountsInput(raw) {
+  let source = raw;
+  if (typeof source === "string") {
+    const text = source.trim();
+    if (!text) return null;
+    try {
+      source = JSON.parse(text);
+    } catch {
+      return null;
+    }
+  }
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return null;
+  }
+  const out = {};
+  for (const [rawKey, rawValue] of Object.entries(source)) {
+    const key = String(rawKey || "").trim().toLowerCase();
+    const mapped = PALETTE_FAMILY_ALIASES[key] || key;
+    if (!PALETTE_FAMILY_ORDER.includes(mapped)) continue;
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) continue;
+    out[mapped] = parsed;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 function collectPalettePatch(req) {
   const read = createRequestValueReader(req);
   const patch = {};
   patchOptionalNumber(read, patch, "colorsPerFamily");
+  const familyColorCounts = parsePaletteFamilyColorCountsInput(read("familyColorCounts"));
+  if (familyColorCounts && Object.keys(familyColorCounts).length) {
+    patch.familyColorCounts = familyColorCounts;
+  }
 
   const familiesRaw = read("families");
   const families = parsePaletteFamiliesInput(familiesRaw);
@@ -8850,11 +9369,48 @@ function collectFixtureRoutingClearPatch(req) {
   return patch;
 }
 
+function buildPalettePresetRuntimeOptions() {
+  const out = {};
+  for (const [key, preset] of Object.entries(SHARED_PALETTE_PRESETS || {})) {
+    const id = String(preset?.id || key || "").trim().toLowerCase();
+    if (!id) continue;
+    const families = normalizePaletteFamilies(
+      Array.isArray(preset?.families) ? preset.families : [],
+      PALETTE_FAMILY_ORDER
+    );
+    const entry = {
+      id,
+      label: String(preset?.label || id).trim() || id,
+      group: String(preset?.group || "").trim().toLowerCase() || "custom",
+      families
+    };
+    const colorsPerFamily = Number(preset?.colorsPerFamily);
+    if (Number.isFinite(colorsPerFamily)) {
+      entry.colorsPerFamily = normalizePaletteColorCount(
+        colorsPerFamily,
+        PALETTE_CONFIG_DEFAULT.colorsPerFamily
+      );
+    } else {
+      entry.colorsPerFamily = null;
+    }
+    if (preset?.familyColorCounts && typeof preset.familyColorCounts === "object") {
+      entry.familyColorCounts = normalizePaletteFamilyColorCounts(
+        preset.familyColorCounts,
+        buildPaletteUniformColorCounts(PALETTE_CONFIG_DEFAULT.colorsPerFamily),
+        PALETTE_CONFIG_DEFAULT.colorsPerFamily
+      );
+    }
+    out[id] = entry;
+  }
+  return out;
+}
+
 function buildPaletteRuntimeSnapshot(configOverride = null) {
   const fixtures = fixtureRegistry.getFixtures?.() || [];
   prunePaletteFixtureOverrides(fixtures);
   const defaultConfig = {
     colorsPerFamily: PALETTE_CONFIG_DEFAULT.colorsPerFamily,
+    familyColorCounts: { ...PALETTE_CONFIG_DEFAULT.familyColorCounts },
     families: PALETTE_CONFIG_DEFAULT.families.slice(),
     disorder: PALETTE_CONFIG_DEFAULT.disorder,
     disorderAggression: PALETTE_CONFIG_DEFAULT.disorderAggression,
@@ -8903,7 +9459,9 @@ function buildPaletteRuntimeSnapshot(configOverride = null) {
     options: {
       colorsPerFamily: PALETTE_COLOR_COUNT_OPTIONS.slice(),
       families: PALETTE_FAMILY_ORDER.slice(),
+      familyAliases: { ...PALETTE_FAMILY_ALIASES },
       brands: PALETTE_SUPPORTED_BRANDS.slice(),
+      presets: buildPalettePresetRuntimeOptions(),
       cycleModes: PALETTE_CYCLE_MODE_ORDER.slice(),
       brightnessModes: PALETTE_BRIGHTNESS_MODE_ORDER.slice(),
       spectrumMapModes: PALETTE_SPECTRUM_MAP_MODE_ORDER.slice(),
@@ -9620,7 +10178,29 @@ app.get("/mods/debug", modsReadRateLimit, (req, res) => {
   });
 });
 
+function ensureModWriteRouteAllowed(req, res, routeLabel = "") {
+  if (isLoopbackRequest(req)) return true;
+  if (!ALLOW_REMOTE_WRITE_RUNTIME) {
+    res.status(403).json({
+      ok: false,
+      error: "forbidden",
+      detail: "mod write routes are restricted to local loopback requests"
+    });
+    return false;
+  }
+  if (ALLOW_REMOTE_MOD_WRITE_RUNTIME) return true;
+  res.status(403).json({
+    ok: false,
+    error: "forbidden",
+    detail:
+      "remote mod write routes require RAVELINK_ALLOW_REMOTE_MOD_WRITE=1 when RAVELINK_ALLOW_REMOTE_WRITE=1",
+    route: String(routeLabel || req.path || "").trim() || undefined
+  });
+  return false;
+}
+
 app.post("/mods/debug", modsConfigRateLimit, (req, res) => {
+  if (!ensureModWriteRouteAllowed(req, res, "/mods/debug")) return;
   const patch = req.body && typeof req.body === "object" ? req.body : {};
   const snapshot = modLoader.setDebugConfig?.(patch);
   if (!snapshot) {
@@ -9633,7 +10213,8 @@ app.post("/mods/debug", modsConfigRateLimit, (req, res) => {
   });
 });
 
-app.post("/mods/debug/clear", modsConfigRateLimit, (_, res) => {
+app.post("/mods/debug/clear", modsConfigRateLimit, (req, res) => {
+  if (!ensureModWriteRouteAllowed(req, res, "/mods/debug/clear")) return;
   const snapshot = modLoader.clearDebugEvents?.();
   if (!snapshot) {
     res.status(503).json({ ok: false, error: "mods debug clear unavailable" });
@@ -9661,6 +10242,7 @@ app.get("/mods/hooks", modsReadRateLimit, (_, res) => {
 });
 
 app.post("/mods/hooks/:hook", modsHookInvokeRateLimit, async (req, res) => {
+  if (!ensureModWriteRouteAllowed(req, res, "/mods/hooks/:hook")) return;
   const hook = String(req.params.hook || "").trim();
   if (!hook) {
     res.status(400).json({ ok: false, error: "missing hook name" });
@@ -9951,6 +10533,7 @@ function writeImportedModFiles(targetDir, records = []) {
 }
 
 app.post("/mods/import", modsImportRateLimit, async (req, res) => {
+  if (!ensureModWriteRouteAllowed(req, res, "/mods/import")) return;
   const payload = req.body && typeof req.body === "object" ? req.body : {};
   const rawFiles = Array.isArray(payload.files) ? payload.files : [];
   const overwrite = payload.overwrite === true;
@@ -10107,6 +10690,7 @@ function normalizeModIdList(value) {
 }
 
 app.post("/mods/config", modsConfigRateLimit, async (req, res) => {
+  if (!ensureModWriteRouteAllowed(req, res, "/mods/config")) return;
   const current = modLoader.list();
   const currentConfig = current?.config && typeof current.config === "object"
     ? current.config
@@ -10173,7 +10757,8 @@ app.post("/mods/config", modsConfigRateLimit, async (req, res) => {
   }
 });
 
-app.post("/mods/reload", modsReloadRateLimit, async (_, res) => {
+app.post("/mods/reload", modsReloadRateLimit, async (req, res) => {
+  if (!ensureModWriteRouteAllowed(req, res, "/mods/reload")) return;
   try {
     const snapshot = await modLoader.reload();
     fireModHook("onBoot", {
@@ -10190,14 +10775,7 @@ app.post("/mods/reload", modsReloadRateLimit, async (_, res) => {
 });
 
 async function handleModHttpRoute(req, res) {
-  if (!(ALLOW_REMOTE_WRITE_RUNTIME || isLoopbackRequest(req))) {
-    res.status(403).json({
-      ok: false,
-      error: "forbidden",
-      detail: "mod HTTP routes are restricted to local loopback requests"
-    });
-    return;
-  }
+  if (!ensureModWriteRouteAllowed(req, res, "mods_http")) return;
   try {
     const result = await modLoader.handleHttp({
       modId: req.params.modId,
@@ -10365,9 +10943,12 @@ app.post("/hue/pair", huePairRateLimit, async (req, res) => {
       return;
     }
 
-    const bridgeConfig = await fetchHueBridgeConfigByIp(bridgeIp);
+    const bridgeConfig = await fetchHueBridgeConfigByIp(bridgeIp, bridgeId);
     if (!bridgeId) {
       bridgeId = String(bridgeConfig?.bridgeid || "").trim().toUpperCase();
+    }
+    if (bridgeId) {
+      rememberHueBridgeIdentity(bridgeIp, bridgeId);
     }
 
     const startedAt = Date.now();
@@ -11234,7 +11815,7 @@ async function shutdown(reason = "signal", exitCode = 0) {
     } catch {}
 
     try {
-      hueHttpAgent.destroy();
+      destroyHueRestHttpsAgents();
     } catch {}
 
     removePidFile();

@@ -214,6 +214,7 @@ function writeInstallerScript() {
     "[Tasks]",
     "Name: \"desktopicon\"; Description: \"Create a desktop shortcut\"; GroupDescription: \"Additional icons:\"; Flags: unchecked",
     "Name: \"desktopuiicon\"; Description: \"Create a desktop shortcut for the browser UI\"; GroupDescription: \"Additional icons:\"; Flags: unchecked",
+    "Name: \"installaudiotools\"; Description: \"Install optional audio isolation tools\"; GroupDescription: \"Optional tools:\"; Flags: unchecked",
     "",
     "[Files]",
     "Source: \"{#SourceDir}\\*\"; DestDir: \"{app}\"; Flags: ignoreversion recursesubdirs createallsubdirs",
@@ -228,6 +229,7 @@ function writeInstallerScript() {
     "Name: \"{autodesktop}\\RaveLink Bridge UI\"; Filename: \"http://127.0.0.1:5050\"; Tasks: desktopuiicon",
     "",
     "[Run]",
+    "Filename: \"{app}\\RaveLink-Bridge-Install-Optional-Audio-Tools.bat\"; Description: \"Install optional audio isolation tools now\"; Flags: postinstall skipifsilent; Tasks: installaudiotools",
     "Filename: \"{app}\\RaveLink-Bridge.bat\"; Description: \"Launch RaveLink Bridge\"; Flags: nowait postinstall skipifsilent"
   ].join("\n");
 

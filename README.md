@@ -11,32 +11,31 @@ RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.5.2): https://github.com/NameSRoby/ravelink-bridge/releases/latest
+- Current Windows release (v1.5.3): https://github.com/NameSRoby/ravelink-bridge/releases/latest
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
-This repository is aligned to `v1.5.2`.
+This repository is aligned to `v1.5.3`.
 
 ## Quick Install (Windows)
 
-1. Preferred when available: download `RaveLink-Bridge-Windows-v1.5.2-setup-installer.exe` and run it.
-2. ZIP fallback: download `RaveLink-Bridge-Windows-v1.5.2.zip` from Releases and extract it.
+1. Preferred when available: download `RaveLink-Bridge-Windows-v1.5.3-setup-installer.exe` and run it.
+2. ZIP fallback: download `RaveLink-Bridge-Windows-v1.5.3.zip` from Releases and extract it.
 3. Run `RaveLink-Bridge.bat`.
 4. Open `http://127.0.0.1:5050`.
 
-## v1.5.2 (Hotfix Rollup)
+## v1.5.3 (Behavior Tuning + Hotfixes)
 
-This is a safety + stability hotfix release with better music response and cleaner packaging defaults.
+This release focuses on runtime behavior tuning and packaging/install polish.
 
-- Reactivity stability:
-  - color movement now follows selected metrics more directly (`baseline+drums`, `peaks`, `transients`, `flux`)
-  - tuned behavior for less “stuck/static” feel during playback
-- Color output quality:
-  - improved per-metric color cadence tuning for clearer motion contrast
-- Per-fixture routing usability:
-  - existing fixture routing workflows remain intact after hotfix restructure
-- Reliability + setup:
-  - cleaner update/install behavior for packaged builds
-  - safer default release baseline for new installs
+- WiZ color behavior:
+  - significantly slower flow color shifts for cleaner, intentional transitions
+  - reduced rapid color churn in high-intensity passages
+- WiZ brightness behavior:
+  - wider dynamic range usage (deeper dims + stronger peaks)
+  - retains fast brightness response while keeping color shifts controlled
+- Installer + setup:
+  - setup now includes an optional task to run extra audio isolation tools
+  - release packaging/sanitize pipeline remains hardened
 
 Detailed release notes:
 - `CHANGELOG.md`
@@ -52,7 +51,7 @@ RaveLink Bridge runs on your stream PC and turns live audio + chat actions into 
 - MIDI controller mapping tab (learn + bindings + trigger tests)
 - Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
 
-## Security Defaults (v1.5.2)
+## Security Defaults (v1.5.3)
 
 RaveLink Bridge is local-first and now ships with stricter default protections:
 
@@ -94,11 +93,11 @@ If your stream setup gremlin appears at 2AM, this checklist is built for that ex
    - `CUSTOM` = manual/custom fixture behavior
 9. Click `APPLY ROUTING` for each fixture you changed.
 10. Optional advanced audio app/process isolation tools:
-   - Run `RaveLink-Bridge-Install-Optional-Audio-Tools.bat`
-10. Click `TEST CONNECTIVITY` and confirm fixture target status is ready.
-11. Start the show with `RAVE ON`.
-12. Optional: open `MIDI` tab and map your controller buttons/knobs.
-13. Stop with `RAVE OFF` when done.
+   - Run `RaveLink-Bridge-Install-Optional-Audio-Tools.bat` (also available as an installer checkbox)
+11. Click `TEST CONNECTIVITY` and confirm fixture target status is ready.
+12. Start the show with `RAVE ON`.
+13. Optional: open `MIDI` tab and map your controller buttons/knobs.
+14. Stop with `RAVE OFF` when done.
 
 **Stop options**
 - `RaveLink-Bridge-Stop.bat`
@@ -245,8 +244,7 @@ The routes below are available in the bridge API, but anything beyond the 3 defa
 | Set behavior mode (interpret only) | `POST /rave/mode?name=bpm` | `/rave/mode?name=bpm` |
 | Lock scene | `POST /rave/scene?name=<scene>` | `/rave/scene?name=flow` |
 | Release scene lock | `POST /rave/scene/auto` | `/rave/scene/auto` |
-| Scene sync on (Hue+WiZ) | `POST /rave/scene/sync/on` | `/rave/scene/sync/on` |
-| Scene sync off (WiZ desync) | `POST /rave/scene/sync/off` | `/rave/scene/sync/off` |
+| Scene sync control (compat; WiZ standalone enforced) | `POST /rave/scene/sync?enabled=<true|false>` | `/rave/scene/sync?enabled=true` |
 | Set auto profile | `POST /rave/auto/profile?name=<profile>` | `/rave/auto/profile?name=reactive` |
 | Set audio reactivity | `POST /rave/audio/reactivity?name=<preset>` | `/rave/audio/reactivity?name=aggressive` |
 | Set flow intensity | `POST /rave/flow/intensity?value=<0.35-2.5>` | `/rave/flow/intensity?value=1.35` |
@@ -330,13 +328,13 @@ Notes:
 - The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
 - Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
 
-## Version 1.5.2 Notes
+## Version 1.5.3 Notes
 
-- This release is a hotfix rollup with safer packaging defaults.
+- This release is mostly behavior tuning + hotfixes.
 - Main focus:
-  - metric-following color motion improvements across `baseline+drums`, `peaks`, `transients`, and `flux`
-  - improved loud/quiet brightness response, especially for WiZ
-  - stronger sanitize checks before publishing redistributables/installers
+  - WiZ color shift pacing slowed down substantially for cleaner visual intent
+  - WiZ brightness contrast extended so dim/bright passages read more naturally
+  - setup installer now offers an optional "install audio isolation tools" task
 - Core control model remains the same (no workflow reset required).
 
 For older major feature lists, see tag history under Releases.
@@ -497,11 +495,11 @@ npm run export:redistributable
 3. Zip:
 
 ```powershell
-Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.2\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.5.2.zip -Force
+Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.3\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.5.3.zip -Force
 ```
 
 Output:
-- `release/RaveLink-Bridge-Windows-v1.5.2`
+- `release/RaveLink-Bridge-Windows-v1.5.3`
 
 ### Setup EXE Build (Windows)
 
@@ -512,10 +510,10 @@ npm run build:setup:windows
 ```
 
 Outputs:
-- `release/RaveLink-Bridge-Windows-v1.5.2`
-- `release/RaveLink-Bridge-Windows-v1.5.2-self-contained.zip`
-- `release/installer/RaveLink-Bridge-Windows-v1.5.2-setup-installer.iss`
-- `release/RaveLink-Bridge-Windows-v1.5.2-setup-installer.exe` (when `ISCC.exe` is available)
+- `release/RaveLink-Bridge-Windows-v1.5.3`
+- `release/RaveLink-Bridge-Windows-v1.5.3-self-contained.zip`
+- `release/installer/RaveLink-Bridge-Windows-v1.5.3-setup-installer.iss`
+- `release/RaveLink-Bridge-Windows-v1.5.3-setup-installer.exe` (when `ISCC.exe` is available)
 
 ## Security And Data Hygiene
 
@@ -540,5 +538,6 @@ Outputs:
 ## License
 
 ISC (`LICENSE`)
+
 
 

@@ -1,24 +1,37 @@
-# Mods Guide (v1.5.1)
+# Mods Guide (v1.5.3)
 
 This document is the developer reference for the local mod system shipped in this distro.
 If you are building adapters, custom brands, or runtime behavior overrides, start here.
 
-## Version Delta (v1.5.1)
+## Version Delta (v1.5.3)
 
 Key behavior changes relevant to mod authors:
 
-- Mod import path sanitization is stricter:
-  - Windows drive-style and ADS-like paths are blocked.
-  - Overlong path/segment entries are rejected.
-- Mod import base64 validation is stricter (malformed payload data is rejected).
-- `POST /mods/config` now keeps only valid mod IDs (`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`) in `enabled/order/disabled`.
-- Redistributable export skips symlink/junction entries to avoid accidentally packaging files outside the project tree.
+- No mod hook contract break in this update; existing mods continue to load/run with current lifecycle APIs.
+- Palette runtime now commonly uses expanded family/count combinations in user presets:
+  - families include `red`, `yellow`, `green`, `cyan`, `blue`
+  - per-family counts can vary per palette (common values: `1`, `3`, `5`, `8`, `12`)
+- WiZ runtime behavior was tuned for slower color pacing with stronger brightness contrast:
+  - if your mod assumes high-frequency per-tick color changes, use `createStateGate` to avoid over-sending.
+- Installer now exposes optional audio isolation tooling as an install task; support scripts remain:
+  - `RaveLink-Bridge-Install-Optional-Audio-Tools.bat`
+
+Example palette patch payload for tooling/mods (per-family count mix):
+
+```json
+{
+  "families": ["red", "yellow", "green", "cyan", "blue"],
+  "familyColorCounts": { "red": 5, "yellow": 3, "green": 12, "cyan": 8, "blue": 5 },
+  "vividness": "high",
+  "disorder": false
+}
+```
 
 Existing v1.5 behavior retained:
 - Legacy genre/decade tuning paths are retired from active runtime behavior.
 - Palette sequencing + fixture metric routing are now first-class controls in LIVE.
 - Per-brand/per-fixture target menus map to runtime overrides (global -> brand -> fixture).
-- Scene-link sync between Hue and WiZ is explicit (`/rave/scene/sync`) and no longer hard-forced standalone.
+- Scene-sync endpoints remain for compatibility (`/rave/scene/sync`), but WiZ standalone mode is enforced in current runtime.
 
 New routing endpoints frequently used by tooling/mods:
 
