@@ -160,7 +160,7 @@ This protects:
 - write-guard coverage
 - header hardening
 - route protection expectations
-- security-baseline files such as third-party notices
+- security-baseline files such as the packaged root `THIRD_PARTY_NOTICES.md`
 
 ### `verify:audit`
 
@@ -209,7 +209,7 @@ This process:
 
 - runs readiness gates unless skipped
 - captures runtime and repository metadata
-- writes release artifacts under `docs/releases/*`
+- writes baseline artifacts under `dist/release-baselines/*`
 
 This is useful because the repo values explainable release state, not just “the tests were green at some point.”
 

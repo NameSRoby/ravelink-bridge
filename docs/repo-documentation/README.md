@@ -35,13 +35,11 @@ They are written to answer not just "what file owns this?" but "why is this spli
 - contributors adding features or fixing bugs
 - mod authors building integrations
 
-## Suggested Pairing With Existing Docs
+## Self-Contained Scope
 
-- `docs/REPO_HANDBOOK.md`
-- `docs/architecture/*`
-- `docs/migration/*`
+This documentation set is intended to stand on its own in the public repository and packaged release.
 
-Use this documentation set as your primary implementation guide, and pair it with architecture docs for contract-level detail.
+The only support document it expects outside this folder is the root-level [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md), which is packaged alongside the app because security and release workflows still reference it directly.
 
 ## Reading Depth
 
