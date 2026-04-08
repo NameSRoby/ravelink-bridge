@@ -367,8 +367,10 @@ function writeVaultToDisk(profileInput = {}, vaultPath = "") {
   }
   if (process.platform !== "win32") {
     return {
-      ok: false,
-      error: "oauth_vault_requires_windows_dpapi"
+      ok: true,
+      provider: "volatile_only",
+      volatileOnly: true,
+      path: targetPath
     };
   }
   const encrypted = {};
