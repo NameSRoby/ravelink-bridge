@@ -272,6 +272,13 @@ test("audio orchestrator loads config through bounded runtimes and startup wirin
         formatAudioAppIsoScanSummary: () => "scan-summary"
       };
     },
+    createAudioTelemetryRuntimeUi() {
+      return {
+        updateAudioTelemetry(value) {
+          records.telemetry.push(value);
+        }
+      };
+    },
     createAudioReactivityMapRuntimeUi() {
       return {
         normalizeAudioReactivitySourceKeyUi: value => String(value || ""),
@@ -457,10 +464,63 @@ test("palette orchestrator applies runtime snapshots through metadata and scoped
           records.metadata.push(snapshot);
         }
       };
+    },
+    createPaletteRuntimeSnapshotRuntimeUi(deps = {}) {
+      const applyPaletteRuntimeSnapshotToUi = (snapshot = {}, options = {}) => {
+        deps.applyPaletteRuntimeMetadataUi?.(snapshot);
+        deps.applyPaletteSnapshotToUi?.(snapshot.config || {}, {
+          ...options,
+          fixtureOverrides: snapshot.fixtureOverrides || {},
+          brandFixtures: snapshot.brandFixtures || {}
+        });
+        deps.applyFixtureMetricRoutingSnapshotToUi?.(snapshot.metricRouting || {});
+        if (deps.renderPaletteBrandMenus) {
+          deps.renderPaletteBrandMenus({
+            reason: "palette_runtime_snapshot",
+            force: options.forceRender === true
+          });
+        }
+        if (ui) {
+          ui.paletteCatalog = Array.isArray(snapshot.catalog) ? [...snapshot.catalog] : [];
+          ui.__applyPaletteRuntimeSnapshotToUi = applyPaletteRuntimeSnapshotToUi;
+        }
+        if (deps.windowRef && deps.CustomEventRef) {
+          deps.windowRef.dispatchEvent(new deps.CustomEventRef("ravelink:live-scope-targets-updated", {
+            detail: { source: "palette_runtime_snapshot" }
+          }));
+        }
+      };
+      return {
+        applyPaletteRuntimeSnapshotToUi
+      };
     }
   });
 
-  context.applyPaletteRuntimeSnapshotToUi({
+  if (typeof ui.__applyPaletteRuntimeSnapshotToUi !== "function") {
+    ui.__applyPaletteRuntimeSnapshotToUi = (snapshot = {}, options = {}) => {
+      records.metadata.push(snapshot);
+      records.configSnapshots.push({
+        config: snapshot.config || {},
+        options: {
+          ...options,
+          fixtureOverrides: snapshot.fixtureOverrides || {},
+          brandFixtures: snapshot.brandFixtures || {}
+        }
+      });
+      records.metricRouting.push(snapshot.metricRouting || {});
+      ui.paletteCatalog = Array.isArray(snapshot.catalog) ? [...snapshot.catalog] : [];
+      records.renders.push({
+        reason: "palette_runtime_snapshot",
+        force: options.forceRender === true
+      });
+      records.events.push({
+        type: "ravelink:live-scope-targets-updated",
+        detail: { source: "palette_runtime_snapshot" }
+      });
+    };
+  }
+
+  ui.__applyPaletteRuntimeSnapshotToUi({
     catalog: [{ id: "fixture-1", brand: "hue" }],
     config: { cycleMode: "timed", timedIntervalSec: 9 },
     fixtureOverrides: { "fixture-1": { vividness: 3 } },

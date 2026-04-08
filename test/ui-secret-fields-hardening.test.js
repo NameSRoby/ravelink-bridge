@@ -16,9 +16,13 @@ function collectPasswordInputs(source) {
 test("server and mod secret fields opt out of browser password-manager heuristics", () => {
   const files = [
     "public/templates/index/sections/panel-fixtures.html",
-    "public/templates/index/sections/panel-system.html",
-    "mods/song-request-mod/ui/index.html"
+    "public/templates/index/sections/panel-system.html"
   ];
+
+  const localOnlyModPath = "mods/song-request-mod/ui/index.html";
+  if (fs.existsSync(path.join(repoRoot, localOnlyModPath))) {
+    files.push(localOnlyModPath);
+  }
 
   for (const relativePath of files) {
     const source = read(relativePath);

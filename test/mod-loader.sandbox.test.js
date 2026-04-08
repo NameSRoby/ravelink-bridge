@@ -103,14 +103,10 @@ test("mod loader discovers enabled mod and executes sandbox hook/action", async 
   assert.equal(actionWithPatchVerb.body?.result?.echo?.method, "PATCH");
   assert.equal(actionWithPatchVerb.body?.result?.echo?.body?.value, 7);
 
-  const nestedHttp = await runtime.handleHttp({
-    modId: "music-mod",
-    actionPath: "api/status",
-    method: "GET",
+  const nestedHttp = await runtime.invokeAction("music-mod", "api/status", "GET", {
     query: { source: "unit" },
     body: {}
   });
-  assert.equal(nestedHttp.handled, true);
   assert.equal(nestedHttp.status, 200);
   assert.equal(nestedHttp.body?.ok, true);
   assert.equal(nestedHttp.body?.result?.lane, "api/status");

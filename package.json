@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/app/index.js",
-    "test": "node --test",
+    "test": "node scripts/run-public-node-tests.js",
     "verify:routes": "node scripts/verify-domain-route-boundary.js",
     "verify:budgets": "node scripts/verify-domain-file-budgets.js",
     "verify:docs": "node scripts/verify-domain-doc-comments.js",
@@ -18,7 +18,7 @@
     "package:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1 -Version 1.6.2",
     "package:installer": "node scripts/build-windows-setup.js",
     "verify:ui-boot": "node --test test/ui-browser-boot-bindings.test.js",
-    "verify:mods": "node --test test/apple-music-se-command.integration.test.js test/apple-music-widget-announcer.test.js",
+    "verify:mods": "node -e \"const fs=require('node:fs'); const {spawnSync}=require('node:child_process'); const modPath='mods/song-request-mod'; if(!fs.existsSync(modPath)){console.log('[VERIFY][MODS] local-only song-request mod not present; skipping mod verification'); process.exit(0);} const result=spawnSync(process.execPath,['--test','test/apple-music-se-command.integration.test.js','test/apple-music-widget-announcer.test.js'],{stdio:'inherit'}); process.exit(result.status ?? 1);\"",
     "verify:runtime-refactor": "npm run verify:routes && npm run verify:budgets && npm run verify:docs && npm run verify:manifest && npm run verify:mods && node --test test/ui-browser-boot-bindings.test.js test/ui-midi-runtime-ui.test.js test/ui-onboarding-tour-runtime-ui.test.js test/ui-secret-fields-hardening.test.js test/ui-mods-runtime-modules.test.js test/system-widget-oauth-integration.test.js test/http-preengine-smoke.test.js test/register-compat-routes.audio.test.js test/register-compat-routes.rave-aliases.test.js test/register-compat-routes.mods-fixtures-parity.test.js test/register-compat-routes.telemetry.test.js test/register-compat-routes.system-core-status.test.js test/audio-capture.launcher-utils.test.js test/audio-capture.signal-analyzer.test.js test/audio-capture.command-builders.test.js test/audio-capture.process-lifecycle.test.js test/audio-runtime.service.test.js test/audio-runtime.capture-session.test.js test/audio-runtime.catalog.test.js test/audio-runtime.device-discovery.test.js test/engine-v2.scene-runtime-controls.test.js test/engine-v2.scene-auto-selection.test.js test/engine-v2.scene-bpm-state.test.js test/engine-v2.scene-section-state.test.js test/engine-v2.scene-cooldown-state.test.js test/engine-v2.scene-transition-state.test.js test/engine-v2.scene-state.test.js test/engine-v2.runtime.test.js test/engine-v2.runtime.sync-groups.test.js test/engine-v2.runtime.profile.test.js test/engine-v2.runtime.fixture-catalog.test.js test/engine-v2.runtime.fixture-exclusions.test.js test/engine-v2.runtime.palette-mapper.test.js test/engine-v2.runtime.cadence.test.js test/engine-v2.runtime.palette-advance.test.js test/system-oauth.vault.test.js test/system-oauth.reconcile.test.js test/system-update.service.test.js test/system-update.release-workflow.test.js test/widget-template.builder.test.js test/docs-ownership-alignment.test.js test/architecture-guardrails.test.js",
     "baseline:lock": "node scripts/lock-pre-engine-baseline.js",
     "baseline:tag": "node scripts/lock-pre-engine-baseline.js --create-tag"
