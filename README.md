@@ -24,23 +24,30 @@ This repository is aligned to `v1.6.2`.
 4. Run `RaveLink-Bridge-Start.bat`.
 5. Open `http://127.0.0.1:5050`.
 
-## v1.6.2 (Public Refresh + UI/Runtime Rework)
+## v1.6.2 (UI Refresh + Workflow Upgrade)
 
-This release is the big public refresh since the older public builds.
+This update focuses on making RaveLink Bridge easier to use live, easier to understand at a glance, and more reliable across the parts people actually touch during a stream.
+
+### What improved
 
 - Server UI refresh:
-  - LIVE, Fixtures, Audio, MIDI, Mods, and System were reorganized and cleaned up heavily
-  - expanded theme customization while keeping the classic preset spirit
-  - onboarding/tour system added across the server UI with per-tab replay
-- Runtime/engine/audio improvements:
-  - desktop capture/app isolation flow was cleaned up
-  - scene, brightness, cadence, and compatibility boundaries were refactored and tuned
-  - MIDI was reworked into an action-first learn workflow that better fits the current server
-- Packaging/public release boundary:
-  - Windows installer is back
+  - LIVE, Fixtures, Audio, MIDI, Mods, and System were cleaned up heavily
+  - tabs, sections, collapsible lanes, and everyday controls are more organized and easier to scan during a show
+  - theme customization is broader now, while the classic preset feel is still there
+- Better onboarding:
+  - the server now has a real guided tour instead of only expecting trial-and-error
+  - onboarding can be replayed by tab, which is much nicer when you only want to revisit one area
+- Better audio workflow:
+  - desktop capture and app-isolation flow were cleaned up
+  - common audio actions are easier to reach and behave more predictably
+- Better LIVE behavior:
+  - scene, brightness, and quiet/loud interpretation were tuned so the engine reads music more naturally
+  - the LIVE tab is laid out more like an actual control surface than a debug screen
+- Better MIDI workflow:
+  - MIDI is now action-first, so you think in terms of what you want the controller to do instead of raw note/CC numbers
+- Better packaging:
+  - the Windows installer is back
   - self-contained and standard zip builds are included again
-  - local runtime state and local-only mods are excluded from the public repo/release
-  - the packaged `docs/repo-documentation` set is now much more detailed and maintainer-friendly
 
 Detailed release notes:
 - https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.6.2
@@ -159,13 +166,14 @@ Notes:
 
 ## Version 1.6.2 Notes
 
-- This is a major public refresh release, not just a small hotfix build.
+- This is the biggest public update since `v1.5.3`, not a small hotfix.
 - Main focus:
-  - server UI modernization and onboarding
-  - runtime/engine/audio cleanup and tuning
-  - restored Windows packaging artifacts
-  - sanitized public repo boundary for open release
-- Private/local-only mods are intentionally outside this public package.
+  - cleaner day-to-day UI across LIVE, Audio, MIDI, System, and Mods
+  - better onboarding so setup is easier to understand
+  - more polished audio capture and app-isolation workflow
+  - improved LIVE interpretation of quiet vs loud musical sections
+  - restored installer + portable packaging options
+- The bundled server still supports mods, but the current local-only song-request mod is intentionally not part of this public package.
 
 ## Developer Quick Start
 
