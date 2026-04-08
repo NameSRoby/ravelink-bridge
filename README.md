@@ -1,131 +1,146 @@
-# RaveLink Bridge v1.6.2
+# RaveLink Bridge
 
-This repository contains the public source for the current RaveLink Bridge server release.
+Lightweight streamer-first local lighting bridge for Philips Hue + WiZ, with audio-reactive LIVE behavior, Twitch-friendly control paths, MIDI performance mapping, and a modular local mod surface.
 
-It intentionally keeps the core server, UI, scripts, and deep repository documentation, while excluding local runtime state and local-only mods.
+Optional support: https://ko-fi.com/namesroby
 
-## Current Status
+## Open Source Note
 
-- New domain-first structure is in place.
-- First production slice is implemented:
-  - Twitch color prefixes (brand + per-fixture)
-  - `/teach` color learning with persistence + duplicate-safe refund signal
-  - `/color` parsing with fuzzy typo handling and Hue/WiZ payload translation
-  - Audio telemetry baseline:
-    - `GET /audio/status`
-    - `GET /audio/telemetry`
-    - `POST /audio/telemetry`
-    - Audio compatibility/config routes:
-      - `GET/POST /audio/config`
-      - `GET /audio/devices`
-      - `GET /audio/apps`
-      - `GET /audio/profiles`
-      - `GET/POST /audio/reactivity-map`
-      - `GET /audio/ffmpeg/app-isolation/locks`
-      - `POST /audio/ffmpeg/app-isolation/*`
-  - Engine v2 skeleton baseline:
-    - `GET /engine/v2/status`
-    - `GET /engine/v2/palette`
-    - `POST /engine/v2/start`
-    - `POST /engine/v2/stop`
-    - `POST /engine/v2/tick`
-    - `POST /engine/v2/palette/custom-color`
-    - `POST /engine/v2/palette/sequence`
-    - `POST /engine/v2/palette/cycle`
-    - `POST /engine/v2/palette/advance`
-  - UI compatibility route baseline:
-    - MIDI contract routes (`/midi/*`) now return deterministic compatibility snapshots
-    - Mods contract routes (`/mods/*`, `/mods/ui/catalog`, `/mods/runtime`, `/mods/hooks`)
-    - LIVE compatibility routes (`/rave/live/compatibility`, `/rave/live/trigger-matrix`)
-    - Rave palette/fixture metrics routes (`/rave/palette`, `/rave/fixture-metrics`, `/rave/fixture-routing/clear`)
-    - Overclock and probe compatibility routes (`/rave/overclock/*`, `/fixtures/*`, `/system/config`)
-    - Core diagnostics routes (`/system/startup-readiness`, `/system/core-status`, `/system/launcher-diagnostics`)
-  - `/rave/on`, `/rave/off`, and `/rave/status` compatibility routes now use telemetry-port rave state (no transferred engine runtime)
-  - Live profile storage endpoints (`save/load/delete`) with Live tab in `full` mode
-  - Frontend LIVE tab now defaults to a core-first surface (colors/scenes/auto-hz/brightness), with quick-jump buttons and core sections visible at load while non-core sections stay hidden by default
-  - UI shell refactor:
-    - Visual design preserved
-    - `public/index.html` no longer holds the monolithic page source
-    - `/` and `/index.html` are composed from modular section templates
-- Local runtime state, logs, vaults, and caches are intentionally excluded from source control.
-- The current song-request mod is intentionally not included in this repository or the packaged public release.
+RaveLink Bridge is open source.
 
-## Start From Source
+If you fork or remix it and ship your own distro, attribution is appreciated but not required:
+
+- `NameSRoby's RaveLink Bridge`
+
+## Download
+
+- Current Windows release (`v1.6.2`): https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.6.2
+- Latest release page: https://github.com/NameSRoby/ravelink-bridge/releases/latest
+- All releases: https://github.com/NameSRoby/ravelink-bridge/releases
+
+This repository is aligned to `v1.6.2`.
+
+## What This Is
+
+RaveLink Bridge runs on your stream PC and turns live audio plus operator control into Hue and WiZ output.
+
+Core capabilities in the current public release:
+
+- audio-reactive LIVE lighting engine with scene, palette, brightness, and cadence control
+- Twitch-oriented color / teach / rave control routes
+- MIDI learn + binding workflow for performance control
+- modular browser UI with onboarding, theme customization, and diagnostics
+- local-first safe-internet + Twitch Helix redemption sync lane
+- optional local mods without turning mods into boot dependencies
+
+## Public Repo Boundary
+
+This public repository keeps the runnable server source, UI, scripts, tests, and the full `docs/repo-documentation` book.
+
+It intentionally does **not** include:
+
+- local runtime state, logs, vaults, caches, and machine-specific data
+- the current local song-request mod
+
+Optional local mods can still be added later under `mods/`, but they are not bundled in this public source tree or in the packaged public release.
+
+## Quick Install (Windows)
+
+1. Download `RaveLink-Bridge-v1.6.2.zip` from the Releases page.
+2. Extract it anywhere you want.
+3. Run `RaveLink-Bridge-Start.bat`.
+4. Open `http://127.0.0.1:5050` if the browser does not open automatically.
+
+The packaged release already includes runtime dependencies so it behaves like an appliance-style local tool instead of a source checkout.
+
+## Streamer Quick Start
+
+If you just want to get lights moving:
+
+1. Start the bridge with `RaveLink-Bridge-Start.bat`.
+2. Open `http://127.0.0.1:5050`.
+3. Go to `FIXTURES` and add your real Hue / WiZ fixtures.
+4. Set routing so the fixtures you want to react are enabled for the engine.
+5. Go to `AUDIO` and apply a capture profile.
+6. Click `RAVE ON`.
+7. Use `LIVE` to tune scenes, palette behavior, auto Hz, and brightness.
+
+Recommended first-read tabs:
+
+- `FIXTURES` for hardware
+- `AUDIO` for capture
+- `LIVE` for the show look
+- `SYSTEM` for Twitch OAuth / widget / safe-internet setup
+
+## Windows Launcher Notes
+
+The Windows launcher is not a thin wrapper. It:
+
+- bootstraps dependencies on first run when needed
+- validates startup prerequisites
+- checks for stale listeners on the bridge port
+- avoids killing unrelated processes
+- coordinates browser opening through `scripts/launcher-open-browser.js`
+
+Useful flags:
+
+- `RaveLink-Bridge-Start.bat --install-only`
+- `RaveLink-Bridge-Start.bat --force-install`
+- `RaveLink-Bridge-Start.bat --skip-install`
+
+Graceful stop helper:
+
+```bat
+RaveLink-Bridge-Stop.bat
+```
+
+Bridge URL default:
+
+`http://127.0.0.1:5050`
+
+## Source Quick Start
+
+If you are running from source instead of the release zip:
 
 ```bash
 npm install
 npm start
 ```
 
-Windows fast-start launcher:
-
-```bat
-RaveLink-Bridge-Start.bat
-```
-
-What it does:
-- First boot: installs dependencies automatically.
-- Next boots: skips install on fast path unless lockfile changed.
-- Launches server directly via `node src/app/index.js` for low startup overhead.
-- Runs startup preflight checks (`node`, `npm`, required script/entrypoint files) before boot.
-- Attempts stale-port recovery when an older bridge listener is holding bridge port.
-- Refuses force-kill when the port holder is not this bridge process.
-- Pauses after bridge process exit so diagnostics stay visible.
-- Sets launcher browser-open policy defaults (`RAVELINK_FORCE_AUTO_BROWSER=1`), while helper-owned launch disables server-side auto-open for that session.
-- Arms launcher-side readiness helper (`scripts/launcher-open-browser.js`) that:
-  - disables server-side auto-browser open for launcher session and owns browser-open flow
-  - waits for `/health`
-  - checks `/system/launcher-diagnostics`
-  - opens the bridge URL via default browser deterministically
-  - writes helper logs to `runtime/logs/launcher-browser-open.log`
-
-Useful flags:
-- `RaveLink-Bridge-Start.bat --install-only` (install/check deps without starting server)
-- `RaveLink-Bridge-Start.bat --force-install` (force reinstall dependencies)
-- `RaveLink-Bridge-Start.bat --skip-install` (skip bootstrap and launch immediately)
-
-Graceful local stop helper:
-
-```bat
-RaveLink-Bridge-Stop.bat
-```
-
-Browser auto-launch notes:
-- Server startup (`npm start`) uses OS-native default-browser launchers.
-- Windows uses fallback launch sequence (`cmd start` -> `PowerShell Start-Process` -> `rundll32`) for stronger reliability.
-- You can suppress launcher/browser auto-open by setting `RAVELINK_DISABLE_AUTO_BROWSER=1`.
-- Sibling-repo rust tool lookup is disabled by default; set `RAVELINK_ALLOW_SIBLING_REPO_TOOLS=1` to re-enable legacy sibling fallback behavior.
-
-Bridge URL defaults to:
-
-`http://127.0.0.1:5050`
-
 ## Package Public Release
 
-Create the public Windows release zip with runtime dependencies included:
+Build the public Windows release zip from source:
 
 ```bash
 npm run package:release
 ```
 
-This builds:
+This produces:
 
 `dist/RaveLink-Bridge-v1.6.2.zip`
 
-Release package rules:
+Release packaging rules:
 
 - includes the runnable app plus `node_modules`
 - excludes local runtime state and logs
 - excludes the local song-request mod
-- ships an empty `mods/` folder so optional local mods can still be added later
+- includes the repository documentation book
 
-## Test
+## Test and Verification
+
+Basic test run:
 
 ```bash
 npm test
 ```
 
-## Pre-Engine Gates
+High-confidence verification pass:
+
+```bash
+npm run verify:runtime-refactor
+```
+
+Additional gate commands:
 
 ```bash
 npm run verify:architecture
@@ -134,7 +149,7 @@ npm run verify:audit
 npm run verify:readiness
 ```
 
-Lock baseline snapshot:
+Optional baseline capture:
 
 ```bash
 npm run baseline:lock
@@ -142,7 +157,14 @@ npm run baseline:lock
 
 ## Documentation
 
-See:
+Primary docs live in:
 
-- `docs/repo-documentation/README.md` (complete repository documentation)
+- `docs/repo-documentation/README.md`
+
+Third-party notices:
+
 - `THIRD_PARTY_NOTICES.md`
+
+## License
+
+ISC (`LICENSE`)
