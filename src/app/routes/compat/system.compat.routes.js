@@ -8,6 +8,7 @@
 // [DEV] This slice keeps the broad system route family together while the
 // [DEV] remaining helper cleanup is peeled away from the top-level registrar.
 
+const rateLimit = require("express-rate-limit");
 const { buildRouteCatalogSnapshot: buildRouteCatalogSnapshotDefault } = require("./system.compat.route-catalog");
 const {
   summarizeCoreServiceChecks: summarizeCoreServiceChecksDefault,
@@ -94,6 +95,18 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
   const computeCoreStatus = typeof deps.computeCoreStatus === "function"
     ? deps.computeCoreStatus
     : computeCoreStatusDefault;
+  const createCompatWriteRateLimit = (keyPrefix, max = 20, windowMs = 60_000) => rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: req => `${keyPrefix}:${String(req?.ip || req?.socket?.remoteAddress || "local")}`,
+    handler: (_req, res) => {
+      toCompatError(res, 429, "rate_limited", `${keyPrefix}_requests_exceeded`);
+    }
+  });
+  const oauthWriteRateLimit = createCompatWriteRateLimit("system_oauth", 20, 60_000);
+  const widgetWriteRateLimit = createCompatWriteRateLimit("system_widget", 15, 60_000);
 
   app.get("/system/config", (_req, res) => {
     res.json(systemConfigService.getConfig());
@@ -201,7 +214,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(systemOauthService.getStatus());
   });
 
-  app.post("/system/oauth/seed", enforceWriteAccess, (req, res) => {
+  app.post("/system/oauth/seed", enforceWriteAccess, oauthWriteRateLimit, (req, res) => {
     if (!systemOauthService || typeof systemOauthService.seedProfile !== "function") {
       toCompatError(res, 503, "system_oauth_unavailable");
       return;
@@ -214,7 +227,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(result);
   });
 
-  app.post("/system/oauth/clear", enforceWriteAccess, (_req, res) => {
+  app.post("/system/oauth/clear", enforceWriteAccess, oauthWriteRateLimit, (_req, res) => {
     if (!systemOauthService || typeof systemOauthService.clearProfile !== "function") {
       toCompatError(res, 503, "system_oauth_unavailable");
       return;
@@ -222,7 +235,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(systemOauthService.clearProfile());
   });
 
-  app.post("/system/oauth/start", enforceWriteAccess, async (req, res) => {
+  app.post("/system/oauth/start", enforceWriteAccess, oauthWriteRateLimit, async (req, res) => {
     if (
       !systemOauthService ||
       typeof systemOauthService.startDeviceFlow !== "function" ||
@@ -248,7 +261,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(started);
   });
 
-  app.post("/system/oauth/device-status", enforceWriteAccess, async (req, res) => {
+  app.post("/system/oauth/device-status", enforceWriteAccess, oauthWriteRateLimit, async (req, res) => {
     if (!systemOauthService || typeof systemOauthService.getDeviceStatus !== "function") {
       toCompatError(res, 503, "system_oauth_unavailable");
       return;
@@ -261,7 +274,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(status);
   });
 
-  app.post("/system/oauth/disconnect", enforceWriteAccess, async (req, res) => {
+  app.post("/system/oauth/disconnect", enforceWriteAccess, oauthWriteRateLimit, async (req, res) => {
     if (
       !systemOauthService ||
       typeof systemOauthService.disconnect !== "function" ||
@@ -280,7 +293,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     });
   });
 
-  app.post("/system/oauth/sync-to-mod", enforceWriteAccess, async (req, res) => {
+  app.post("/system/oauth/sync-to-mod", enforceWriteAccess, oauthWriteRateLimit, async (req, res) => {
     if (!systemOauthService || typeof systemOauthService.getProfileForInternal !== "function") {
       toCompatError(res, 503, "system_oauth_unavailable");
       return;
@@ -306,7 +319,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     });
   });
 
-  app.post("/system/widget-template-get", enforceWriteAccess, async (req, res) => {
+  app.post("/system/widget-template-get", enforceWriteAccess, widgetWriteRateLimit, async (req, res) => {
     const payload = getRequestMap(req.body);
     const mergedPayload = mergeOauthProfileIntoWidgetPayload({
       ...payload
@@ -332,7 +345,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(result);
   });
 
-  app.post("/system/widget-redemption-status", enforceWriteAccess, async (req, res) => {
+  app.post("/system/widget-redemption-status", enforceWriteAccess, widgetWriteRateLimit, async (req, res) => {
     if (!systemOauthService || typeof systemOauthService.patchRedemptionStatus !== "function") {
       toCompatError(res, 503, "system_oauth_status_sync_unavailable");
       return;
@@ -376,7 +389,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(result);
   });
 
-  app.post("/system/widget-redemption-reconcile", enforceWriteAccess, async (req, res) => {
+  app.post("/system/widget-redemption-reconcile", enforceWriteAccess, widgetWriteRateLimit, async (req, res) => {
     if (!systemOauthService || typeof systemOauthService.reconcilePendingRedemptions !== "function") {
       toCompatError(res, 503, "system_oauth_status_sync_unavailable");
       return;

@@ -89,6 +89,7 @@ test("song request StreamElements widget retries now-playing announce when bot s
     },
     fetch: async (url, options = {}) => {
       const requestUrl = String(url || "");
+      const parsedUrl = new URL(requestUrl, "https://local.invalid");
       fetchCalls.push({ url: requestUrl, options });
       if (requestUrl.endsWith("/state")) {
         return createFetchResponse({ body: statePayload });
@@ -98,7 +99,7 @@ test("song request StreamElements widget retries now-playing announce when bot s
         dedupeWindows.push(Number(body.windowMs || 0));
         return createFetchResponse({ body: { ok: true, claimed: true } });
       }
-      if (requestUrl.includes("api.streamelements.com")) {
+      if (parsedUrl.hostname === "api.streamelements.com") {
         botCalls.push({ url: requestUrl, options });
         return createFetchResponse({
           ok: botCalls.length > 1,

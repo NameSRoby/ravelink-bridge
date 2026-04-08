@@ -23,6 +23,63 @@ function createFixturesHardwareCompatHelpers(deps = {}) {
       return Math.min(Number(max), Math.max(Number(min), parsed));
     });
 
+  function filterTokenChars(value = "", options = {}) {
+    const source = String(value || "");
+    const allowDots = options.allowDots === true;
+    const allowDashes = options.allowDashes !== false;
+    const out = [];
+    for (const char of source) {
+      const code = char.charCodeAt(0);
+      const isDigit = code >= 48 && code <= 57;
+      const isLower = code >= 97 && code <= 122;
+      const isUpper = code >= 65 && code <= 90;
+      if (isDigit || isLower || isUpper || char === "_") {
+        out.push(char);
+        continue;
+      }
+      if (allowDashes && char === "-") {
+        out.push(char);
+        continue;
+      }
+      if (allowDots && char === ".") {
+        out.push(char);
+      }
+    }
+    return out.join("");
+  }
+
+  function normalizeDashedToken(value = "", max = 64, fallback = "") {
+    const source = String(value || fallback || "").trim().toLowerCase();
+    if (!source) return "";
+    const out = [];
+    let lastWasDash = false;
+    for (const char of source) {
+      const code = char.charCodeAt(0);
+      const isDigit = code >= 48 && code <= 57;
+      const isLower = code >= 97 && code <= 122;
+      const keep = isDigit || isLower || char === "_" || char === "-";
+      if (keep) {
+        if (char === "-") {
+          if (out.length === 0 || lastWasDash) continue;
+          lastWasDash = true;
+        } else {
+          lastWasDash = false;
+        }
+        out.push(char);
+        if (out.length >= Math.max(1, Number(max) || 64)) break;
+        continue;
+      }
+      if (out.length > 0 && lastWasDash !== true) {
+        out.push("-");
+        lastWasDash = true;
+        if (out.length >= Math.max(1, Number(max) || 64)) break;
+      }
+    }
+    while (out[0] === "-") out.shift();
+    while (out[out.length - 1] === "-") out.pop();
+    return out.join("").slice(0, Math.max(1, Number(max) || 64));
+  }
+
   function normalizeFixtureIdFromRequest(req) {
     return String(
       req?.body?.id ??
@@ -35,14 +92,29 @@ function createFixturesHardwareCompatHelpers(deps = {}) {
   function normalizeHueBridgeHost(value) {
     const token = String(value || "").trim().toLowerCase();
     if (!token) return "";
-    if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(token)) return token;
-    if (/^[a-z0-9][a-z0-9.-]{0,252}[a-z0-9]$/i.test(token)) return token;
-    return "";
+    if (normalizeIpv4Host(token)) return token;
+    const filtered = filterTokenChars(token, { allowDots: true, allowDashes: true }).toLowerCase();
+    if (filtered !== token) return "";
+    if (filtered.length < 1 || filtered.length > 254) return "";
+    if (!filtered.includes(".")) return "";
+    if (filtered.startsWith(".") || filtered.endsWith(".")) return "";
+    if (filtered.startsWith("-") || filtered.endsWith("-")) return "";
+    const labels = filtered.split(".");
+    if (!labels.length) return "";
+    for (const label of labels) {
+      if (!label || label.length > 63) return "";
+      if (label.startsWith("-") || label.endsWith("-")) return "";
+    }
+    return filtered;
   }
 
   function normalizeIpv4Host(value) {
     const token = String(value || "").trim();
-    if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(token)) return "";
+    const filtered = filterTokenChars(token, { allowDots: true, allowDashes: false });
+    if (filtered !== token) return "";
+    const partsRaw = token.split(".");
+    if (partsRaw.length !== 4) return "";
+    if (partsRaw.some(part => part.length < 1 || part.length > 3)) return "";
     const parts = token.split(".").map(part => Number(part));
     if (parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return "";
     return token;
@@ -162,12 +234,11 @@ function createFixturesHardwareCompatHelpers(deps = {}) {
   }
 
   function normalizeFixtureIdToken(value, fallback = "") {
-    const raw = String(value || fallback || "").trim().toLowerCase();
-    return raw.replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+    return normalizeDashedToken(value || fallback || "", 64, fallback);
   }
 
   function buildHueFixtureId(hint = {}) {
-    const bridgeId = normalizeToken(hint.bridgeId, 12).toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const bridgeId = normalizeDashedToken(normalizeToken(hint.bridgeId, 12), 12, "");
     const lightId = clampNumber(Math.round(Number(hint.lightId)), 1, 65535, 1);
     const bridgeToken = bridgeId || "bridge";
     return normalizeFixtureIdToken(`hue-${bridgeToken}-${lightId}`, `hue-${lightId}`);
