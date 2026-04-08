@@ -508,22 +508,45 @@ function registerRoutes(app, deps = {}) {
       forceRefreshApps: true
     });
     const audioStartFailed = audioRuntimeResult && audioRuntimeResult.ok === false;
+    const audioStartSoftFailure = audioStartFailed && (
+      String(audioRuntimeResult?.error || "").trim().toLowerCase() === "capture_platform_unsupported" ||
+      String(audioRuntimeResult?.error || "").trim().toLowerCase() === "unsupported_platform"
+    );
     if (audioStartFailed) {
-      if (typeof audioEngine.setTelemetry === "function") {
-        audioEngine.setTelemetry({
-          running: false,
-          lastError: String(audioRuntimeResult?.error || "audio_start_failed"),
-          lastRestartReason: "rave_on_route_audio_start_failed"
+      if (audioStartSoftFailure) {
+        if (typeof audioEngine.setTelemetry === "function") {
+          audioEngine.setTelemetry({
+            running: false,
+            lastError: "",
+            lastRestartReason: "rave_on_route_audio_capture_unsupported"
+          });
+        }
+      } else {
+        if (typeof audioEngine.setTelemetry === "function") {
+          audioEngine.setTelemetry({
+            running: false,
+            lastError: String(audioRuntimeResult?.error || "audio_start_failed"),
+            lastRestartReason: "rave_on_route_audio_start_failed"
+          });
+        }
+        res.status(503).json({
+          ok: false,
+          error: "audio_start_failed",
+          detail: String(audioRuntimeResult?.error || "audio capture failed to start"),
+          audioRuntime: audioRuntimeResult
         });
+        return;
       }
-      res.status(503).json({
-        ok: false,
-        error: "audio_start_failed",
-        detail: String(audioRuntimeResult?.error || "audio capture failed to start"),
-        audioRuntime: audioRuntimeResult
-      });
-      return;
     }
+    const normalizedAudioRuntime = audioStartSoftFailure
+      ? {
+        ...audioRuntimeResult,
+        ok: true,
+        degraded: true,
+        captureSupported: false,
+        reason: "capture_platform_unsupported"
+      }
+      : audioRuntimeResult;
     const startResult = audioEngine.startRave({
       reason: "rave_on_route",
       requestedBy: String(req?.ip || "")
@@ -545,7 +568,7 @@ function registerRoutes(app, deps = {}) {
         ok: true,
         ...startResult,
         engine: engineStart,
-        audioRuntime: audioRuntimeResult,
+        audioRuntime: normalizedAudioRuntime,
         hueTransport
       });
       return;
@@ -558,7 +581,7 @@ function registerRoutes(app, deps = {}) {
       ok: true,
       ...startResult,
       engine: engineStart,
-      audioRuntime: audioRuntimeResult,
+      audioRuntime: normalizedAudioRuntime,
       hueTransport
     });
   });

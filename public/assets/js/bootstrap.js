@@ -129,7 +129,16 @@ void (async () => {
     if (typeof applyAudioReactivityMapToUi === "function" && typeof AUDIO_REACTIVITY_MAP_DEFAULT !== "undefined") {
       applyAudioReactivityMapToUi(AUDIO_REACTIVITY_MAP_DEFAULT, { markDirty: false });
     }
-    await runBootStep("hydrateLiveModePolicyUi", () => hydrateLiveModePolicyUi({ silent: true }), { timeoutMs: 4000 });
+    const hydratedLiveMode = await runOptionalBootStep(
+      "hydrateLiveModePolicyUi",
+      () => hydrateLiveModePolicyUi({ silent: true }),
+      { timeoutMs: 8000 }
+    );
+    if (!hydratedLiveMode) {
+      ui.liveShellMode = "full";
+      ui.liveShellModeHydrated = false;
+      if (typeof applyLiveModeUiPolicy === "function") applyLiveModeUiPolicy();
+    }
     await runBootStep("bootLiveControlsUi", () => bootLiveControlsUi(), { timeoutMs: 3500 });
     await runBootStep("initThemeSettings", () => initThemeSettings(), { timeoutMs: 3500 });
     await runBootStep("initObsDockMode", () => initObsDockMode(), { timeoutMs: 2500 });
