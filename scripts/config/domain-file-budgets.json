@@ -1,0 +1,12 @@
+{
+  "defaultMaxLines": 750,
+  "lockedFiles": {
+    "audio.js": 1950,
+    "palette.js": 1760,
+    "fixtures.js": 1000,
+    "mods.js": 590
+  },
+  "overrides": {
+    "live/live-profile-store-runtime-ui.js": 760
+  }
+}

@@ -1,32 +1,35 @@
 {
   "name": "ravelink-bridge",
-  "version": "1.5.3",
-  "description": "RaveLink Bridge - reactive Hue/WiZ lighting with Twitch hooks",
-  "main": "server.js",
-  "scripts": {
-    "test": "node --test tests/*.test.js",
-    "start": "node scripts/start-bridge.js",
-    "stop": "node scripts/stop-bridge.js",
-    "sanitize:release": "node scripts/sanitize-release.js",
-    "export:redistributable": "node scripts/export-redistributable.js",
-    "build:setup:windows": "node scripts/build-windows-setup.js",
-    "core:lock": "node scripts/core-lock.js lock",
-    "core:unlock": "node scripts/core-lock.js unlock",
-    "core:lock:status": "node scripts/core-lock.js status",
-    "core:unlock:key:init": "node scripts/core-lock.js init-key",
-    "core:unlock:key:status": "node scripts/core-lock.js key-status"
-  },
-  "keywords": [],
-  "author": "NameSRoby (AI assisted)",
-  "license": "ISC",
+  "version": "1.6.2-dev",
+  "description": "RaveLink Bridge rewrite foundation with modular Twitch, fixture, mods, MIDI, and audio boundaries",
+  "main": "src/app/index.js",
   "type": "commonjs",
+  "scripts": {
+    "start": "node src/app/index.js",
+    "test": "node --test",
+    "verify:routes": "node scripts/verify-domain-route-boundary.js",
+    "verify:budgets": "node scripts/verify-domain-file-budgets.js",
+    "verify:docs": "node scripts/verify-domain-doc-comments.js",
+    "verify:manifest": "node scripts/verify-script-manifest-order.js",
+    "verify:architecture": "node scripts/verify-architecture.js",
+    "verify:security": "node scripts/verify-security-baseline.js",
+    "verify:audit": "node scripts/verify-dependency-audit.js",
+    "verify:readiness": "node scripts/verify-release-readiness.js",
+    "package:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1 -Version 1.6.2",
+    "verify:ui-boot": "node --test test/ui-browser-boot-bindings.test.js",
+    "verify:mods": "node --test test/apple-music-se-command.integration.test.js test/apple-music-widget-announcer.test.js",
+    "verify:runtime-refactor": "npm run verify:routes && npm run verify:budgets && npm run verify:docs && npm run verify:manifest && npm run verify:mods && node --test test/ui-browser-boot-bindings.test.js test/ui-midi-runtime-ui.test.js test/ui-onboarding-tour-runtime-ui.test.js test/ui-secret-fields-hardening.test.js test/ui-mods-runtime-modules.test.js test/system-widget-oauth-integration.test.js test/http-preengine-smoke.test.js test/register-compat-routes.audio.test.js test/register-compat-routes.rave-aliases.test.js test/register-compat-routes.mods-fixtures-parity.test.js test/register-compat-routes.telemetry.test.js test/register-compat-routes.system-core-status.test.js test/audio-capture.launcher-utils.test.js test/audio-capture.signal-analyzer.test.js test/audio-capture.command-builders.test.js test/audio-capture.process-lifecycle.test.js test/audio-runtime.service.test.js test/audio-runtime.capture-session.test.js test/audio-runtime.catalog.test.js test/audio-runtime.device-discovery.test.js test/engine-v2.scene-runtime-controls.test.js test/engine-v2.scene-auto-selection.test.js test/engine-v2.scene-bpm-state.test.js test/engine-v2.scene-section-state.test.js test/engine-v2.scene-cooldown-state.test.js test/engine-v2.scene-transition-state.test.js test/engine-v2.scene-state.test.js test/engine-v2.runtime.test.js test/engine-v2.runtime.sync-groups.test.js test/engine-v2.runtime.profile.test.js test/engine-v2.runtime.fixture-catalog.test.js test/engine-v2.runtime.fixture-exclusions.test.js test/engine-v2.runtime.palette-mapper.test.js test/engine-v2.runtime.cadence.test.js test/engine-v2.runtime.palette-advance.test.js test/system-oauth.vault.test.js test/system-oauth.reconcile.test.js test/system-update.service.test.js test/system-update.release-workflow.test.js test/widget-template.builder.test.js test/docs-ownership-alignment.test.js test/architecture-guardrails.test.js",
+    "baseline:lock": "node scripts/lock-pre-engine-baseline.js",
+    "baseline:tag": "node scripts/lock-pre-engine-baseline.js --create-tag"
+  },
   "dependencies": {
     "axios": "^1.13.5",
+    "cross-fetch": "3.1.5",
     "express": "^5.2.1",
-    "express-rate-limit": "^7.5.0",
+    "playwright": "^1.58.2"
+  },
+  "optionalDependencies": {
     "hue-sync": "^0.1.3",
-    "midi": "^2.0.0",
-    "naudiodon": "^2.3.6",
-    "semver": "^7.7.4"
+    "node-dtls-client": "^1.1.1"
   }
 }

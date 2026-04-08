@@ -1,0 +1,430 @@
+<!-- [TITLE] Section Template: public/templates/index/sections/panel-live.html -->
+<!-- [DEV] Purpose: LIVE tab panel markup. -->
+<div class="panel tabPage active" data-tab="live">
+  <div class="cluster liveMainCluster">
+    <h3>POWER <span class="infoTip" title="RAVE ON starts live reactive output. RAVE OFF stops reactive output. PANIC forces immediate blackout intent.">?</span></h3>
+    <div class="grid3">
+      <button id="onBtn" type="button">RAVE ON</button>
+      <button id="offBtn" type="button">RAVE OFF</button>
+      <button id="panicBtn" type="button" class="bad hidden">PANIC</button>
+    </div>
+    <div class="liveProfileRow">
+      <input id="liveProfileName" type="text" placeholder="profile name (local)" maxlength="32" autocomplete="off" spellcheck="false">
+      <select id="liveProfileSelect" title="Select a saved local LIVE profile.">
+        <option value="__custom__">CUSTOM / TYPE NAME</option>
+      </select>
+      <button id="liveProfileSaveBtn" type="button">SAVE PROFILE</button>
+      <button id="liveProfileLoadBtn" type="button">LOAD PROFILE</button>
+      <button id="liveProfileDeleteBtn" type="button" class="warn">DELETE PROFILE</button>
+      <button id="liveProfileResetBtn" type="button">RESET DEFAULT</button>
+    </div>
+    <p id="liveProfileStat" class="hint liveProfileStat">LIVE PROFILE: default (unsaved)</p>
+    <p id="liveModeNotice" class="hint hidden">LIVE tab is in profiles-only mode. Advanced engine controls are hidden until the rebuilt engine slice is enabled.</p>
+
+    <div id="liveScopeSection" class="subcluster liveAdvancedSection">
+      <h3>LIVE CONTROL SCOPE <span class="infoTip" title="Choose GLOBAL SETTINGS for one shared setup, or CUSTOM PER FIXTURE to tune scene/runtime/palette behavior per brand or fixture.">?</span></h3>
+      <p class="advancedSubTitle">EDIT SCOPE</p>
+      <div class="paletteScopeRow compactButtonRow">
+        <button id="paletteScopeGlobalBtn" type="button">GLOBAL SETTINGS</button>
+        <button id="paletteScopeCustomBtn" type="button">CUSTOM PER FIXTURE</button>
+      </div>
+      <p class="hint">Scope applies across LIVE core controls. Custom target can tune brand-wide defaults or one fixture override.</p>
+      <div id="liveScopeCustomTargetPanel" class="liveScopeCustomTargetPanel hidden">
+        <p class="advancedSubTitle">CUSTOM TARGET</p>
+        <div id="paletteCustomBrandTabs" class="paletteCustomBrandTabs compactButtonRow">
+          <button type="button" data-palette-custom-brand="hue">HUE</button>
+          <button type="button" data-palette-custom-brand="wiz">WIZ</button>
+        </div>
+        <div class="liveScopeFixtureRow">
+          <label for="liveScopeFixtureSelect">FIXTURE TARGET</label>
+          <select id="liveScopeFixtureSelect">
+            <option value="__all__">ALL FIXTURES</option>
+          </select>
+        </div>
+        <p id="liveScopeStatus" class="hint">Scope target idle.</p>
+      </div>
+    </div>
+
+    <div id="liveSyncGroupsSection" class="subcluster collapsible liveAdvancedSection" data-collapsible-key="liveSyncGroups" data-collapsed-default="1" data-collapsed-default-mobile="1">
+      <div class="clusterHeaderRow">
+        <h3>FIXTURE SYNC GROUPS <span class="infoTip" title="Create expandable fixture groups that can run shared color order, reversed order, or offset order. Works across Hue/WiZ in the same group.">?</span></h3>
+        <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide fixture sync group controls.">COLLAPSE</button>
+      </div>
+      <div class="clusterBody">
+        <p class="hint">Use this to keep selected fixtures color-synced together or intentionally desync groups (reverse/offset) without changing global scene pace/brightness logic.</p>
+        <p class="hint">ENGINE column is a quick remove/re-add toggle. ON REMOVE can keep current output, blackout, or apply a custom HEX/CCT + brightness state when a fixture is removed.</p>
+        <div class="grid3">
+          <div>
+            <label><input id="liveSyncGroupsEnabled" type="checkbox"> ENABLE SYNC GROUP ROUTING</label>
+          </div>
+          <div>
+            <label for="liveSyncGroupSelect">GROUP</label>
+            <select id="liveSyncGroupSelect">
+              <option value="">select group...</option>
+            </select>
+          </div>
+          <div class="grid2">
+            <button id="liveSyncGroupAddBtn" type="button">ADD GROUP</button>
+            <button id="liveSyncGroupDeleteBtn" type="button" class="warn">DELETE GROUP</button>
+          </div>
+        </div>
+        <div class="controlRow">
+          <div>
+            <label for="liveSyncGroupName">GROUP NAME</label>
+            <input id="liveSyncGroupName" type="text" maxlength="48" placeholder="e.g. Stage Front">
+          </div>
+          <div>
+            <label for="liveSyncGroupMode">SEQUENCE MODE</label>
+            <select id="liveSyncGroupMode">
+              <option value="sync">SYNC (SAME ORDER)</option>
+              <option value="reverse">REVERSE ORDER</option>
+              <option value="offset">OFFSET ORDER</option>
+            </select>
+          </div>
+          <div>
+            <label for="liveSyncGroupOffset">OFFSET STEPS (OFFSET MODE)</label>
+            <input id="liveSyncGroupOffset" type="number" min="-64" max="64" step="1" value="0">
+          </div>
+        </div>
+        <div>
+          <label>FIXTURE ASSIGNMENTS</label>
+          <div id="liveSyncFixtureRows" class="liveSyncFixtureRows">
+            <div class="hint">Fixture list will appear when fixtures are loaded.</div>
+          </div>
+        </div>
+        <div class="grid3">
+          <button id="liveSyncGroupsReloadBtn" type="button">RELOAD SYNC GROUPS</button>
+          <button id="liveSyncGroupsSaveBtn" type="button">SAVE SYNC GROUPS</button>
+          <input id="liveSyncGroupsStatus" type="text" value="Sync groups idle." readonly>
+        </div>
+      </div>
+    </div>
+
+    <h3>MODE <span class="infoTip" title="BPM (INTERPRET) is the active global mode for live scene timing.">?</span></h3>
+    <p class="hint">BPM (INTERPRET) is enforced globally.</p>
+    <div class="liveCoreQuickNav" role="group" aria-label="Live core controls">
+      <button type="button" data-live-jump-target="livePaletteSection">COLORS</button>
+      <button type="button" data-live-jump-target="liveSceneSection">SCENES</button>
+      <button type="button" data-live-jump-target="liveCadenceSection">AUTO HZ</button>
+      <button type="button" data-live-jump-target="liveBrightnessSection">BRIGHTNESS</button>
+    </div>
+
+    <div id="liveCadenceSection" class="subcluster collapsible livePriorityPanel liveAdvancedSection" data-collapsible-key="livePriorityControls">
+      <div class="clusterHeaderRow">
+        <h3>PRIORITY // HZ</h3>
+        <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide priority live controls.">COLLAPSE</button>
+      </div>
+      <div class="clusterBody">
+        <div class="priorityGrid">
+          <section class="priorityCard">
+            <h3>OVERCLOCK <span class="infoTip" title="Higher Hz increases visual motion and network load. Use Entertainment mode for highest stable rates.">?</span></h3>
+            <div class="grid4">
+              <button id="ocOffBtn" type="button">SLOW 2HZ</button>
+              <button id="ocOnBtn" type="button">SLOW 4HZ</button>
+              <button id="ocTurboBtn" type="button" class="warn">DEFAULT 6HZ</button>
+              <button id="ocAutoBtn" type="button">AUTO HZ</button>
+              <button id="ocUltraBtn" type="button" class="warn">ULTRA 8HZ</button>
+              <button id="ocExtremeBtn" type="button" class="warn">EXTREME 10HZ</button>
+              <button id="ocInsaneBtn" type="button" class="bad">INSANE 12HZ</button>
+              <button id="ocHyperBtn" type="button" class="bad">HYPER 14HZ</button>
+              <button id="ocLudicrousBtn" type="button" class="bad">LUDICROUS 16HZ</button>
+            </div>
+            <div id="ocDevCluster" class="hidden">
+              <h3>UNSAFE DEV OVERCLOCK <span class="infoTip" title="Manual-only destructive rates. Never auto-mapped by profile/palette/scene and may break output stability.">?</span></h3>
+              <div class="grid5">
+                <button id="ocDev20Btn" type="button" class="bad">DEV 20HZ</button>
+                <button id="ocDev30Btn" type="button" class="bad">DEV 30HZ</button>
+                <button id="ocDev40Btn" type="button" class="bad">DEV 40HZ</button>
+                <button id="ocDev50Btn" type="button" class="bad">DEV 50HZ</button>
+                <button id="ocDev60Btn" type="button" class="bad">DEV 60HZ</button>
+              </div>
+              <p class="hint">Severe warning: these rates are intentionally destructive and unpredictable. Use only on isolated test rigs.</p>
+            </div>
+            <p class="hint">
+              Practical rate guidance: Hue REST is usually best at 2-6Hz. Use Hue Entertainment for 8-16Hz.
+              WiZ can often run faster, but weak Wi-Fi can still cause skips.
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="liveReactivityCluster" class="subcluster liveAdvancedSection liveNonCoreSection hidden">
+      <h3>REACTIVITY GAIN <span class="infoTip" title="AUTO adapts brightness sensitivity to current listening volume. MANUAL applies a fixed multiplier.">?</span></h3>
+      <p class="hint">Use this when effects feel too flat at low volume or too intense at high volume.</p>
+      <div class="controlRow">
+        <div>
+          <label for="reactGainMode">GAIN MODE</label>
+          <select id="reactGainMode">
+            <option value="auto">AUTO (ADAPTIVE)</option>
+            <option value="manual">MANUAL</option>
+          </select>
+        </div>
+        <div>
+          <label for="reactGainManual">MANUAL REACTIVITY GAIN</label>
+          <div class="slider">
+            <input id="reactGainManual" type="range" min="25" max="300" step="1" value="100" />
+            <span id="reactGainManualVal" class="sliderValue">1.00x</span>
+          </div>
+        </div>
+        <div>
+          <label for="reactHardwareRateLimitsEnabled">HARDWARE RATE LIMITS</label>
+          <label><input id="reactHardwareRateLimitsEnabled" type="checkbox"> ENFORCE SAFE TX CAPS</label>
+          <button id="reactGainSaveBtn" type="button">SAVE REACTIVITY GAIN</button>
+        </div>
+      </div>
+      <input id="reactMapStatus" type="text" value="Reactivity map idle." readonly>
+    </div>
+
+    <div id="liveSceneSection" class="subcluster collapsible liveAdvancedSection" data-collapsible-key="liveSceneFlow" data-collapsed-default-mobile="1">
+      <div class="clusterHeaderRow">
+        <h3>SCENE + MOTION</h3>
+        <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide scene and flow controls.">COLLAPSE</button>
+      </div>
+      <div class="clusterBody">
+        <p class="hint">AUTO rotates scenes. STEADY = smooth color drift with controlled motion. MOTION = rhythmic color flow. IMPACT = high-energy color response for intense passages.</p>
+        <div class="sceneLockRows">
+          <div class="grid4">
+            <button id="sceneAutoBtn" type="button" data-scene="auto">AUTO</button>
+            <button type="button" data-scene="steady">STEADY</button>
+            <button type="button" data-scene="motion">MOTION</button>
+            <button type="button" data-scene="impact">IMPACT</button>
+          </div>
+        </div>
+        <p id="sceneSyncStat" class="hint">WIZ SCENE MODE: STANDALONE (ENFORCED)</p>
+        <p class="hint">AUTO resolves the best scene from the music. STEADY is smooth and controlled. MOTION is faster and more decisive. IMPACT tracks energetic transitions aggressively.</p>
+        <div class="subcluster">
+          <h3>SCENE FILTER AGGRESSIVENESS</h3>
+          <p class="hint">Tune how fast each scene reacts to audio. Higher values react faster with shorter hold; lower values smooth motion.</p>
+          <div class="grid3">
+            <div class="slider">
+              <label for="sceneFilterAggCalm">
+                <span>CALM</span>
+                <span id="sceneFilterAggCalmVal" class="sliderValue">1.00x</span>
+              </label>
+              <input id="sceneFilterAggCalm" type="range" min="45" max="210" step="1" value="100">
+            </div>
+            <div class="slider">
+              <label for="sceneFilterAggGroove">
+                <span>GROOVE</span>
+                <span id="sceneFilterAggGrooveVal" class="sliderValue">1.00x</span>
+              </label>
+              <input id="sceneFilterAggGroove" type="range" min="45" max="210" step="1" value="100">
+            </div>
+            <div class="slider">
+              <label for="sceneFilterAggImpact">
+                <span>IMPACT</span>
+                <span id="sceneFilterAggImpactVal" class="sliderValue">1.00x</span>
+              </label>
+              <input id="sceneFilterAggImpact" type="range" min="45" max="210" step="1" value="100">
+            </div>
+          </div>
+          <div class="grid3">
+            <button id="sceneFilterAggResetBtn" type="button">RESET FILTER TUNING</button>
+            <button id="sceneFilterAggSaveBtn" type="button">SAVE FILTER TUNING</button>
+            <input id="sceneFilterAggStatus" type="text" value="Scene filter tuning idle." readonly>
+          </div>
+        </div>
+        <div id="liveBrightnessSection" class="subcluster">
+          <h3>BRIGHTNESS + SCENE RUNTIME</h3>
+          <p class="hint">Brightness is global and should reflect song movement. Use floor/ceiling to keep quiet passages near-dark and loud passages bright, then tune transition/cooldown timing.</p>
+          <div class="grid3">
+            <div>
+              <label for="sceneRuntimeBpmSource">BPM SOURCE MODE</label>
+              <select id="sceneRuntimeBpmSource">
+                <option value="hybrid">HYBRID (RECOMMENDED)</option>
+                <option value="telemetry">TELEMETRY ONLY</option>
+                <option value="derived">DERIVED ONLY</option>
+              </select>
+            </div>
+            <div class="slider">
+              <label for="sceneRuntimeCooldownMs">
+                <span>SCENE SWITCH COOLDOWN</span>
+                <span id="sceneRuntimeCooldownMsVal" class="sliderValue">260ms</span>
+              </label>
+              <input id="sceneRuntimeCooldownMs" type="range" min="0" max="2500" step="10" value="260">
+            </div>
+            <div class="slider">
+              <label for="sceneRuntimeImpactHoldMs">
+                <span>IMPACT HOLD</span>
+                <span id="sceneRuntimeImpactHoldMsVal" class="sliderValue">140ms</span>
+              </label>
+              <input id="sceneRuntimeImpactHoldMs" type="range" min="0" max="1500" step="10" value="140">
+            </div>
+          </div>
+          <div class="grid3">
+            <div class="slider">
+              <label for="sceneRuntimeBrightnessFloor">
+                <span>BRIGHTNESS FLOOR</span>
+                <span id="sceneRuntimeBrightnessFloorVal" class="sliderValue">2%</span>
+              </label>
+              <input id="sceneRuntimeBrightnessFloor" type="range" min="0" max="90" step="1" value="2">
+            </div>
+            <div class="slider">
+              <label for="sceneRuntimeBrightnessCeil">
+                <span>BRIGHTNESS CEILING</span>
+                <span id="sceneRuntimeBrightnessCeilVal" class="sliderValue">100%</span>
+              </label>
+              <input id="sceneRuntimeBrightnessCeil" type="range" min="10" max="100" step="1" value="100">
+            </div>
+            <div class="slider">
+              <label for="sceneRuntimeBeatConfidenceMin">
+                <span>TELEMETRY CONFIDENCE MIN</span>
+                <span id="sceneRuntimeBeatConfidenceMinVal" class="sliderValue">34%</span>
+              </label>
+              <input id="sceneRuntimeBeatConfidenceMin" type="range" min="0" max="100" step="1" value="34">
+            </div>
+          </div>
+          <div class="grid3">
+            <div class="slider">
+              <label for="sceneRuntimeTransitionFloorMs">
+                <span>TRANSITION FLOOR</span>
+                <span id="sceneRuntimeTransitionFloorMsVal" class="sliderValue">32ms</span>
+              </label>
+              <input id="sceneRuntimeTransitionFloorMs" type="range" min="20" max="1000" step="5" value="32">
+            </div>
+            <div class="slider">
+              <label for="sceneRuntimeTransitionCeilMs">
+                <span>TRANSITION CEILING</span>
+                <span id="sceneRuntimeTransitionCeilMsVal" class="sliderValue">190ms</span>
+              </label>
+              <input id="sceneRuntimeTransitionCeilMs" type="range" min="80" max="2000" step="5" value="190">
+            </div>
+            <div class="grid2">
+              <button id="sceneRuntimeResetBtn" type="button">RESET RUNTIME TUNING</button>
+              <button id="sceneRuntimeSaveBtn" type="button">SAVE RUNTIME TUNING</button>
+            </div>
+          </div>
+          <input id="sceneRuntimeStatus" type="text" value="Scene runtime tuning idle." readonly>
+        </div>
+      </div>
+    </div>
+
+    <div id="livePaletteSection" class="subcluster collapsible paletteRoutingPanel liveAdvancedSection" data-collapsible-key="livePaletteRouting" data-collapsed-default-mobile="1">
+      <div class="clusterHeaderRow">
+        <h3>PALETTE + FIXTURE ROUTING</h3>
+        <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide palette and fixture-routing controls.">COLLAPSE</button>
+      </div>
+      <div class="clusterBody">
+        <h3>COLOR PALETTE SEQUENCER <span class="infoTip" title="Palette expansion: pick exact colors per family, toggle them on/off, and set the order yourself. ORDERED follows your saved sequence, DISORDER auto-jumps through that same selected set.">?</span></h3>
+        <p class="hint">Scope controls now live at the top of LIVE tab under profiles. Custom mode enables per-brand/per-fixture overrides below.</p>
+
+        <div id="paletteGlobalPanel" class="paletteGlobalPanel">
+          <div class="paletteGlobalCompactLayout">
+            <section class="paletteGlobalCard paletteGlobalCard--families">
+              <p class="advancedSubTitle">FAMILIES + COLOR SELECTION</p>
+              <div id="paletteFamilyGrid" class="paletteFamilyGrid">
+                <div class="hint">Loading palette families...</div>
+              </div>
+              <div class="slider">
+                <label>
+                  <span>VIVIDNESS</span>
+                  <span class="sliderInlineControls">
+                    <span id="paletteVividnessVal" class="sliderValue">HIGH</span>
+                    <button id="paletteVividnessResetBtn" type="button" class="sliderInlineResetBtn">RESET</button>
+                  </span>
+                </label>
+                <input id="paletteVividness" type="range" min="0" max="4" step="1" value="2">
+              </div>
+              <p class="hint">Higher vividness boosts saturation/contrast and preview swatches update live as you drag.</p>
+              <p class="hint">Families are library buckets only. Toggle colors on/off in any family and drag active sequence chips to reorder globally.</p>
+            </section>
+
+          </div>
+        </div>
+
+        <div id="paletteCustomPanel" class="paletteCustomPanel hidden">
+        <p class="advancedSubTitle">CUSTOM ROUTING + OVERRIDES</p>
+        <div id="paletteBrandMenus" class="paletteBrandMenus"></div>
+        <p class="hint">Per-brand/per-fixture menus control scoped palette overrides without affecting other fixtures.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="subcluster collapsible liveAdvancedSection liveNonCoreSection hidden" data-collapsible-key="liveAppIsolationQuick" data-collapsed-default="1" data-collapsed-default-mobile="1">
+      <div class="clusterHeaderRow">
+        <h3>AUDIO APP ISOLATION QUICK ACTION</h3>
+        <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide quick app isolation actions.">COLLAPSE</button>
+      </div>
+      <div class="clusterBody">
+        <p class="hint">Force a rescan for FFmpeg app-isolation priority/fallback now (without waiting for the 5-minute auto check).</p>
+        <div class="grid2 audioQuickActionRow">
+          <button id="liveAudioAppSearchBtn" type="button">FORCE APP SEARCH</button>
+          <input id="liveAudioAppSearchStat" class="audioAppSearchStatus" type="text" value="App source scan idle." readonly>
+        </div>
+        <p class="hint">Use this after opening your priority app to force immediate capture-source handoff.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="cluster collapsible liveAdvancedSection liveNonCoreSection hidden" data-collapsible-key="liveAnalyzer" data-collapsed-default-mobile="1">
+    <div class="clusterHeaderRow">
+      <h3>REACTOR // LIVE ANALYZER</h3>
+      <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide analyzer visuals and deep telemetry.">COLLAPSE</button>
+    </div>
+    <div class="clusterBody">
+    <div id="scope">
+      <div class="scopeHud">
+        <div class="scopeChip"><strong>DRIVE</strong><span id="scopeDrive">0.00</span></div>
+        <div class="scopeChip"><strong>MOTION</strong><span id="scopeMotion">0.00</span></div>
+        <div class="scopeChip"><strong>SCENE</strong><span id="scopeScene">-</span></div>
+        <div class="scopeChip"><strong>BEHAV</strong><span id="scopeBehav">-</span></div>
+      </div>
+      <canvas id="canvas"></canvas>
+      <div id="dropOverlay">DROP</div>
+    </div>
+
+    <div id="telemetryScope">
+      <canvas id="telemetryCanvas"></canvas>
+      <div class="scopeLegend">
+        <div class="legendChip">RED = ENERGY</div>
+        <div class="legendChip">CYAN = RMS</div>
+        <div class="legendChip">YELLOW = FLUX</div>
+        <div class="legendChip">ORANGE = HUE LAT</div>
+        <div class="legendChip">GREEN = WIZ LAT</div>
+        <div class="legendChip">WHITE BARS = DROP</div>
+      </div>
+    </div>
+
+    <div class="liveStats">
+      <div class="statGroup">
+        <div class="statGroupTitle">CORE SIGNAL</div>
+        <div class="statGrid">
+          <div class="liveStat"><strong>RMS</strong><span id="rms">0.00</span></div>
+          <div class="liveStat"><strong>ENG</strong><span id="eng">0.00</span></div>
+          <div class="liveStat"><strong>MODE</strong><span id="mode">-</span></div>
+          <div class="liveStat"><strong>PALETTES</strong><span id="paletteStat">BLUE+PURPLE</span></div>
+          <div class="liveStat"><strong>ORDER</strong><span id="paletteOrderStat">ORDERED</span></div>
+          <div class="liveStat"><strong>SCENE</strong><span id="scene">-</span></div>
+        </div>
+      </div>
+
+      <div class="statGroup">
+        <div class="statGroupTitle">ADAPTIVE STATE</div>
+        <div class="statGrid">
+          <div class="liveStat"><strong>BEHAV</strong><span id="behavior">-</span></div>
+          <div class="liveStat"><strong>PHRASE</strong><span id="phrase">-</span></div>
+          <div class="liveStat"><strong>DROP</strong><span id="dropStat">NO</span></div>
+          <div class="liveStat"><strong>BPM</strong><span id="bpmStat">-</span></div>
+          <div class="liveStat"><strong>META</strong><span id="metaAutoStat">OFF</span></div>
+          <div class="liveStat"><strong>DYNAMICS</strong><span id="flowStat">SCENE-OWNED</span></div>
+        </div>
+      </div>
+
+      <div class="statGroup">
+        <div class="statGroupTitle">TRANSPORT</div>
+        <div class="statGrid">
+          <div class="liveStat"><strong>HUE STATE</strong><span id="hState">OK</span></div>
+          <div class="liveStat"><strong>WIZ STATE</strong><span id="wState">OK</span></div>
+          <div class="liveStat"><strong>HUE LAT</strong><span id="hLat">0</span></div>
+          <div class="liveStat"><strong>WIZ LAT</strong><span id="wLat">0</span></div>
+          <div class="liveStat"><strong>HUE SENT</strong><span id="hSent">0</span></div>
+          <div class="liveStat"><strong>WIZ SENT</strong><span id="wSent">0</span></div>
+          <div class="liveStat"><strong>HUE SKIP</strong><span id="hSkip">0</span></div>
+          <div class="liveStat"><strong>WIZ SKIP</strong><span id="wSkip">0</span></div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+</div>

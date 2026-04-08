@@ -1,0 +1,236 @@
+<!-- [TITLE] Section Template: public/templates/index/sections/chrome.html -->
+<!-- [DEV] Purpose: header, gates, and tab navigation shell. -->
+<header>
+  <div>
+    <h1>RAVELINK</h1>
+    <div class="sub">reactive lighting bridge // ready for creators, streamers, and live setups</div>
+    <div class="quickLinks">
+      <a href="#deviceRouting" id="jumpRoutingLink">Device Routing</a>
+      <a href="#modCenter" id="jumpModsLink">Mod Center</a>
+    </div>
+  </div>
+  <div class="headerRight">
+    <div class="themeWrap">
+      <button id="themeCogBtn" type="button" class="iconBtn" title="Theme settings" aria-label="Theme settings">&#9881;</button>
+      <div id="themePanel" class="themePanel hidden">
+        <h4>THEME PRESETS</h4>
+        <div class="themePresetGrid">
+          <button type="button" class="themePresetBtn" data-theme-preset="midnight">MIDNIGHT</button>
+          <button type="button" class="themePresetBtn" data-theme-preset="ember">EMBER</button>
+          <button type="button" class="themePresetBtn" data-theme-preset="ocean">OCEAN</button>
+          <button type="button" class="themePresetBtn" data-theme-preset="matrix">MATRIX</button>
+          <button type="button" class="themePresetBtn" data-theme-preset="aurora">AURORA</button>
+          <button type="button" class="themePresetBtn" data-theme-preset="solar">SOLAR</button>
+          <button type="button" class="themePresetBtn" data-theme-preset="glacier">GLACIER</button>
+        </div>
+        <h4 style="margin-top:10px;">CUSTOM COLORS</h4>
+        <div class="themeCustomGrid">
+          <div>
+            <label for="themeLogoColor">LOGO / ACTIVE</label>
+            <input id="themeLogoColor" class="themeColorPicker" type="color" value="#8b001f" data-theme-custom="accent" />
+          </div>
+          <div>
+            <label for="themeButtonColor">BUTTON BASE</label>
+            <input id="themeButtonColor" class="themeColorPicker" type="color" value="#14182c" data-theme-custom="btnBg" />
+          </div>
+          <div>
+            <label for="themeBgColor">BACKGROUND</label>
+            <input id="themeBgColor" class="themeColorPicker" type="color" value="#050507" data-theme-custom="bg" />
+          </div>
+          <div>
+            <label for="themePanelColor">PANEL</label>
+            <input id="themePanelColor" class="themeColorPicker" type="color" value="#0b0e18" data-theme-custom="panel" />
+          </div>
+          <div>
+            <label for="themeSurfaceColor">SURFACE</label>
+            <input id="themeSurfaceColor" class="themeColorPicker" type="color" value="#121a2f" data-theme-custom="panel2" />
+          </div>
+          <div>
+            <label for="themeEdgeColor">LINES / BORDERS</label>
+            <input id="themeEdgeColor" class="themeColorPicker" type="color" value="#233055" data-theme-custom="edge" />
+          </div>
+          <div>
+            <label for="themeTextColor">TEXT</label>
+            <input id="themeTextColor" class="themeColorPicker" type="color" value="#eaeaea" data-theme-custom="text" />
+          </div>
+          <div>
+            <label for="themeOkColor">SUCCESS</label>
+            <input id="themeOkColor" class="themeColorPicker" type="color" value="#19ff6a" data-theme-custom="ok" />
+          </div>
+          <div>
+            <label for="themeWarnColor">WARNING</label>
+            <input id="themeWarnColor" class="themeColorPicker" type="color" value="#ffb000" data-theme-custom="warn" />
+          </div>
+          <div>
+            <label for="themeBadColor">DANGER</label>
+            <input id="themeBadColor" class="themeColorPicker" type="color" value="#ff4444" data-theme-custom="bad" />
+          </div>
+        </div>
+        <div class="themeGlowRow">
+          <label for="themeGlowStrength">GLOW STRENGTH <span id="themeGlowStrengthVal">67%</span></label>
+          <input id="themeGlowStrength" type="range" min="20" max="95" step="1" value="67" data-theme-custom="glow" />
+        </div>
+        <div class="themePreview" aria-label="Theme preview">
+          <div class="themePreviewPanel">
+            <div class="themePreviewTitle">LIVE PREVIEW</div>
+            <div class="themePreviewButtons">
+              <span class="themePreviewAccent">Active</span>
+              <span class="themePreviewButton">Base</span>
+            </div>
+            <div class="themePreviewBadges">
+              <span class="ok">OK</span>
+              <span class="warn">WARN</span>
+              <span class="bad">BAD</span>
+            </div>
+          </div>
+        </div>
+        <div class="themeCustomRow">
+          <button id="themeResetBtn" type="button" class="themePresetBtn">RESET THEME</button>
+          <button id="themeCloseBtn" type="button" class="themePresetBtn">CLOSE</button>
+        </div>
+        <h4 style="margin-top:10px;">ONBOARDING</h4>
+        <div class="themeCustomRow">
+          <button id="onboardStartBtn" type="button" class="themePresetBtn">START FULL TOUR</button>
+          <button id="onboardResetBtn" type="button" class="themePresetBtn">RESET TOUR</button>
+        </div>
+        <h4 style="margin-top:10px;">MIDI TAB</h4>
+        <div class="themeCustomRow">
+          <button id="midiTabToggleBtn" type="button" class="themePresetBtn">MIDI TAB OFF (NO DEVICE)</button>
+        </div>
+        <input id="midiCogStatus" class="themeStatusField" type="text" value="MIDI not detected yet." readonly>
+        <p class="hint" style="margin:8px 2px 0;">
+          Replay the whole tour or use a tab help button for a focused refresher.
+        </p>
+      </div>
+    </div>
+    <button id="obsDockCompactBtn" type="button" class="iconBtn hidden" title="Toggle compact OBS dock layout">DK</button>
+    <div id="health" class="badge ok">FIXTURES 0/0 | HUE REST</div>
+    <div id="netBadge" class="badge ok">NET OK</div>
+  </div>
+</header>
+
+<div id="devOcAckGate" class="devAckGate hidden" aria-hidden="true">
+  <div class="devAckCard">
+    <h3 class="devAckTitle">UNSAFE DEV OVERCLOCK CHECK</h3>
+    <p class="hint" style="margin:0 0 4px;">
+      Last gate before arming destructive 20-60Hz overclock. This is intentionally absurd.
+    </p>
+    <label for="devOcAckInput">TYPE THE EXACT PHRASE TO ARM</label>
+    <input
+      id="devOcAckInput"
+      class="devAckInput"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="Type the exact phrase, then press Enter to confirm."
+    />
+    <input id="devOcAckPhrase" class="devAckPhrase" type="text" readonly value="" />
+    <div class="themeCustomRow">
+      <button id="devOcAckCancelBtn" type="button" class="themePresetBtn">CANCEL</button>
+      <button id="devOcAckConfirmBtn" type="button" class="themePresetBtn bad">ARM DEV HZ</button>
+    </div>
+  </div>
+</div>
+
+<div
+  class="subcluster collapsible supportPanel"
+  id="supportPanel"
+  data-collapsible-key="supportPanel"
+  data-collapsed-default-mobile="1"
+>
+  <div class="clusterHeaderRow">
+    <h3>OPTIONAL SUPPORT</h3>
+    <button
+      type="button"
+      class="collapseBtn"
+      data-collapse-btn
+      aria-expanded="true"
+      title="Show or hide optional support link."
+    >
+      COLLAPSE
+    </button>
+  </div>
+  <div class="clusterBody">
+    <span class="supportMeta">If this engine helps, optional support:</span>
+    <a class="supportLink" href="https://ko-fi.com/namesroby" target="_blank" rel="noopener noreferrer">
+      ko-fi.com/namesroby
+    </a>
+  </div>
+</div>
+
+<div id="onboardGate" class="onboardGate hidden" aria-live="polite">
+  <div class="onboardGateCard">
+    <div class="onboardGateTitle">FIRST-TIME SERVER TOUR</div>
+    <div class="onboardGateText">
+      Walk through LIVE, fixtures, audio, MIDI, mods, System OAuth, and widget setup with highlighted sections.
+      Mods can add their own steps when they support the server tour, and removing a mod will simply remove its steps.
+    </div>
+    <div class="onboardGateActions">
+      <p class="hint">Recommended on first launch. You can replay it any time from the settings cog or tab help buttons.</p>
+      <button id="onboardSkipBtn" type="button" class="onboardGhostBtn">SKIP FOR NOW</button>
+      <button id="onboardAckBtn" type="button" class="onboardAckBtn">START TOUR</button>
+    </div>
+  </div>
+</div>
+
+<div id="onboardingTourLayer" class="onboardingTourLayer hidden" aria-live="polite" aria-hidden="true">
+  <div id="onboardingTourHighlight" class="onboardingTourHighlight" aria-hidden="true"></div>
+  <section id="onboardingTourCard" class="onboardingTourCard" role="dialog" aria-modal="false" aria-labelledby="onboardingTourTitle">
+    <div id="onboardingTourKicker" class="onboardingTourKicker">RAVELINK TOUR</div>
+    <h2 id="onboardingTourTitle">Tour step</h2>
+    <p id="onboardingTourBody">This step explains the selected area.</p>
+    <div class="onboardingTourFooter">
+      <span id="onboardingTourProgress" class="onboardingTourProgress">Step 1 of 1</span>
+      <div class="onboardingTourActions">
+        <button id="onboardingTourSkipBtn" type="button" class="ghostBtn">Exit</button>
+        <button id="onboardingTourPrevBtn" type="button" class="ghostBtn">Back</button>
+        <button id="onboardingTourNextBtn" type="button">Next</button>
+        <button id="onboardingTourDoneBtn" type="button" class="hidden">Done</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="hueEntGuideGate" class="hueEntGuideGate hidden" aria-live="polite">
+  <div class="hueEntGuideCard">
+    <div class="hueEntGuideTitle">HUE ENTERTAINMENT IS REQUIRED FOR RELIABLE ENGINE SYNC</div>
+    <div class="hueEntGuideText">
+      Before discovery/pairing, make sure a Hue Entertainment area exists. Without it, Hue falls back to slower REST behavior and can fail to stream at engine rate.
+    </div>
+    <ol class="hueEntGuideSteps">
+      <li>Open Hue app -> <b>Settings</b> -> <b>Entertainment areas</b>.</li>
+      <li>Create an area and add the exact lights you want in RaveLink.</li>
+      <li>Save it, then use that area name or id in <b>ENT AREA (NAME/ID)</b>.</li>
+    </ol>
+    <div class="hueEntGuideActions">
+      <button id="hueEntGuideAckBtn" type="button" class="hueEntGuideAckBtn">I UNDERSTAND</button>
+    </div>
+  </div>
+</div>
+
+<div id="tabsBar" class="tabs">
+  <div class="tabNavItem">
+    <button class="tabBtn active" type="button" data-tab-btn="live">LIVE</button>
+    <button class="tabTourBtn" type="button" data-tour-tab="live" aria-label="Replay LIVE tab tour" title="Replay LIVE tab tour">?</button>
+  </div>
+  <div class="tabNavItem">
+    <button class="tabBtn" type="button" data-tab-btn="fixtures">FIXTURES</button>
+    <button class="tabTourBtn" type="button" data-tour-tab="fixtures" aria-label="Replay Fixtures tab tour" title="Replay Fixtures tab tour">?</button>
+  </div>
+  <div class="tabNavItem">
+    <button class="tabBtn" type="button" data-tab-btn="audio">AUDIO</button>
+    <button class="tabTourBtn" type="button" data-tour-tab="audio" aria-label="Replay Audio tab tour" title="Replay Audio tab tour">?</button>
+  </div>
+  <div id="midiTabNavItem" class="tabNavItem hidden">
+    <button id="midiTabBtn" class="tabBtn hidden" type="button" data-tab-btn="midi">MIDI</button>
+    <button id="midiTourBtn" class="tabTourBtn hidden" type="button" data-tour-tab="midi" aria-label="Replay MIDI tab tour" title="Replay MIDI tab tour">?</button>
+  </div>
+  <div class="tabNavItem">
+    <button class="tabBtn" type="button" data-tab-btn="mods">MODS</button>
+    <button class="tabTourBtn" type="button" data-tour-tab="mods" aria-label="Replay Mods tab tour" title="Replay Mods tab tour">?</button>
+  </div>
+  <div class="tabNavItem">
+    <button class="tabBtn" type="button" data-tab-btn="system">SYSTEM</button>
+    <button class="tabTourBtn" type="button" data-tour-tab="system" aria-label="Replay System tab tour" title="Replay System tab tour">?</button>
+  </div>
+</div>

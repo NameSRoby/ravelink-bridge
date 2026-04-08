@@ -1,0 +1,603 @@
+<!-- [TITLE] Section Template: public/templates/index/sections/panel-system.html -->
+<!-- [DEV] Purpose: SYSTEM tab panel markup. -->
+<div class="panel tabPage" data-tab="system">
+  <div class="cluster collapsible" data-collapsible-key="systemSettings">
+    <div class="clusterHeaderRow">
+      <h3>SYSTEM SETTINGS</h3>
+      <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide system-level runtime settings.">COLLAPSE</button>
+    </div>
+    <div class="clusterBody">
+      <div class="controlRow">
+        <div>
+          <label for="systemStartTab">START TAB</label>
+          <select id="systemStartTab">
+            <option value="live">live</option>
+            <option value="fixtures">fixtures</option>
+            <option value="audio">audio</option>
+            <option value="midi">midi</option>
+            <option value="mods">mods</option>
+            <option value="system">system</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemConfirmActions">CONFIRM DANGEROUS ACTIONS</label>
+          <select id="systemConfirmActions">
+            <option value="true">enabled</option>
+            <option value="false">disabled</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemPollingMode">AUTO POLLING</label>
+          <select id="systemPollingMode">
+            <option value="live">live</option>
+            <option value="paused">paused</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemAutoLaunchBrowser">SERVER BROWSER AUTO-LAUNCH</label>
+          <select id="systemAutoLaunchBrowser">
+            <option value="true">enabled</option>
+            <option value="false">disabled</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemHueTransportPreference">HUE TRANSPORT DEFAULT</label>
+          <select id="systemHueTransportPreference">
+            <option value="auto">auto (entertainment preferred)</option>
+            <option value="entertainment">entertainment only</option>
+            <option value="rest">rest only</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemAudioBackendStrategy">AUDIO BACKEND STRATEGY</label>
+          <select id="systemAudioBackendStrategy">
+            <option value="auto_rust_first">Auto (Rust-first, fallback on Rust startup failure)</option>
+            <option value="force_rust">Force Rust</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemUnsafeSensitiveLogs">SERVER LOG REDACTION</label>
+          <select id="systemUnsafeSensitiveLogs">
+            <option value="false">redacted (safe default)</option>
+            <option value="true">expose sensitive logs (DEV RISK)</option>
+          </select>
+        </div>
+        <div class="grid2">
+          <button id="systemSettingsSaveBtn" type="button">SAVE SYSTEM SETTINGS</button>
+          <button id="systemSettingsResetBtn" type="button">RESET SYSTEM DEFAULTS</button>
+        </div>
+      </div>
+      <div class="controlRow">
+        <div>
+          <label for="systemUpdateChecksEnabled">UPDATE CHECK ON SERVER START</label>
+          <select id="systemUpdateChecksEnabled">
+            <option value="true">enabled (once per launch)</option>
+            <option value="false">disabled</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemUpdateStartupPromptEnabled">STARTUP UPDATE PROMPTS</label>
+          <select id="systemUpdateStartupPromptEnabled">
+            <option value="true">enabled</option>
+            <option value="false">disabled (manual checks only)</option>
+          </select>
+        </div>
+        <div class="grid2">
+          <button id="systemUpdateCheckNowBtn" type="button">CHECK FOR UPDATES</button>
+          <button id="systemUpdateOpenReleaseBtn" type="button">OPEN RELEASE PAGE</button>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button id="systemUpdateApplyBtn" type="button" class="warn">APPLY UPDATE (NON-DESTRUCTIVE)</button>
+        </div>
+      </div>
+      <div class="controlRow">
+        <div>
+          <label for="systemUpdateStatus">UPDATE STATUS</label>
+          <input id="systemUpdateStatus" type="text" value="UPDATE CHECK IDLE" readonly>
+        </div>
+      </div>
+      <div class="controlRow">
+        <div>
+          <label for="systemSettingsStatus">SETTINGS STATUS</label>
+          <input id="systemSettingsStatus" type="text" value="SYSTEM SETTINGS READY" readonly>
+        </div>
+        <div class="grid2">
+          <button id="systemPollNowBtn" type="button">POLL NOW</button>
+          <button id="systemClearCacheBtn" type="button" class="warn">CLEAR UI CACHE</button>
+        </div>
+      </div>
+      <div class="apiBaseRow">
+        <div class="apiBaseInputWrap">
+          <label for="apiBaseInput">API BASE (optional)</label>
+          <input id="apiBaseInput" type="text" placeholder="http://127.0.0.1:5050" />
+        </div>
+        <button id="apiBaseSaveBtn" type="button" title="Save a custom API endpoint when this UI and bridge are on different hosts.">SAVE API BASE</button>
+        <button id="apiBaseResetBtn" type="button" title="Reset API BASE to this page origin.">USE DEFAULT</button>
+      </div>
+      <p class="hint">System settings include browser-local controls plus server browser auto-launch behavior.</p>
+      <p class="hint">Set <code>HUE TRANSPORT DEFAULT</code> to <code>rest only</code> if you want to avoid Entertainment mode auto-switching.</p>
+      <p class="hint">Audio backend strategy controls Rust-first auto mode or explicit Force Rust behavior.</p>
+      <p class="hint">Release checks run once when the server launches (if enabled). Use <code>CHECK FOR UPDATES</code> any time for manual checks.</p>
+      <p class="hint"><code>APPLY UPDATE</code> performs a non-destructive in-place update with backup/rollback and then requires server restart.</p>
+      <p class="hint">Set <code>STARTUP UPDATE PROMPTS</code> to disabled if you do not want update prompts; manual checks stay available.</p>
+      <p class="hint">Danger: disabling log redaction can expose usernames, client keys, bridge IDs, area IDs, bearer tokens, and network addresses in plain text logs.</p>
+      <p class="hint">Use API BASE if this UI runs on a different host than the bridge server.</p>
+    </div>
+  </div>
+
+  <div class="cluster collapsible" data-collapsible-key="systemStartupReadiness" data-collapsed-default="1">
+    <div class="clusterHeaderRow">
+      <h3>STARTUP READINESS</h3>
+      <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide startup readiness diagnostics.">COLLAPSE</button>
+    </div>
+    <div class="clusterBody">
+      <div class="controlRow">
+        <div class="grid2">
+          <button id="systemStartupReadinessRefreshBtn" type="button">REFRESH STARTUP READINESS</button>
+          <button id="systemStartupReadinessCopyBtn" type="button">COPY DIAGNOSTICS JSON</button>
+        </div>
+        <div>
+          <label for="systemStartupReadinessStatus">READINESS STATUS</label>
+          <input id="systemStartupReadinessStatus" type="text" value="STARTUP READINESS LOADING..." readonly>
+        </div>
+      </div>
+      <div class="telemetry">
+        <div>BOOT AT<br><span id="systemStartupReadinessBootAt">-</span></div>
+        <div>SNAPSHOT AT<br><span id="systemStartupReadinessCapturedAt">-</span></div>
+        <div>RUNTIME AGE<br><span id="systemStartupReadinessAge">-</span></div>
+        <div>CORE STATUS<br><span id="systemStartupReadinessCoreStatus">-</span></div>
+        <div>BROWSER LAUNCH<br><span id="systemStartupReadinessLaunchStatus">-</span></div>
+      </div>
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>LANE</th>
+              <th>BOOT</th>
+              <th>CURRENT</th>
+              <th>DETAIL</th>
+            </tr>
+          </thead>
+          <tbody id="systemStartupReadinessRows"></tbody>
+        </table>
+      </div>
+      <p class="hint">Lanes tracked: config, profiles, mods, midi, hue, wiz.</p>
+      <p class="hint">Boot shows startup snapshot. Current shows live runtime state after retries/reloads.</p>
+    </div>
+  </div>
+
+  <div class="cluster collapsible" data-collapsible-key="systemGatewayHelixSync" data-collapsed-default="1" data-collapsed-default-mobile="1">
+    <div class="clusterHeaderRow">
+      <h3>SAFE INTERNET + TWITCH REDEMPTIONS</h3>
+      <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide safe internet and Twitch redemption sync controls.">COLLAPSE</button>
+    </div>
+    <div class="clusterBody">
+      <div class="gatewayHelixFlow" aria-label="Internet gateway and Twitch Helix reconciliation flow">
+        <div>
+          <span>1. SAFE EGRESS</span>
+          <strong>Internet Gateway</strong>
+          <p>Broker for outbound OAuth/Helix calls so the bridge and mods do not need loose direct internet access.</p>
+        </div>
+        <div>
+          <span>2. TWITCH OAUTH</span>
+          <strong>Helix Readiness</strong>
+          <p>Uses the stored <code>channel:manage:redemptions</code> user token when you choose to enable status sync.</p>
+        </div>
+        <div>
+          <span>3. REDEMPTION SYNC</span>
+          <strong>Complete / Refund</strong>
+          <p>Manual or automatic reconcile marks pending channel-point redemptions fulfilled or canceled after server/mod actions.</p>
+        </div>
+      </div>
+      <div class="controlRow">
+        <div class="grid2">
+          <button id="systemGatewayStatusRefreshBtn" type="button">REFRESH SAFE INTERNET</button>
+          <button id="systemWidgetReconcileStatusRefreshBtn" type="button">REFRESH TWITCH SYNC</button>
+        </div>
+        <div>
+          <label for="systemGatewayStatusText">GATEWAY + HELIX STATUS</label>
+          <input id="systemGatewayStatusText" type="text" value="Safe internet + Twitch sync status idle." readonly>
+        </div>
+      </div>
+      <div class="gatewayHelixStatusStrip">
+        <div><span>Gateway</span><strong id="systemGatewayRunning">-</strong></div>
+        <div><span>Gateway Ready</span><strong id="systemGatewayReady">-</strong></div>
+        <div><span>Mode</span><strong id="systemGatewayMode">-</strong></div>
+        <div><span>Helix Ready</span><strong id="systemHelixReady">-</strong></div>
+        <div><span>OAuth Vault</span><strong id="systemHelixOAuth">-</strong></div>
+        <div><span>Scope</span><strong id="systemHelixScope">-</strong></div>
+        <div><span>Reconcile</span><strong id="systemWidgetReconcileEnabled">-</strong></div>
+        <div><span>In Flight</span><strong id="systemWidgetReconcileInFlight">-</strong></div>
+        <div><span>Last Run</span><strong id="systemWidgetReconcileLastRun">-</strong></div>
+        <div><span>Last Outcome</span><strong id="systemWidgetReconcileLastOutcome">-</strong></div>
+        <div><span>Requests</span><strong id="systemGatewayRequestCount">0</strong></div>
+        <div><span>Req Errors</span><strong id="systemGatewayRequestErrors">0</strong></div>
+        <div><span>Policy</span><strong id="systemGatewayPolicy">-</strong></div>
+      </div>
+      <p class="gatewayHelixNote">Optional but strict: if you enable this, OAuth readiness and gateway status should both be healthy before reconcile can reliably complete/refund Twitch redemptions.</p>
+      <div class="controlRow">
+        <div>
+          <label for="systemWidgetReconcileRewardIds">REWARD IDS (OPTIONAL)</label>
+          <input id="systemWidgetReconcileRewardIds" type="text" placeholder="comma-separated reward ids; blank = managed rewards">
+        </div>
+        <div>
+          <label for="systemWidgetReconcileStatus">TARGET STATUS</label>
+          <select id="systemWidgetReconcileStatus">
+            <option value="FULFILLED">FULFILLED (COMPLETE)</option>
+            <option value="CANCELED">CANCELED (REFUND)</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemWidgetReconcileReason">REASON TOKEN</label>
+          <input id="systemWidgetReconcileReason" type="text" value="manual_reconcile" placeholder="manual_reconcile">
+        </div>
+      </div>
+      <div class="controlRow">
+        <div>
+          <label for="systemWidgetReconcileMaxRewards">MAX REWARDS</label>
+          <input id="systemWidgetReconcileMaxRewards" type="number" min="1" max="500" step="1" value="100">
+        </div>
+        <div>
+          <label for="systemWidgetReconcileMaxRedemptions">MAX REDEMPTIONS</label>
+          <input id="systemWidgetReconcileMaxRedemptions" type="number" min="1" max="500" step="1" value="200">
+        </div>
+        <div class="grid2">
+          <button id="systemWidgetReconcileRunBtn" type="button">SYNC PENDING NOW</button>
+          <button id="systemWidgetReconcileCopyBtn" type="button">COPY LAST RESULT JSON</button>
+        </div>
+      </div>
+      <textarea id="systemWidgetReconcileDump" rows="8" readonly>Run sync or refresh status to inspect details.</textarea>
+      <p class="hint">Blank reward IDs means reconcile scans manageable rewards from Helix. Use explicit reward IDs only when you want to target a specific reward family.</p>
+    </div>
+  </div>
+
+  <div class="cluster collapsible" data-collapsible-key="systemWidgetTemplate" data-collapsed-default="1" data-collapsed-default-mobile="1">
+    <div class="clusterHeaderRow">
+      <h3>STREAMELEMENTS WIDGET GENERATOR</h3>
+      <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide widget template controls.">COLLAPSE</button>
+    </div>
+    <div class="clusterBody">
+      <p class="hint">Generate the main StreamElements widget JS with your active parameters, then paste it into Custom Widget -> JS.</p>
+      <div class="controlRow">
+        <div>
+          <label for="systemWidgetBundleMode">WIDGET LAYOUT</label>
+          <select id="systemWidgetBundleMode">
+            <option value="separate">Separate server + mod widgets (recommended)</option>
+            <option value="combined">Single combined widget when supported</option>
+          </select>
+        </div>
+        <div>
+          <label for="systemWidgetDockModOauth">MOD OAUTH DOCKING</label>
+          <div class="inline-toggle">
+            <input id="systemWidgetDockModOauth" type="checkbox">
+            <span>Let compatible mods reuse this OAuth/widget setup panel</span>
+          </div>
+        </div>
+      </div>
+      <p class="hint">Combined widgets and OAuth docking are opt-in compatibility helpers. Mods remain removable; unsupported mods keep their own setup.</p>
+      <div class="controlRow">
+        <div>
+          <label for="systemWidgetColorRewardId">CHANGE LIGHTS REWARD ID</label>
+          <input id="systemWidgetColorRewardId" type="password" placeholder="replace_color_reward_id" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+        </div>
+        <div>
+          <label for="systemWidgetTeachRewardId">TEACH COLOR REWARD ID</label>
+          <input id="systemWidgetTeachRewardId" type="password" placeholder="replace_teach_reward_id" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+        </div>
+        <div>
+          <label for="systemWidgetRaveRewardId">RAVE REWARD ID</label>
+          <input id="systemWidgetRaveRewardId" type="password" placeholder="replace_rave_reward_id" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+        </div>
+      </div>
+      <div class="controlRow">
+        <div>
+          <label for="systemWidgetBaseUrl">BRIDGE BASE URL</label>
+          <input id="systemWidgetBaseUrl" type="text" placeholder="http://127.0.0.1:5050">
+        </div>
+        <div>
+          <label for="systemWidgetRaveAutoOffResetOnRepeat">AUTO-OFF TIMER ON REPEAT</label>
+          <div class="inline-toggle">
+            <input id="systemWidgetRaveAutoOffResetOnRepeat" type="checkbox" checked>
+            <span>Reset timer on repeated RAVE redemption (recommended)</span>
+          </div>
+        </div>
+        <div>
+          <label for="systemWidgetRaveAutoOffSec">RAVE AUTO-OFF SECONDS</label>
+          <input id="systemWidgetRaveAutoOffSec" type="number" min="15" max="1800" step="1" value="300">
+        </div>
+      </div>
+      <p class="hint">RAVE reward redemption always starts RAVE. Viewer input text is ignored.</p>
+      <div class="controlRow">
+        <div class="inline-toggle">
+          <input id="systemWidgetEnableStatusSync" type="checkbox">
+          <span>Enable widget reward status sync (fulfill/refund)</span>
+        </div>
+      </div>
+      <div class="controlRow">
+        <div class="inline-toggle">
+          <input id="systemWidgetSeBotEnabled" type="checkbox">
+          <span>Enable StreamElements bot chat notifications</span>
+        </div>
+        <div>
+          <label for="systemWidgetSeBotChannelId">SE BOT CHANNEL ID</label>
+          <input id="systemWidgetSeBotChannelId" type="password" placeholder="streamelements channel id" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+        </div>
+        <div>
+          <label for="systemWidgetSeBotJwt">SE BOT JWT</label>
+          <input id="systemWidgetSeBotJwt" type="password" placeholder="streamelements jwt" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+        </div>
+      </div>
+      <div class="controlRow">
+        <div>
+          <label for="systemWidgetSeBotPrefix">SE BOT MESSAGE PREFIX (OPTIONAL)</label>
+          <input id="systemWidgetSeBotPrefix" type="text" placeholder="[RaveLink]">
+        </div>
+      </div>
+      <div class="controlRow">
+        <div class="inline-toggle">
+          <input id="systemWidgetRaveOffAnnounceEnabled" type="checkbox" checked>
+          <span>Announce when RAVE ends and color reward is active again</span>
+        </div>
+        <div>
+          <label for="systemWidgetRaveOffAnnounceMessage">RAVE OFF CHAT MESSAGE</label>
+          <input id="systemWidgetRaveOffAnnounceMessage" type="text" placeholder="RAVE is now off. Change Lights redemption is active again.">
+        </div>
+        <div>
+          <label for="systemWidgetBlockedMessage">RAVE ACTIVE BLOCK MESSAGE</label>
+          <input id="systemWidgetBlockedMessage" type="text" placeholder="light commands are disabled while RAVE is active (runtime: 5 minutes)">
+        </div>
+      </div>
+      <div class="grid2">
+        <button id="systemWidgetGenerateBtn" type="button">GENERATE WIDGET JS</button>
+        <button id="systemWidgetCopyBtn" type="button">COPY WIDGET JS</button>
+      </div>
+      <div class="grid2">
+        <button id="systemWidgetOauthOpenBtn" type="button">OPEN TWITCH ACTIVATE PAGE</button>
+        <button id="systemWidgetOauthCopyBtn" type="button">COPY TWITCH ACTIVATE LINK</button>
+      </div>
+      <textarea id="systemWidgetOutput" rows="12" spellcheck="false" placeholder="Generated widget script appears here..."></textarea>
+      <p id="systemWidgetStatus" class="hint">Fill IDs + active parameters, then generate.</p>
+      <p class="hint">Status sync uses the System OAuth profile. DEV OAuth controls are diagnostics-only and are hidden unless DEV DEBUG is enabled.</p>
+      <p class="hint">SE bot chat uses StreamElements Kappa bot API and requires both SE BOT CHANNEL ID and SE BOT JWT.</p>
+      <p class="hint">Activation helper opens the Twitch Device OAuth page for the System OAuth lane.</p>
+      <p class="hint">DEV OAuth inputs are write-only, wiped after seed, and intended for controlled local diagnostics only.</p>
+    </div>
+  </div>
+
+  <!-- [TITLE] Cluster: DEV OPERATIONS -->
+  <!-- [DEV] Purpose: developer diagnostics and maintenance commands moved out of the theme cog. -->
+  <div class="cluster collapsible" data-collapsible-key="systemDevOperations" data-collapsed-default="1" data-collapsed-default-mobile="1">
+    <div class="clusterHeaderRow">
+      <h3>DEV OPERATIONS</h3>
+      <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide developer probes and maintenance commands.">COLLAPSE</button>
+    </div>
+    <div class="clusterBody">
+      <div class="controlRow">
+        <div class="grid2">
+          <button id="devDebugToggleBtn" type="button" class="warn">DEV DEBUG OFF</button>
+        </div>
+        <div>
+          <label for="devDebugStatus">DEV DEBUG STATUS</label>
+          <input id="devDebugStatus" type="text" value="Enables developer probes and maintenance commands. Use only for controlled testing." readonly>
+        </div>
+      </div>
+      <div id="devToolsPanel" class="hidden">
+        <div class="cluster collapsible" data-collapsible-key="systemDevOauth" data-collapsed-default-mobile="0">
+          <div class="clusterHeaderRow">
+            <h3>DEV OAUTH VAULT (WRITE-ONLY)</h3>
+            <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide dev OAuth credential controls.">COLLAPSE</button>
+          </div>
+          <div class="clusterBody">
+            <div class="controlRow">
+              <div>
+                <label for="systemWidgetTwitchClientId">TWITCH CLIENT ID</label>
+                <input id="systemWidgetTwitchClientId" type="password" placeholder="required for device OAuth + status-sync" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+              </div>
+              <div>
+                <label for="systemWidgetTwitchUserAccessToken">TWITCH USER ACCESS TOKEN</label>
+                <input id="systemWidgetTwitchUserAccessToken" type="password" placeholder="channel:manage:redemptions token" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+              </div>
+              <div>
+                <label for="systemWidgetTwitchBroadcasterId">TWITCH BROADCASTER ID</label>
+                <input id="systemWidgetTwitchBroadcasterId" type="password" placeholder="numeric broadcaster id" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+              </div>
+              <div class="grid2">
+                <button id="systemWidgetSensitiveToggleBtn" type="button">REVEAL SENSITIVE FIELDS</button>
+              </div>
+            </div>
+            <div class="grid2">
+              <button id="systemWidgetOauthSeedBtn" type="button">SEED DEV OAUTH VAULT</button>
+              <button id="systemWidgetOauthClearBtn" type="button" class="warn">CLEAR DEV OAUTH VAULT</button>
+            </div>
+            <div class="grid2">
+              <button id="systemWidgetOauthSyncToModBtn" type="button">SYNC DEV OAUTH TO MOD</button>
+            </div>
+            <p class="hint">DEV DEBUG must be ON. Values are accepted once, applied in memory, and input fields are wiped immediately.</p>
+            <p class="hint">System OAuth persists in its own local vault. Sync-to-mod is a DEV-only migration helper, not the normal status-sync path.</p>
+          </div>
+        </div>
+        <div class="controlRow">
+          <div class="grid2">
+            <button id="devToolRuntimeBtn" type="button">RUNTIME</button>
+            <button id="devToolConnectivityBtn" type="button">CONNECTIVITY</button>
+          </div>
+          <div class="grid2">
+            <button id="devToolHooksBtn" type="button">MOD HOOKS</button>
+            <button id="devToolTiersBtn" type="button">OC TIERS</button>
+          </div>
+        </div>
+        <div class="controlRow">
+          <div class="grid2">
+            <button id="reloadBtn" type="button">RAVE RELOAD</button>
+            <button id="hueEntBtn" type="button">HUE ENT</button>
+          </div>
+          <div class="grid2">
+            <button id="hueRestBtn" type="button">HUE REST</button>
+            <button id="serverStopBtn" type="button" class="warn">STOP SERVER</button>
+          </div>
+        </div>
+        <div class="controlRow">
+          <div>
+            <label for="devToolsStatus">DEV TOOLS STATUS</label>
+            <input id="devToolsStatus" type="text" value="DEV tools idle." readonly>
+          </div>
+        </div>
+        <textarea id="devToolsDump" rows="12" readonly>Run a DEV tool to inspect live JSON snapshots.</textarea>
+
+        <div class="subcluster collapsible" data-collapsible-key="systemApiRouteConsole" data-collapsed-default-mobile="1">
+          <div class="clusterHeaderRow">
+            <h3>BACKEND ROUTE CONSOLE</h3>
+            <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide direct backend route console.">COLLAPSE</button>
+          </div>
+          <div class="clusterBody">
+            <p class="hint">Direct API console for complete backend coverage. Load route catalog, pick a route, then execute with chosen method/body.</p>
+            <div class="controlRow">
+              <div>
+                <label for="systemRouteCatalogSelect">ROUTE CATALOG</label>
+                <select id="systemRouteCatalogSelect">
+                  <option value="">load route catalog...</option>
+                </select>
+              </div>
+              <div class="grid2">
+                <button id="systemRouteCatalogLoadBtn" type="button">LOAD ROUTE CATALOG</button>
+                <button id="systemRouteCatalogApplyBtn" type="button">USE SELECTED ROUTE</button>
+              </div>
+            </div>
+            <div class="controlRow">
+              <div>
+                <label for="systemRouteConsoleMethod">METHOD</label>
+                <select id="systemRouteConsoleMethod">
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="PATCH">PATCH</option>
+                  <option value="DELETE">DELETE</option>
+                </select>
+              </div>
+              <div>
+                <label for="systemRouteConsolePath">PATH</label>
+                <input id="systemRouteConsolePath" type="text" value="/health" placeholder="/system/core-status">
+              </div>
+              <div class="grid2">
+                <button id="systemRouteConsoleSendBtn" type="button">SEND REQUEST</button>
+                <button id="systemRouteConsoleCopyBtn" type="button">COPY RESPONSE JSON</button>
+              </div>
+            </div>
+            <div class="controlRow">
+              <div>
+                <label for="systemRouteConsoleBody">REQUEST BODY JSON</label>
+                <textarea id="systemRouteConsoleBody" rows="5" spellcheck="false" placeholder="{ }"></textarea>
+              </div>
+            </div>
+            <div class="controlRow">
+              <div>
+                <label for="systemRouteConsoleStatus">ROUTE CONSOLE STATUS</label>
+                <input id="systemRouteConsoleStatus" type="text" value="Route console idle." readonly>
+              </div>
+            </div>
+            <textarea id="systemRouteConsoleOutput" rows="12" readonly>Run request to inspect response JSON.</textarea>
+            <p class="hint">Dynamic route parameters use Express format in catalog (e.g. <code>/mods/:modId/:action</code>). Replace <code>:param</code> segments before sending.</p>
+          </div>
+        </div>
+
+        <div class="subcluster collapsible" data-collapsible-key="systemRustTransportWorker" data-collapsed-default-mobile="1">
+          <div class="clusterHeaderRow">
+            <h3>RUST TRANSPORT WORKER</h3>
+            <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide dedicated Rust transport worker controls.">COLLAPSE</button>
+          </div>
+          <div class="clusterBody">
+            <p class="hint">Dedicated controls for <code>/audio/rust/transport-worker/*</code> lanes (status, watchdog, adapters, lifecycle, and config patch).</p>
+            <div class="controlRow">
+              <div class="grid2">
+                <button id="systemRustWorkerStatusRefreshBtn" type="button">REFRESH STATUS</button>
+                <button id="systemRustWorkerAdaptersRefreshBtn" type="button">REFRESH ADAPTERS</button>
+              </div>
+              <div class="grid2">
+                <button id="systemRustWorkerWatchdogRefreshBtn" type="button">REFRESH WATCHDOG</button>
+                <button id="systemRustWorkerCopyBtn" type="button">COPY WORKER JSON</button>
+              </div>
+              <div>
+                <label for="systemRustWorkerStatusText">WORKER STATUS</label>
+                <input id="systemRustWorkerStatusText" type="text" value="Rust transport worker idle." readonly>
+              </div>
+            </div>
+            <div class="telemetry">
+              <div>AVAILABLE<br><span id="systemRustWorkerAvailable">-</span></div>
+              <div>RUNNING<br><span id="systemRustWorkerRunning">-</span></div>
+              <div>PID<br><span id="systemRustWorkerPid">-</span></div>
+              <div>STARTS<br><span id="systemRustWorkerStarts">0</span></div>
+              <div>RESTARTS<br><span id="systemRustWorkerRestarts">0</span></div>
+              <div>ERRORS<br><span id="systemRustWorkerErrors">0</span></div>
+              <div>LAST EVENT<br><span id="systemRustWorkerLastEvent">-</span></div>
+              <div>LAST REASON<br><span id="systemRustWorkerLastReason">-</span></div>
+            </div>
+            <div class="controlRow">
+              <div>
+                <label for="systemRustWorkerEnabled">ENABLED</label>
+                <select id="systemRustWorkerEnabled">
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              </div>
+              <div>
+                <label for="systemRustWorkerAutoStart">AUTO START</label>
+                <select id="systemRustWorkerAutoStart">
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              </div>
+              <div>
+                <label for="systemRustWorkerAdapterPreference">ADAPTER PREFERENCE</label>
+                <input id="systemRustWorkerAdapterPreference" type="text" value="auto" placeholder="auto">
+              </div>
+              <div>
+                <label for="systemRustWorkerWatchdogMs">WATCHDOG (ms)</label>
+                <input id="systemRustWorkerWatchdogMs" type="number" min="250" max="30000" step="50" value="2500">
+              </div>
+              <div>
+                <label for="systemRustWorkerRestartBackoffMs">RESTART BACKOFF (ms)</label>
+                <input id="systemRustWorkerRestartBackoffMs" type="number" min="100" max="60000" step="50" value="1200">
+              </div>
+            </div>
+            <div class="controlRow">
+              <div>
+                <label for="systemRustWorkerCommandPath">COMMAND PATH (OPTIONAL)</label>
+                <input id="systemRustWorkerCommandPath" type="text" placeholder="ravelink-transport-worker.exe">
+              </div>
+              <div class="grid2">
+                <button id="systemRustWorkerConfigApplyBtn" type="button">APPLY CONFIG</button>
+                <button id="systemRustWorkerStartBtn" type="button">START</button>
+              </div>
+              <div class="grid2">
+                <button id="systemRustWorkerStopBtn" type="button">STOP</button>
+                <button id="systemRustWorkerRestartBtn" type="button">RESTART</button>
+              </div>
+            </div>
+            <textarea id="systemRustWorkerDump" rows="10" readonly>Refresh status to inspect transport worker diagnostics.</textarea>
+          </div>
+        </div>
+      </div>
+      <p class="hint">DEV DEBUG gate remains required before any maintenance command executes.</p>
+    </div>
+  </div>
+
+  <div class="cluster">
+    <h3>FIXTURE TOPOLOGY</h3>
+    <div class="telemetry">
+      <div>HUE<br><span id="fixHue">0</span></div>
+      <div>WIZ<br><span id="fixWiz">0</span></div>
+      <div>HUE READY<br><span id="fixHueReady">0</span></div>
+      <div>WIZ READY<br><span id="fixWizReady">0</span></div>
+      <div>R:HUE<br><span id="routeHue">-</span></div>
+      <div>R:WIZ<br><span id="routeWiz">-</span></div>
+      <div>R:T-HUE<br><span id="routeTwitchHue">-</span></div>
+      <div>R:T-WIZ<br><span id="routeTwitchWiz">-</span></div>
+      <div>CFG VER<br><span id="cfgVer">0</span></div>
+      <div>CFG AT<br><span id="cfgAt">-</span></div>
+      <div>LOCK<br><span id="sceneLockStat">AUTO</span></div>
+      <div>POLL(ms)<br><span id="pollMs">220</span></div>
+    </div>
+  </div>
+
+</div>

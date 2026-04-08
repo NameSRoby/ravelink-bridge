@@ -1,0 +1,177 @@
+<!-- [TITLE] Section Template: public/templates/index/sections/panel-midi.html -->
+<!-- [DEV] Purpose: MIDI tab panel markup. -->
+<div id="midiTabPage" class="panel tabPage hidden" data-tab="midi">
+  <div class="cluster">
+    <h3>MIDI PERFORMANCE CONTROL <span class="infoTip" title="Turn a MIDI controller into a hands-on RaveLink control surface.">?</span></h3>
+    <p class="hint">Connect a keyboard, pad, or knob controller, pick what an input should control, then use learn mode so RaveLink maps the next note/CC you touch.</p>
+
+    <div class="midiOverview" aria-label="MIDI runtime overview">
+      <div>
+        <span>CONNECTION</span>
+        <strong id="midiConnectionSummary">CHECKING</strong>
+      </div>
+      <div>
+        <span>ACTIVE PORT</span>
+        <strong id="midiActivePortSummary">NONE</strong>
+      </div>
+      <div>
+        <span>PORTS</span>
+        <strong id="midiPortCount">0</strong>
+      </div>
+      <div>
+        <span>BOUND ACTIONS</span>
+        <strong id="midiConfiguredBindings">0</strong>
+      </div>
+    </div>
+
+    <div class="midiSetupGrid">
+      <div>
+        <label for="midiEnabled">MIDI INPUT</label>
+        <select id="midiEnabled">
+          <option value="true">enabled</option>
+          <option value="false">disabled</option>
+        </select>
+      </div>
+      <div>
+        <label for="midiPortSelect">INPUT PORT</label>
+        <select id="midiPortSelect"></select>
+      </div>
+      <div>
+        <label for="midiDeviceMatch">PORT NAME MATCH (OPTIONAL)</label>
+        <input id="midiDeviceMatch" type="text" placeholder="partial controller name">
+      </div>
+      <div class="grid2 midiSetupActions">
+        <button id="midiRefreshBtn" type="button">SCAN CONTROLLERS</button>
+        <button id="midiSaveCfgBtn" type="button">SAVE + CONNECT</button>
+      </div>
+    </div>
+
+    <div class="midiLearnDeck">
+      <div class="midiLearnIntro">
+        <span>LEARN WORKFLOW</span>
+        <strong>Choose what you want to control, arm learn, then press the pad/key or move the knob.</strong>
+      </div>
+      <div class="controlRow">
+        <div>
+          <label for="midiActionGroup">ACTION GROUP</label>
+          <select id="midiActionGroup">
+            <option value="core">core performance</option>
+            <option value="scene">scenes</option>
+            <option value="hz">auto hz / overclock</option>
+            <option value="palette">palette</option>
+            <option value="flow">flow intensity</option>
+            <option value="all">all actions</option>
+          </select>
+        </div>
+        <div>
+          <label for="midiLearnAction">ACTION TO LEARN / TEST</label>
+          <select id="midiLearnAction"></select>
+        </div>
+        <div>
+          <label for="midiSelectedActionSummary">SELECTED ACTION</label>
+          <input id="midiSelectedActionSummary" type="text" value="choose an action" readonly>
+        </div>
+      </div>
+      <div class="midiQuickLearnGrid" aria-label="Common MIDI learn shortcuts">
+        <button type="button" data-midi-learn-action="drop">Learn Drop Hit</button>
+        <button type="button" data-midi-learn-action="scene_auto">Learn Scene Auto</button>
+        <button type="button" data-midi-learn-action="scene_impact">Learn Impact Scene</button>
+        <button type="button" data-midi-learn-action="overclock_auto_toggle">Learn Auto Hz Toggle</button>
+        <button type="button" data-midi-learn-action="overclock_toggle">Learn Overclock Toggle</button>
+        <button type="button" data-midi-learn-action="palette_ordered">Learn Palette Ordered</button>
+      </div>
+      <div class="grid3 midiLearnActions">
+        <button id="midiLearnArmBtn" type="button">ARM LEARN</button>
+        <button id="midiTriggerBtn" type="button">TEST ACTION</button>
+        <button id="midiLearnCancelBtn" type="button">CANCEL LEARN</button>
+      </div>
+    </div>
+
+    <div class="midiSignalStrip" aria-label="Latest MIDI activity">
+      <div>
+        <label for="midiLearnStatus">LEARN MODE</label>
+        <input id="midiLearnStatus" type="text" value="idle" readonly>
+      </div>
+      <div>
+        <label for="midiLastEvent">LAST MIDI INPUT</label>
+        <input id="midiLastEvent" type="text" value="none" readonly>
+      </div>
+      <div>
+        <label for="midiLastAction">LAST RAVELINK ACTION</label>
+        <input id="midiLastAction" type="text" value="none" readonly>
+      </div>
+    </div>
+
+    <div class="cluster collapsible" data-collapsible-key="midiAdvancedMapping" data-collapsed-default="1" data-collapsed-default-mobile="1">
+      <div class="clusterHeaderRow">
+        <h3>ADVANCED MIDI MAPPING</h3>
+        <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide manual MIDI binding editor.">COLLAPSE</button>
+      </div>
+      <div class="clusterBody">
+        <p class="hint">Use this when learn mode grabbed the wrong control, when you need a specific channel, or when a knob should only trigger above a certain value.</p>
+        <div class="controlRow">
+          <div>
+            <label for="midiBindingAction">ACTION</label>
+            <select id="midiBindingAction"></select>
+          </div>
+          <div>
+            <label for="midiBindingType">INPUT TYPE</label>
+            <select id="midiBindingType">
+              <option value="note">note / pad / key</option>
+              <option value="cc">cc / knob / fader</option>
+            </select>
+          </div>
+          <div>
+            <label for="midiBindingNumber">NOTE / CC NUMBER</label>
+            <input id="midiBindingNumber" type="number" min="0" max="127" step="1" value="36">
+          </div>
+          <div>
+            <label for="midiBindingChannel">CHANNEL (BLANK = ANY)</label>
+            <input id="midiBindingChannel" type="number" min="1" max="16" step="1" placeholder="any">
+          </div>
+        </div>
+        <div class="controlRow">
+          <div>
+            <label for="midiVelocityThreshold">DEFAULT LEARN THRESHOLD</label>
+            <input id="midiVelocityThreshold" type="number" min="0" max="127" step="1" value="1">
+          </div>
+          <div>
+            <label for="midiBindingMinValue">TRIGGER THRESHOLD</label>
+            <input id="midiBindingMinValue" type="number" min="0" max="127" step="1" value="1">
+          </div>
+          <div class="grid3">
+            <button id="midiBindingSaveBtn" type="button">SAVE MANUAL BINDING</button>
+            <button id="midiBindingClearBtn" type="button" class="warn">CLEAR ACTION</button>
+            <button id="midiBindingResetBtn" type="button" class="warn">CLEAR ALL BINDINGS</button>
+          </div>
+        </div>
+        <p class="hint">If a knob or fader triggers too easily, raise <b>TRIGGER THRESHOLD</b>. For note/pad controls, a value of 1 usually means “press only, ignore release.”</p>
+      </div>
+    </div>
+
+    <div class="cluster collapsible" data-collapsible-key="midiDiagnostics" data-collapsed-default="1" data-collapsed-default-mobile="1">
+      <div class="clusterHeaderRow">
+        <h3>MIDI DIAGNOSTICS</h3>
+        <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide MIDI diagnostics.">COLLAPSE</button>
+      </div>
+      <div class="clusterBody">
+        <div class="controlRow">
+          <div>
+            <label for="midiModuleStatus">MODULE</label>
+            <input id="midiModuleStatus" type="text" value="checking..." readonly>
+          </div>
+          <div>
+            <label for="midiRuntimeStatus">RUNTIME</label>
+            <input id="midiRuntimeStatus" type="text" value="checking..." readonly>
+          </div>
+          <div>
+            <label for="midiActivePort">ACTIVE PORT DETAIL</label>
+            <input id="midiActivePort" type="text" value="none" readonly>
+          </div>
+        </div>
+        <label for="midiBindingsDump">BINDINGS SNAPSHOT</label>
+        <textarea id="midiBindingsDump" readonly>no bindings loaded yet</textarea>
+      </div>
+    </div>
+  </div>
+</div>

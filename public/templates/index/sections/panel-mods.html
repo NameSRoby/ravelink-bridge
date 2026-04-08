@@ -1,0 +1,165 @@
+<!-- [TITLE] Section Template: public/templates/index/sections/panel-mods.html -->
+<!-- [DEV] Purpose: MODS tab panel markup. -->
+<div id="modUiPanel" class="panel tabPage" data-tab="mods">
+  <div class="cluster collapsible" id="modCenter" data-collapsible-key="modCenter" data-collapsed-default="1">
+    <div class="clusterHeaderRow">
+      <h3>MOD CENTER</h3>
+      <div class="clusterHeaderActions">
+        <button id="moddingReadmeBtn" type="button" class="modReadmeBtn" title="Open developer modding docs in a separate page.">MODDING README</button>
+        <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide mod controls.">COLLAPSE</button>
+      </div>
+    </div>
+    <div class="clusterBody">
+      <p class="hint">
+        Add mod folders under <code>mods/</code> (each with <code>mod.json</code>), then use <b>RELOAD MODS</b>.
+      </p>
+      <p class="hint">
+        <code>0/2 loaded</code> is normal in a fresh distro when mods exist but are disabled in <code>mods/mods.config.json</code>.
+      </p>
+      <div id="modDropZone" class="modDropZone">
+        <div class="controlRow">
+          <div>
+            <label>DRAG + DROP MOD IMPORT</label>
+            <input id="modImportStatus" type="text" value="Drop a mod folder here, or browse and pick a folder." readonly>
+          </div>
+          <div class="grid2">
+            <button id="modImportBrowseBtn" type="button">BROWSE FOLDER</button>
+          </div>
+        </div>
+        <div class="controlRow">
+          <div>
+            <label style="font-size:11px;">
+              <input id="modImportOverwrite" type="checkbox">
+              overwrite existing mod with same id
+            </label>
+          </div>
+          <div>
+            <label style="font-size:11px;">
+              <input id="modImportEnable" type="checkbox" checked>
+              auto-enable + hotswap after import
+            </label>
+          </div>
+        </div>
+        <p class="hint">Folder must include <code>mod.json</code>. Supports drag/drop directly from Explorer.</p>
+        <input id="modImportPicker" type="file" webkitdirectory directory multiple class="hidden">
+      </div>
+      <div class="controlRow">
+        <div>
+          <label>MOD STATUS</label>
+          <input id="modsStatus" type="text" value="No mod data loaded yet." readonly>
+        </div>
+        <div class="grid2">
+          <button id="modsRefreshBtn" type="button" title="Fetch mod status from server without reloading modules.">REFRESH MODS</button>
+          <button id="modsReloadBtn" type="button" class="warn" title="Reload mods.config.json and re-instantiate enabled mods.">RELOAD MODS</button>
+        </div>
+      </div>
+      <div class="controlRow">
+        <div>
+          <label>MOD DEBUG LOGS</label>
+          <input id="modsDebugStatus" type="text" value="MOD DEBUG OFF" readonly>
+        </div>
+        <div class="grid2">
+          <button id="modsDebugToggleBtn" type="button" title="Enable or disable verbose [MODS][DBG] console logs.">MOD DEBUG OFF</button>
+          <button id="modsDebugClearBtn" type="button" title="Clear in-memory mod debug history buffer.">CLEAR DEBUG BUFFER</button>
+        </div>
+      </div>
+      <p class="hint">Average-user mode keeps mod debug logs off. Turn this on only while troubleshooting.</p>
+      <div class="controlRow">
+        <div>
+          <label for="modEnableId">MOD ID</label>
+          <input id="modEnableId" type="text" placeholder="quiet-hours-mod">
+          <label for="modHotswapStatus">HOTSWAP STATUS</label>
+          <input id="modHotswapStatus" type="text" value="No pending mod changes." readonly>
+        </div>
+        <div class="grid4">
+          <button id="modEnableBtn" type="button" title="Queue this mod to enable. Changes are not live until APPLY HOTSWAP.">QUEUE ENABLE</button>
+          <button id="modDisableBtn" type="button" title="Queue this mod to disable. Changes are not live until APPLY HOTSWAP.">QUEUE DISABLE</button>
+          <button id="modApplyBtn" type="button" class="warn" title="Apply all queued mod enable/disable changes live.">APPLY HOTSWAP</button>
+          <button id="modDiscardBtn" type="button" title="Discard queued changes and keep current loaded mods.">DISCARD CHANGES</button>
+        </div>
+      </div>
+      <p class="hint">Queue one or more mod enable/disable changes, then press <b>APPLY HOTSWAP</b> to load/unload without restarting the bridge.</p>
+      <p class="hint">Hover a mod ID to see its summary from <code>mod-info.txt</code>/<code>README.md</code> or <code>mod.json description</code>.</p>
+
+      <div class="subcluster modUiLauncher">
+        <h3>MOD UI LAUNCHER</h3>
+        <p class="hint">Loaded mods with UI assets create their own top tab. Use this only to pick one, refresh the catalog, or open it in a separate browser tab.</p>
+        <div class="modUiToolbar">
+          <div>
+            <label for="modUiSelect">MOD UI</label>
+            <select id="modUiSelect">
+              <option value="">no loaded mod UI</option>
+            </select>
+          </div>
+          <button id="modUiRefreshBtn" type="button" title="Refresh mod UI catalog from /mods/ui/catalog.">REFRESH UIs</button>
+          <button id="modUiReloadBtn" type="button" title="Open the selected mod UI in its generated RaveLink tab.">OPEN MOD TAB</button>
+        </div>
+        <div class="controlRow">
+          <div>
+            <label for="modUiStatus">MOD UI STATUS</label>
+            <input id="modUiStatus" type="text" value="Waiting for mod UI catalog..." readonly>
+          </div>
+          <div class="grid2">
+            <button id="modUiOpenBtn" type="button" title="Open selected mod UI in a separate browser tab.">OPEN IN NEW TAB</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>VERSION</th>
+              <th>ENABLED</th>
+              <th>PENDING</th>
+              <th>LOADED</th>
+              <th>HOOKS</th>
+              <th>ERROR</th>
+            </tr>
+          </thead>
+          <tbody id="modsRows"></tbody>
+        </table>
+      </div>
+
+      <div class="subcluster">
+        <h3>RUN MOD ACTION</h3>
+        <div class="controlRow">
+          <div>
+            <label for="modActionModId">MOD ID</label>
+            <input id="modActionModId" type="text" placeholder="hello-mod">
+          </div>
+          <div>
+            <label for="modActionName">ACTION</label>
+            <input id="modActionName" type="text" placeholder="status">
+          </div>
+          <div>
+            <label for="modActionMethod">METHOD</label>
+            <select id="modActionMethod">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+            </select>
+          </div>
+          <div class="grid2">
+            <button id="modActionRunBtn" type="button" title="Call /mods/:modId/:action using selected method.">RUN ACTION</button>
+          </div>
+        </div>
+        <textarea id="modActionOutput" readonly>Waiting for mod action...</textarea>
+        <p class="hint">Action calls use /mods/:modId/:action routes. Leave action blank to call /mods/:modId.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="modUiWorkbench" class="cluster">
+    <div id="modUiEmpty" class="modUiEmpty">
+      Select a loaded mod UI from the Mods tab or open its generated top tab.
+    </div>
+    <div id="modUiFrameWrap" class="modUiFrameWrap hidden">
+      <iframe
+        id="modUiFrame"
+        title="Mod UI host frame"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+      ></iframe>
+    </div>
+  </div>
+</div>

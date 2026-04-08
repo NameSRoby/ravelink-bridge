@@ -1,543 +1,148 @@
-# RaveLink Bridge
+# RaveLink Bridge v1.6.2
 
-Lightweight and powerful streamer-first local lighting engine for Philips Hue + WiZ, with Twitch-ready controls and modular brand extension via local mods.
+This repository contains the public source for the current RaveLink Bridge server release.
 
-Optional support: https://ko-fi.com/namesroby
+It intentionally keeps the core server, UI, scripts, and deep repository documentation, while excluding local runtime state and local-only mods.
 
-## Open Source Note
+## Current Status
 
-RaveLink-Bridge is open source. If you fork/remix and ship your own distro, attribution is appreciated (not required):
-- "NameSroby's RaveLink-Bridge"
+- New domain-first structure is in place.
+- First production slice is implemented:
+  - Twitch color prefixes (brand + per-fixture)
+  - `/teach` color learning with persistence + duplicate-safe refund signal
+  - `/color` parsing with fuzzy typo handling and Hue/WiZ payload translation
+  - Audio telemetry baseline:
+    - `GET /audio/status`
+    - `GET /audio/telemetry`
+    - `POST /audio/telemetry`
+    - Audio compatibility/config routes:
+      - `GET/POST /audio/config`
+      - `GET /audio/devices`
+      - `GET /audio/apps`
+      - `GET /audio/profiles`
+      - `GET/POST /audio/reactivity-map`
+      - `GET /audio/ffmpeg/app-isolation/locks`
+      - `POST /audio/ffmpeg/app-isolation/*`
+  - Engine v2 skeleton baseline:
+    - `GET /engine/v2/status`
+    - `GET /engine/v2/palette`
+    - `POST /engine/v2/start`
+    - `POST /engine/v2/stop`
+    - `POST /engine/v2/tick`
+    - `POST /engine/v2/palette/custom-color`
+    - `POST /engine/v2/palette/sequence`
+    - `POST /engine/v2/palette/cycle`
+    - `POST /engine/v2/palette/advance`
+  - UI compatibility route baseline:
+    - MIDI contract routes (`/midi/*`) now return deterministic compatibility snapshots
+    - Mods contract routes (`/mods/*`, `/mods/ui/catalog`, `/mods/runtime`, `/mods/hooks`)
+    - LIVE compatibility routes (`/rave/live/compatibility`, `/rave/live/trigger-matrix`)
+    - Rave palette/fixture metrics routes (`/rave/palette`, `/rave/fixture-metrics`, `/rave/fixture-routing/clear`)
+    - Overclock and probe compatibility routes (`/rave/overclock/*`, `/fixtures/*`, `/system/config`)
+    - Core diagnostics routes (`/system/startup-readiness`, `/system/core-status`, `/system/launcher-diagnostics`)
+  - `/rave/on`, `/rave/off`, and `/rave/status` compatibility routes now use telemetry-port rave state (no transferred engine runtime)
+  - Live profile storage endpoints (`save/load/delete`) with Live tab in `full` mode
+  - Frontend LIVE tab now defaults to a core-first surface (colors/scenes/auto-hz/brightness), with quick-jump buttons and core sections visible at load while non-core sections stay hidden by default
+  - UI shell refactor:
+    - Visual design preserved
+    - `public/index.html` no longer holds the monolithic page source
+    - `/` and `/index.html` are composed from modular section templates
+- Local runtime state, logs, vaults, and caches are intentionally excluded from source control.
+- The current song-request mod is intentionally not included in this repository or the packaged public release.
 
-## Download
-
-- Current Windows release (v1.5.3): https://github.com/NameSRoby/ravelink-bridge/releases/latest
-- All releases: https://github.com/NameSRoby/ravelink-bridge/releases
-
-This repository is aligned to `v1.5.3`.
-
-## Quick Install (Windows)
-
-1. Preferred when available: download `RaveLink-Bridge-Windows-v1.5.3-setup-installer.exe` and run it.
-2. ZIP fallback: download `RaveLink-Bridge-Windows-v1.5.3.zip` from Releases and extract it.
-3. Run `RaveLink-Bridge.bat`.
-4. Open `http://127.0.0.1:5050`.
-
-## v1.5.3 (Behavior Tuning + Hotfixes)
-
-This release focuses on runtime behavior tuning and packaging/install polish.
-
-- WiZ color behavior:
-  - significantly slower flow color shifts for cleaner, intentional transitions
-  - reduced rapid color churn in high-intensity passages
-- WiZ brightness behavior:
-  - wider dynamic range usage (deeper dims + stronger peaks)
-  - retains fast brightness response while keeping color shifts controlled
-- Installer + setup:
-  - setup now includes an optional task to run extra audio isolation tools
-  - release packaging/sanitize pipeline remains hardened
-
-Detailed release notes:
-- `CHANGELOG.md`
-
-## What This Is
-
-RaveLink Bridge runs on your stream PC and turns live audio + chat actions into Hue/WiZ light output.
-
-- Audio-reactive engine for music/gameplay
-- Twitch-triggerable color and scene control
-- Channel points/reward friendly HTTP endpoints
-- OBS dock URL built in (`/obs/dock`)
-- MIDI controller mapping tab (learn + bindings + trigger tests)
-- Mod system for adding other fixture brands without forking core Hue/WiZ transport logic
-
-## Security Defaults (v1.5.3)
-
-RaveLink Bridge is local-first and now ships with stricter default protections:
-
-- Mutating API routes are loopback-only by default.
-- Privileged read routes (fixture/config/discovery/device inventory) are loopback-only by default.
-- Mutating command routes (`/rave/on`, `/rave/off`, `/teach`, `/color`) require `POST`.
-- Hue Entertainment transport keeps TLS certificate verification enabled.
-- Sensitive values are redacted in logs by default; unsafe raw logging requires explicit ack.
-- Rate limits are applied across high-risk and high-churn endpoints.
-
-Optional network-access env flags (advanced users only):
-- `RAVELINK_ALLOW_REMOTE_WRITE=1`
-- `RAVELINK_ALLOW_REMOTE_PRIVILEGED_READ=1`
-
-
-> Developer note: this README is intentionally streamer-first. Developer setup and technical workflows are lower in this document under Developer Quick Start.
-
-## Streamer Quick Start
-
-If your stream setup gremlin appears at 2AM, this checklist is built for that exact moment.
-
-1. If you used the Windows installer or self-contained ZIP, you do not need a separate Node install.
-   - Source/minimal ZIP users: install Node.js LTS from `https://nodejs.org`.
-2. Double-click `RaveLink-Bridge.bat`.
-   - Self-contained distro builds default to offline-safe verify mode (no automatic dependency downloads).
-3. Wait for the launcher window to show:
-   - `Bridge URL: http://127.0.0.1:5050`
-4. The browser should open automatically.
-5. If the browser does not open automatically, open:
-   - `http://127.0.0.1:5050`
-6. Go to `FIXTURE LIST`:
-   - Delete placeholder fixtures (`hue-main-1`, `wiz-background-1`, `wiz-custom-1`) if they are still there.
-7. Add your real fixtures in `FIXTURE PAIRING / DEVICE SETUP`:
-   - Hue: set `bridgeIp`, `username`, `lightId` (plus `bridgeId` + `clientKey` for Entertainment).
-   - WiZ: set `ip`.
-8. Go to `DEVICE ROUTING` and pick each fixture, then set modes:
-   - `ENGINE` = audio reactive engine
-   - `TWITCH` = chat/reward `/color` control
-   - `CUSTOM` = manual/custom fixture behavior
-9. Click `APPLY ROUTING` for each fixture you changed.
-10. Optional advanced audio app/process isolation tools:
-   - Run `RaveLink-Bridge-Install-Optional-Audio-Tools.bat` (also available as an installer checkbox)
-11. Click `TEST CONNECTIVITY` and confirm fixture target status is ready.
-12. Start the show with `RAVE ON`.
-13. Optional: open `MIDI` tab and map your controller buttons/knobs.
-14. Stop with `RAVE OFF` when done.
-
-**Stop options**
-- `RaveLink-Bridge-Stop.bat`
-- `RaveLink-Bridge-Stop.sh` (Linux/macOS shell)
-- `Ctrl+C` in the launcher window
-- `npm run stop` (terminal method)
-
-Why this matters:
-- Use one of the stop methods above so Node shuts down cleanly.
-- If you just close windows/tabs the wrong way, the Node process can keep running in the background.
-- That is not malware, just an unclean shutdown where the local bridge server did not exit properly.
-
-**Terminal fallback (if needed)**
+## Start From Source
 
 ```bash
 npm install
 npm start
 ```
 
-## Linux Bring-Up (Experimental)
+Windows fast-start launcher:
 
-Linux startup is now supported for source runs, but Windows remains the primary validated platform.
-
-1. Install Node.js LTS and npm.
-2. From project root, run:
-   - `bash RaveLink-Bridge.sh`
-3. Open:
-   - `http://127.0.0.1:5050`
-4. Stop with:
-   - `bash RaveLink-Bridge-Stop.sh`
-   - or `Ctrl+C` in the terminal running the bridge.
-
-Notes:
-- Full Linux parity is not guaranteed yet (especially native audio/MIDI stack differences).
-- If browser auto-open is unavailable in your environment, open the URL manually.
-
-## Twitch + Channel Points Setup
-
-How this integration is meant to work:
-- RaveLink Bridge runs locally on your stream PC (`http://127.0.0.1:5050`).
-- Twitch reward listener code runs inside a StreamElements Custom Widget (overlay code).
-- OBS loads that StreamElements overlay URL as a Browser Source.
-- The integration bot must be connected to your channel chat (StreamElements bot, Streamer.bot account, Mix It Up, etc.), otherwise channel-point/chat activations are not seen.
-
-If "where does this code go?" is ever the question, the answer is: inside the StreamElements widget JS panel, not in `server.js`.
-
-### Option A: StreamElements Widget (overlay logic)
-
-Use this exact template file:
-- `INTEGRATIONS_TWITCH/START-HERE-STREAMELEMENTS-WIDGET-TEMPLATE/PASTE-INTO-STREAMELEMENTS-CUSTOM-WIDGET.js`
-
-Step-by-step:
-1. Start `RaveLink-Bridge.bat` first, so the local bridge is already live.
-2. Make sure your integration bot is in your Twitch chat before testing rewards.
-3. Make sure OBS is running and the StreamElements overlay Browser Source is active.
-4. In Twitch Creator Dashboard, create your Channel Point rewards (for example `Rave`, `Teach`, `Color`).
-5. Open Twitch Creator Dashboard -> Viewer Rewards -> Channel Points, then copy each reward ID.
-6. Open the template file above in a code editor.
-7. Edit these constants in that file:
-   - `COLOR_REWARD_ID`
-   - `TEACH_REWARD_ID`
-   - `RAVE_REWARD_ID`
-   - `TEACH_REWARD_ID` input format: `<name> <#RRGGBB>` (example `toxic_green #39ff14`).
-   - Use underscores/hyphens in `<name>` (spaces are not supported in teach names).
-8. Leave `BASE_URL = "http://127.0.0.1:5050"` when OBS + bridge run on the same PC.
-9. Open StreamElements -> `My Overlays` -> your overlay -> `+` -> `Static/Custom` -> `Custom Widget`.
-10. In widget editor:
-   - Paste full template code into the `JS` tab.
-   - `HTML`/`CSS` can stay empty for this listener-only widget.
-11. Save the overlay.
-12. Copy the overlay URL from StreamElements.
-13. In OBS, add or update a `Browser Source` that points to that overlay URL.
-14. Keep that Browser Source active during stream.
-15. Trigger one reward in Twitch chat and confirm lights respond.
-
-If rewards trigger in StreamElements but lights do not move, re-check:
-- `BASE_URL` value
-- reward IDs in the template
-- widget code is in the StreamElements `JS` tab (not in bridge files)
-- bridge is running (`http://127.0.0.1:5050` opens)
-- integration bot is connected to chat
-- OBS is running with the overlay Browser Source active
-
-### Option B: Streamer.bot / Mix It Up / SAMMI / any bot with HTTP actions
-
-Use reward triggers or chat command actions to call bridge endpoints, for example:
-- `POST http://127.0.0.1:5050/rave/on`
-- `POST http://127.0.0.1:5050/rave/off`
-- `POST http://127.0.0.1:5050/color?value1=purple`
-- `POST http://127.0.0.1:5050/teach` with JSON body `{ "value1": "toxic_green #39ff14" }`
-
-### Overlay/Chat Bot Compatibility
-
-Any overlay or bot can work if it can send HTTP requests to the bridge host.
-
-- Local bot on stream PC: use `http://127.0.0.1:5050`.
-- Bot on another machine: use the stream PC LAN IP (for example `http://192.168.1.x:5050`) and allow LAN access.
-- Cloud bot service: cannot reach your localhost directly without a relay/tunnel. If you expose the bridge, secure it and limit commands.
-
-## Stream Command Matrix (Channel Points First)
-
-Plain-English flow:
-1. Viewer redeems a channel point reward (optionally with text input).
-2. Your bot/overlay reads that text and sends one HTTP request to the bridge.
-3. The bridge applies the action to fixtures that are routed for `TWITCH`.
-
-What the included StreamElements widget supports out of the box:
-- `RAVE_REWARD_ID` -> calls `/rave/on` (then auto `/rave/off` after timeout).
-- `COLOR_REWARD_ID` -> sends reward text to `POST /color?value1=...`.
-- `TEACH_REWARD_ID` -> sends reward text to `POST /teach?value1=...`.
-
-Concrete channel point examples (default widget behavior):
-
-| Viewer input or reward text | Bot HTTP request | What happens |
-|---|---|---|
-| Reward title `RAVE` | `POST http://127.0.0.1:5050/rave/on` | Starts rave engine (default widget then auto-calls `/rave/off` after timeout). |
-| Reward text `blue` | `POST http://127.0.0.1:5050/color?value1=blue` | Applies blue using current Twitch color config (default unprefixed target is `hue`, auto-falls back to `wiz` if no Hue fixtures are routed). |
-| Reward text `wiz blue` | `POST http://127.0.0.1:5050/color?value1=wiz+blue` | Applies blue to WiZ-routed fixtures only. |
-| Reward text `hue blue` | `POST http://127.0.0.1:5050/color?value1=hue+blue` | Applies blue to Hue-routed fixtures only. |
-| Reward text `toxic_green #39ff14` (Teach reward) | `POST http://127.0.0.1:5050/teach?value1=toxic_green+%2339ff14` | Learns a new color alias named `toxic_green`. |
-
-How much can you customize:
-- You can name rewards anything (`Blue`, `Wiz Blue`, `Rave Start`, etc.).
-- You can map one action to channel points, chat, deck buttons, or all of them.
-- You can hardcode values in your bot or parse viewer-provided text.
-- You can control who can trigger actions using reward/bot permission settings.
-- Keep admin endpoints private (`/rave/panic`, `/system/stop`, `/rave/reload`).
-
-Full endpoint reference:
-The routes below are available in the bridge API, but anything beyond the 3 default widget reward IDs requires your own bot/automation mapping.
-
-| Stream action idea | Endpoint | Example |
-|---|---|---|
-| Start show | `POST /rave/on` | `http://127.0.0.1:5050/rave/on` |
-| Stop show | `POST /rave/off` | `http://127.0.0.1:5050/rave/off` |
-| Force drop pulse | `POST /rave/drop` | `http://127.0.0.1:5050/rave/drop` |
-| Teach color alias (`<name> <#RRGGBB>`) | `POST /teach` | body: `{"value1":"toxic_green #39ff14"}` |
-| Apply named color | `POST /color` | `/color?value1=hot+pink` |
-| Color only Hue | `POST /color` | `/color?value1=cyan&target=hue` |
-| Color only WiZ | `POST /color` | `/color?value1=orange&target=wiz` |
-| Color specific route zone | `POST /color` | `/color?value1=red&zone=wiz` |
-| Get palette runtime | `GET /rave/palette` | `/rave/palette` |
-| Update palette config | `POST /rave/palette` | body: `{"families":["blue","purple"],"colorsPerFamily":3,"disorder":false}` |
-| Set behavior mode (interpret only) | `POST /rave/mode?name=bpm` | `/rave/mode?name=bpm` |
-| Lock scene | `POST /rave/scene?name=<scene>` | `/rave/scene?name=flow` |
-| Release scene lock | `POST /rave/scene/auto` | `/rave/scene/auto` |
-| Scene sync control (compat; WiZ standalone enforced) | `POST /rave/scene/sync?enabled=<true|false>` | `/rave/scene/sync?enabled=true` |
-| Set auto profile | `POST /rave/auto/profile?name=<profile>` | `/rave/auto/profile?name=reactive` |
-| Set audio reactivity | `POST /rave/audio/reactivity?name=<preset>` | `/rave/audio/reactivity?name=aggressive` |
-| Set flow intensity | `POST /rave/flow/intensity?value=<0.35-2.5>` | `/rave/flow/intensity?value=1.35` |
-| Meta auto on | `POST /rave/meta/auto/on` | `/rave/meta/auto/on` |
-| Meta auto off | `POST /rave/meta/auto/off` | `/rave/meta/auto/off` |
-| Meta auto explicit flag | `POST /rave/meta/auto?enabled=<true|false>` | `/rave/meta/auto?enabled=true` |
-| Overclock base on/off | `POST /rave/overclock/on` or `/off` | `/rave/overclock/on` |
-| Overclock turbo | `POST /rave/overclock/turbo/on` | `/rave/overclock/turbo/on` |
-| Overclock ultra | `POST /rave/overclock/ultra/on` | `/rave/overclock/ultra/on` |
-| Overclock extreme | `POST /rave/overclock/extreme/on` | `/rave/overclock/extreme/on` |
-| Overclock insane | `POST /rave/overclock/insane/on` | `/rave/overclock/insane/on` |
-| Overclock hyper | `POST /rave/overclock/hyper/on` | `/rave/overclock/hyper/on` |
-| Overclock ludicrous | `POST /rave/overclock/ludicrous/on` | `/rave/overclock/ludicrous/on` |
-
-Common values:
-- Mode names: `bpm` (alias: `interpret`)
-- Scene names: `auto`, `idle_soft`, `flow`, `pulse_strobe`
-- Auto profiles: `reactive`, `balanced`, `cinematic`
-- Audio reactivity presets: `balanced`, `aggressive`, `precision`
-- Palette families: `blue`, `purple`, `red`, `green`, `yellow`
-- Colors per family: `1`, `3`, `5`
-- Palette order mode: `ordered`, `disorder`
-- Song metric mode: `manual`, `meta_auto`
-- Manual metric keys: `baseline`, `peaks`, `transients`, `flux`
-- Teach payload format: `<name> <#RRGGBB>` (example `laser_blue #00aaff`, query-string encoded as `laser_blue+%2300aaff`)
-
-Admin-only (do not expose to public chat):
-- `POST /rave/panic`
-- `POST /rave/reload`
-- `POST /system/stop`
-- `POST /rave/overclock/dev/<20|30|40|50|60>/on?unsafe=true`
-- `POST /mods/hooks/:hook`
-- `POST /mods/debug`
-- `POST /mods/debug/clear`
-
-## Routing Rules That Matter For Streaming
-
-- Hue fixtures stay on Hue paths, WiZ fixtures stay on WiZ paths.
-- `engineEnabled` and `customEnabled` cannot both be active on the same fixture.
-- `TWITCH` commands only affect fixtures with `twitchEnabled: true`.
-- Route values shown in UI (`HUE_STATE`, `WIZ_PULSE`, `TWITCH_HUE`, `TWITCH_WIZ`) are derived from fixture mode toggles.
-- Canonical built-in zones are `hue`, `wiz`, and `custom`.
-
-## Troubleshooting
-
-If audio is moving but bulbs are static:
-- Verify fixture credentials/IP are valid.
-- Confirm fixture mode toggles are enabled and route was applied.
-- Check connectivity with `TEST CONNECTIVITY`.
-- Confirm command target/zone actually maps to routed fixtures.
-
-Log hints:
-- `[HUE][ENT] ... missing bridgeIp/username/bridgeId/clientKey` means Hue fixture or env config is incomplete.
-- `[WIZ] no engine targets ... fixtures routed but not configured` means WiZ fixtures exist but have missing/invalid IP.
-- `no routed fixtures matched` from `/color` means Twitch route + target filters found zero fixtures.
-
-## MIDI Quick Start
-
-1. Open the `MIDI` tab (auto-shows when a MIDI input device is detected).
-2. Select `MIDI INPUT PORT` and click `SAVE MIDI CFG`.
-3. Choose a `LEARN ACTION`, click `ARM LEARN`, then press your controller key/knob.
-4. Verify with `TRIGGER ACTION` and watch `LAST ACTION`.
-5. Fine-tune or manually edit bindings in `LEARN + BINDINGS`.
-
-Notes:
-- If no MIDI device is detected, you can force-show the MIDI tab from the settings cog (`MIDI TAB` toggle).
-- `DEV TOOLS` in the settings cog only appear when `DEV DEBUG` is enabled.
-- Expanded MIDI actions include palette controls (`ORDERED/DISORDER`, family toggles, `1/3/5` colors, quick presets), `AUTO HZ` toggles, `FLOW INTENSITY` up/down/reset, and WiZ scene-sync toggle.
-
-## OBS Dock
-
-Add this URL to OBS custom docks:
-
-- `http://127.0.0.1:5050/obs/dock`
-
-Optional expanded layout URL:
-
-- `http://127.0.0.1:5050/obs/dock?compact=0`
-
-Notes:
-- The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
-- Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
-
-## Version 1.5.3 Notes
-
-- This release is mostly behavior tuning + hotfixes.
-- Main focus:
-  - WiZ color shift pacing slowed down substantially for cleaner visual intent
-  - WiZ brightness contrast extended so dim/bright passages read more naturally
-  - setup installer now offers an optional "install audio isolation tools" task
-- Core control model remains the same (no workflow reset required).
-
-For older major feature lists, see tag history under Releases.
-
-## Developer Quick Start
-
-Developer tip:
-- Most setup categories in this README have their own quick-start directly under the category heading (Streamer, Twitch, MIDI, OBS, Developer).
-
-1. Install dependencies and run:
-
-```powershell
-npm install
-npm start
+```bat
+RaveLink-Bridge-Start.bat
 ```
 
-2. Open `http://127.0.0.1:5050`.
-3. Run targeted syntax checks:
+What it does:
+- First boot: installs dependencies automatically.
+- Next boots: skips install on fast path unless lockfile changed.
+- Launches server directly via `node src/app/index.js` for low startup overhead.
+- Runs startup preflight checks (`node`, `npm`, required script/entrypoint files) before boot.
+- Attempts stale-port recovery when an older bridge listener is holding bridge port.
+- Refuses force-kill when the port holder is not this bridge process.
+- Pauses after bridge process exit so diagnostics stay visible.
+- Sets launcher browser-open policy defaults (`RAVELINK_FORCE_AUTO_BROWSER=1`), while helper-owned launch disables server-side auto-open for that session.
+- Arms launcher-side readiness helper (`scripts/launcher-open-browser.js`) that:
+  - disables server-side auto-browser open for launcher session and owns browser-open flow
+  - waits for `/health`
+  - checks `/system/launcher-diagnostics`
+  - opens the bridge URL via default browser deterministically
+  - writes helper logs to `runtime/logs/launcher-browser-open.log`
 
-```powershell
-node --check server.js
-node --check core\rave-engine.js
-node --check core\fixtures.js
-node --check core\mods\mod-loader.js
-node --check core\midi\midi-manager.js
-node --check core\midi\midi-learn.js
+Useful flags:
+- `RaveLink-Bridge-Start.bat --install-only` (install/check deps without starting server)
+- `RaveLink-Bridge-Start.bat --force-install` (force reinstall dependencies)
+- `RaveLink-Bridge-Start.bat --skip-install` (skip bootstrap and launch immediately)
+
+Graceful local stop helper:
+
+```bat
+RaveLink-Bridge-Stop.bat
 ```
 
-4. For broad checks:
+Browser auto-launch notes:
+- Server startup (`npm start`) uses OS-native default-browser launchers.
+- Windows uses fallback launch sequence (`cmd start` -> `PowerShell Start-Process` -> `rundll32`) for stronger reliability.
+- You can suppress launcher/browser auto-open by setting `RAVELINK_DISABLE_AUTO_BROWSER=1`.
+- Sibling-repo rust tool lookup is disabled by default; set `RAVELINK_ALLOW_SIBLING_REPO_TOOLS=1` to re-enable legacy sibling fallback behavior.
 
-```powershell
-Get-ChildItem -Recurse -File -Filter *.js |
-  Where-Object { $_.FullName -notmatch '\\node_modules\\' -and $_.FullName -notmatch '\\release\\' } |
-  ForEach-Object { node --check $_.FullName }
+Bridge URL defaults to:
+
+`http://127.0.0.1:5050`
+
+## Package Public Release
+
+Create the public Windows release zip with runtime dependencies included:
+
+```bash
+npm run package:release
 ```
 
-## Repository Map
+This builds:
 
-- `server.js`: API surface, runtime orchestration, transport lifecycle
-- `core/rave-engine.js`: audio-to-intent logic
-- `core/audio.js`: capture + telemetry
-- `core/fixtures.js`: fixture registry, validation, coupling, derived routing
-- `core/mods/mod-loader.js`: trusted local mod loader and hook runner
-- `core/midi/midi-manager.js`: MIDI runtime, port connect/reconnect, action dispatch
-- `core/midi/midi-learn.js`: MIDI config + learn/binding persistence
-- `core/hue-scheduler.js`: Hue scheduler
-- `core/hue-entertainment.js`: Hue Entertainment transport path
-- `core/wiz-scheduler.js` + `adapters/wiz-adapter.js`: WiZ transport path
-- `mods/`: local mods (`mod.json` + entrypoint)
-- `docs/`: project docs
-- `scripts/sanitize-release.js`: scrub release-sensitive files
-- `scripts/export-redistributable.js`: generate distributable folder
+`dist/RaveLink-Bridge-v1.6.2.zip`
 
-## Runtime Architecture
+Release package rules:
 
-1. `core/audio.js` emits telemetry.
-2. `core/rave-engine.js` emits intents (`HUE_STATE`, `WIZ_PULSE`, Twitch variants).
-3. `core/fixtures.js` resolves mode/brand/zone eligible fixtures.
-4. Built-in Hue/WiZ transports send output with scheduler and state gating.
-5. Mods can observe and extend behavior through hook APIs.
+- includes the runnable app plus `node_modules`
+- excludes local runtime state and logs
+- excludes the local song-request mod
+- ships an empty `mods/` folder so optional local mods can still be added later
 
-Core API families:
-- `/rave/*`
-- `/audio/*`
-- `/fixtures/*`
-- `/hue/*`
-- `/wiz/*`
-- `/automation/*`
-- `/mods/*`
-- `/midi/*`
+## Test
 
-## Fixture Model And Modular Brand Path
-
-Config file:
-- `core/fixtures.config.json`
-
-Built-in brands:
-- `hue`
-- `wiz`
-
-Mod brands:
-- any lowercase id matching `^[a-z][a-z0-9_-]{1,31}$` (example `http-rgb`)
-
-Per fixture mode flags:
-- `engineEnabled`
-- `twitchEnabled`
-- `customEnabled`
-
-Coupling rules:
-- Built-in brand coupling is strict (`hue` to Hue path, `wiz` to WiZ path).
-- `engineEnabled` and `customEnabled` are mutually exclusive.
-- Mod-brand fixtures can carry extra fields for adapter metadata.
-
-Recommended extension flow:
-1. Create/load your mod adapter (`mods/<your-mod>/mod.json` + `index.js`).
-2. Add mod-brand fixtures either:
-   - in UI (`FIXTURES -> FIXTURE PAIRING / DEVICE SETUP -> BRAND -> Mod Brands`), or
-   - directly in `core/fixtures.config.json`.
-3. Route fixtures in `FIXTURES -> DEVICE ROUTING` (new fixtures default to `ENGINE + TWITCH`).
-4. Use helper APIs such as `api.getFixturesBy`, `api.getIntentZones`, `api.normalizeRgbState`, and `api.createStateGate`.
-5. Expose optional mod endpoints through `onHttp`.
-
-Reference mod:
-- `mods/http-rgb-brand-mod/`
-
-## Mod Developer Diagnostics
-
-Detailed mod logs now include:
-- `sectionTitle` (for example `CONFIG`, `DISCOVERY`, `LIFECYCLE`, `HOOKS`, `HTTP`)
-- `explanation` (human-readable reason for the event)
-- high-resolution `durationMs` on hook/lifecycle events
-- structured payload/result snapshots with secret redaction
-
-Endpoints:
-- `GET /mods/debug?limit=<n>&sinceSeq=<seq>`
-- `POST /mods/debug` (toggle/update: `enabled`, `maxEvents`, `maxPayloadChars`, `maxDepth`)
-- `POST /mods/debug/clear`
-
-## Optional Core File Lock
-
-Commands:
-
-```powershell
-npm run core:lock
-npm run core:unlock
-npm run core:lock:status
-npm run core:unlock:key:init
-npm run core:unlock:key:status
+```bash
+npm test
 ```
 
-Unlock is key-protected:
+## Pre-Engine Gates
 
-```powershell
-# one-time key generation
-npm run core:unlock:key:init
-
-# unlock using env var
-$env:RAVELINK_CORE_UNLOCK_KEY="<paste-key>"
-npm run core:unlock
-
-# unlock using CLI flag
-node scripts/core-lock.js unlock --key "<paste-key>"
+```bash
+npm run verify:architecture
+npm run verify:security
+npm run verify:audit
+npm run verify:readiness
 ```
 
-Manifest:
-- `core/core-lock-manifest.json`
+Lock baseline snapshot:
 
-## Release Workflow
-
-1. Stop bridge.
-2. Sanitize and export:
-
-```powershell
-npm run sanitize:release
-npm run export:redistributable
+```bash
+npm run baseline:lock
 ```
 
-3. Zip:
+## Documentation
 
-```powershell
-Compress-Archive -Path .\release\RaveLink-Bridge-Windows-v1.5.3\* -DestinationPath .\release\RaveLink-Bridge-Windows-v1.5.3.zip -Force
-```
+See:
 
-Output:
-- `release/RaveLink-Bridge-Windows-v1.5.3`
-
-### Setup EXE Build (Windows)
-
-Use this to produce a self-contained installer payload (bundled `node_modules` + local Node runtime, optional bundled `ffmpeg` when available on the build machine) and compile a setup EXE when Inno Setup is installed.
-
-```powershell
-npm run build:setup:windows
-```
-
-Outputs:
-- `release/RaveLink-Bridge-Windows-v1.5.3`
-- `release/RaveLink-Bridge-Windows-v1.5.3-self-contained.zip`
-- `release/installer/RaveLink-Bridge-Windows-v1.5.3-setup-installer.iss`
-- `release/RaveLink-Bridge-Windows-v1.5.3-setup-installer.exe` (when `ISCC.exe` is available)
-
-## Security And Data Hygiene
-
-- Keep local backups private (`backups/`, `core/backups/`).
-- Do not publish real fixture credentials/tokens/IPs.
-- Use `sanitize-release` before publishing redistributables.
-- `sanitize-release` now purges repo/release backup artifacts by default; use `--keep-backups` (or `RAVELINK_SANITIZE_KEEP_BACKUPS=1`) only for local-only workflows.
-
-## Related Docs
-
-- Developer guide: `docs/DEVELOPER_GUIDE.md`
-- Modding: `docs/MODS.md`
-- Streaming integrations: `docs/STREAMING_INTEGRATIONS.md`
-- Launch checklist: `docs/LAUNCH_CHECKLIST.md`
-- Third-party notices: `THIRD_PARTY_NOTICES.md`
-- 
-<img alt="UI_GREEN" src="https://github.com/user-attachments/assets/34c965f8-5262-466d-b217-d87084f568ec" height="702" />
-<img alt="UI_RED" src="https://github.com/user-attachments/assets/10122b60-abf7-4538-ae80-b84a3a55b5ae" height="702" />
-<img alt="UI_ORANGE" src="https://github.com/user-attachments/assets/152771b7-d5aa-44ca-b483-94155f306523" height="702" />
-<img alt="UI_BLUE" src="https://github.com/user-attachments/assets/fbf283fc-a1c1-4dc0-ace5-b1f4ff96f7a6" height="702" />
-
-## License
-
-ISC (`LICENSE`)
-
-
-
+- `docs/repo-documentation/README.md` (complete repository documentation)
+- `THIRD_PARTY_NOTICES.md`

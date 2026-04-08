@@ -1,13 +1,13 @@
 node_modules/
-release/
 .runtime/
-.pushrepo/
-core/fixtures.config.local.backup.json
-core/.core-lock.key
-ravelink-bridge/
-
-# Runtime/local artifacts that may contain personal network data or keys
-backups/
-core/backups/
+runtime/
+dist/
+coverage/
 *.log
+*.pid
 *.tmp
+.tmp-debug-*/
+mods/
+docs/*
+!docs/repo-documentation/
+!docs/repo-documentation/**

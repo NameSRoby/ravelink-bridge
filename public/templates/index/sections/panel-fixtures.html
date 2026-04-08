@@ -1,0 +1,338 @@
+<!-- [TITLE] Section Template: public/templates/index/sections/panel-fixtures.html -->
+<!-- [DEV] Purpose: FIXTURES tab panel markup. -->
+<div class="panel tabPage" data-tab="fixtures">
+  <div class="cluster">
+    <h3>FIXTURE PAIRING / DEVICE SETUP</h3>
+    <div class="fixtureGrid">
+      <div>
+        <label for="fxBrand">BRAND</label>
+        <select id="fxBrand">
+          <option value="hue">Hue</option>
+          <option value="wiz">WiZ</option>
+          <optgroup id="fxModBrandGroup" label="Mod Brands (locked)" disabled>
+            <option value="" disabled>No mod brands detected</option>
+          </optgroup>
+        </select>
+        <div id="fxModBrandStatus" class="hint fixtureModBrandStatus prefixDisabled">
+          Mod fixture brands unlock when mods are discovered.
+        </div>
+      </div>
+      <div id="fxModBrandWrap" class="hidden">
+        <label for="fxModBrandId">MOD BRAND ID <span class="infoTip" title="Lowercase adapter brand id provided by your mod (example: http-rgb).">?</span></label>
+        <input id="fxModBrandId" class="mono" type="text" placeholder="example: http-rgb" autocomplete="off" spellcheck="false" maxlength="32">
+      </div>
+      <div>
+        <label for="fxId">ID</label>
+        <input id="fxId" type="text" placeholder="auto if blank">
+      </div>
+      <div>
+        <label for="fxZone">ZONE</label>
+        <input id="fxZone" type="text" placeholder="custom path (e.g. desk-left)">
+      </div>
+      <div>
+        <label for="fxEnabled">ENABLED</label>
+        <select id="fxEnabled">
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      </div>
+      <div id="fxHueLightWrap">
+        <label for="fxLightId">HUE LIGHT ID <span class="infoTip" title="The numeric Hue light id for REST commands. Use the same id shown by the Hue API/bridge app.">?</span></label>
+        <input id="fxLightId" type="number" min="1" value="1">
+      </div>
+      <div id="fxWizIpWrap" class="hidden">
+        <label id="fxWizIpLabel" for="fxWizIp">WIZ IP <span class="infoTip" title="LAN IP of the WiZ fixture. One fixture per entry in this form.">?</span></label>
+        <div class="secretFieldRow">
+          <input id="fxWizIp" type="password" placeholder="192.168.x.x" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+          <button id="fxWizIpShowBtn" type="button" class="warn secretToggleBtn" title="Reveal or hide this sensitive field.">SHOW</button>
+        </div>
+      </div>
+      <div id="fxWizOnboardingWrap" class="subcluster hidden">
+        <h3>WIZ IP-FIRST ONBOARDING</h3>
+        <div class="controlRow">
+          <div class="grid2">
+            <button id="fxWizManualGuideBtn" type="button" title="Show the primary manual WiZ onboarding path.">IP ENTRY GUIDE</button>
+            <button id="fxWizDiscoverBtn" type="button" title="Optional helper: discover WiZ devices on local LAN.">OPTIONAL: DISCOVER WIZ</button>
+          </div>
+          <div>
+            <label for="fxWizDiscoverSelect">DISCOVERED WIZ DEVICES (OPTIONAL)</label>
+            <select id="fxWizDiscoverSelect">
+              <option value="">No discovery run yet.</option>
+            </select>
+          </div>
+          <div class="grid2">
+            <button id="fxWizUseSelectedBtn" type="button" title="Apply selected discovered WiZ device IP to WIZ IP field.">USE SELECTED IP</button>
+            <button id="fxWizClearDiscoveryBtn" type="button" title="Clear discovered WiZ helper list.">CLEAR DISCOVERY LIST</button>
+          </div>
+          <div>
+            <label for="fxWizOnboardingStatus">WIZ ONBOARDING STATUS</label>
+            <input id="fxWizOnboardingStatus" type="text" value="Manual WiZ IP entry is primary." readonly>
+          </div>
+        </div>
+        <p class="hint">Primary workflow: enter WiZ IP manually and save fixture. Discovery is an optional helper only.</p>
+        <p class="hint">Discovery does not auto-overwrite fields. Select a device then click <b>USE SELECTED IP</b>.</p>
+      </div>
+      <div class="grid2">
+        <button id="fxSaveBtn" type="button" title="Save this fixture entry to fixtures.config.json.">SAVE FIXTURE</button>
+        <button id="fxResetBtn" type="button" title="Clear all fixture form fields.">CLEAR FORM</button>
+      </div>
+      <input id="fxEngineEnabled" type="hidden" value="true">
+      <input id="fxCustomEnabled" type="hidden" value="false">
+      <input id="fxTwitchEnabled" type="hidden" value="true">
+      <input id="fxControlMode" type="hidden" value="engine">
+      <input id="fxEngineBinding" type="hidden" value="hue">
+      <input id="fxOriginalId" type="hidden" value="">
+      <div id="fxCompatHint" class="hidden"></div>
+    </div>
+
+    <div id="fxHueBridgeBlock" class="subcluster">
+      <h3>HUE BRIDGE / PAIRING</h3>
+      <div class="fixtureGrid">
+      <div id="fxHueBridgeWrap">
+        <label for="fxBridgeIp">HUE BRIDGE IP <span class="infoTip" title="Bridge LAN IP. Discover fills this automatically on the current network.">?</span></label>
+        <div class="secretFieldRow">
+          <input id="fxBridgeIp" type="password" placeholder="192.168.x.x" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+          <button id="fxBridgeIpShowBtn" type="button" class="warn secretToggleBtn" title="Reveal or hide this sensitive field.">SHOW</button>
+        </div>
+      </div>
+      <div id="fxHueUserWrap">
+        <label for="fxUsername">HUE USERNAME <span class="infoTip" title="Hue application key used for REST and entertainment setup. Pairing generates this for you.">?</span></label>
+        <div class="secretFieldRow">
+          <input id="fxUsername" type="password" class="mono" placeholder="app key" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+          <button id="fxUsernameShowBtn" type="button" class="warn secretToggleBtn" title="Reveal or hide this sensitive field.">SHOW</button>
+        </div>
+      </div>
+      <div id="fxHueBridgeIdWrap">
+        <label for="fxBridgeId">HUE BRIDGE ID <span class="infoTip" title="Unique bridge identifier required by Hue Entertainment transport.">?</span></label>
+        <input id="fxBridgeId" type="text" class="mono" placeholder="ECB5...">
+      </div>
+      <div id="fxHueClientKeyWrap">
+        <label for="fxClientKey">HUE CLIENT KEY <span class="infoTip" title="DTLS client key used by Hue Entertainment for low-latency streaming. Generated during pairing.">?</span></label>
+        <div class="secretFieldRow">
+          <input id="fxClientKey" type="password" class="mono" placeholder="for entertainment" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+          <button id="fxClientKeyShowBtn" type="button" class="warn secretToggleBtn" title="Reveal or hide this sensitive field.">SHOW</button>
+        </div>
+      </div>
+      <div id="fxHueEntWrap">
+        <label for="fxEntertainmentAreaId">ENT AREA (NAME/ID) <span class="infoTip" title="Entertainment Area to stream to. Use name or id from the paired bridge areas list.">?</span></label>
+        <input id="fxEntertainmentAreaId" type="text" placeholder="Living Room">
+      </div>
+      <div id="fxHuePairWrap" class="pairActionRow">
+        <div class="grid2">
+          <button id="fxHueDiscoverBtn" type="button" class="pairDiscoverBtn" title="Step 1: Discover bridge IP/ID from local network.">1) DISCOVER BRIDGE</button>
+          <button id="fxHuePairBtn" type="button" class="pairLinkBtn" title="Step 2: Press physical Hue bridge link button, then run pairing and save fixtures based on Pair Mode.">2) PAIR (PRESS LINK)</button>
+        </div>
+        <div>
+          <label for="fxHuePairMode">PAIR MODE <span class="infoTip" title="single_light saves only HUE LIGHT ID from this form. import_all_lights scans bridge lights and saves one fixture per light id.">?</span></label>
+          <select id="fxHuePairMode">
+            <option value="single_light">single_light (recommended)</option>
+            <option value="import_all_lights">import_all_lights</option>
+          </select>
+        </div>
+        <div class="pairBridgeSaveRow">
+          <button id="fxHueSaveBridgeBtn" type="button" class="pairBridgeSaveBtn" title="Save Hue bridge fields to the selected fixture without re-pairing.">SAVE BRIDGE EDITS (NO RE-PAIR)</button>
+        </div>
+      </div>
+      <div class="hint"><b>Pairing order:</b> Discover Bridge -> press link button on bridge -> Pair.</div>
+      <div class="hint"><b>Bridge edits:</b> after loading a fixture with EDIT, change Hue bridge fields and click <b>SAVE BRIDGE EDITS</b> to confirm without pairing again.</div>
+      <div class="hint">
+        <b>Entertainment area required:</b> create one in the Hue app, then use that name/id here.
+        <span class="infoTip" title="Hue app -> Settings -> Entertainment areas -> Create area -> add lights -> Save. Then paste that area name or id into ENT AREA.">?</span>
+      </div>
+      <div class="hint">
+        Discovery and pairing only apply to Hue fixtures. Press the bridge link button during pairing.
+        Pairing fills username/client key/bridge id so Entertainment can run.
+      </div>
+      <div class="hint">
+        Recommendation: configure Hue Entertainment for smooth high-rate scenes.
+        Without it, Hue falls back to REST, which is safer but less responsive at very high Hz.
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <div class="cluster collapsible" data-collapsible-key="fixtureList" data-collapsed-default-mobile="1">
+    <div class="clusterHeaderRow">
+      <h3>FIXTURE LIST</h3>
+      <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide fixture table.">COLLAPSE</button>
+    </div>
+    <div class="clusterBody">
+    <p class="hint">
+      <b>First-time setup:</b> new installs start with an empty fixture list.
+      Add your real Hue/WiZ devices here before starting RAVE mode.
+    </p>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>BRAND</th>
+            <th>ZONE</th>
+            <th title="Current per-fixture enable state for ENGINE and TWITCH paths.">APPLIED MODES</th>
+            <th title="Resolved route bindings this fixture listens to.">ROUTE PATH</th>
+            <th>TARGET</th>
+            <th>ENABLED</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="fixtureRows"></tbody>
+      </table>
+    </div>
+    <p class="hint">APPLIED MODES shows per-fixture state: ENG (rave engine), TWITCH (/color).</p>
+    </div>
+  </div>
+
+  <div class="cluster collapsible" id="deviceRouting" data-collapsible-key="deviceRouting" data-collapsed-default="1" data-collapsed-default-mobile="1">
+    <div class="clusterHeaderRow">
+      <h3>DEVICE ROUTING</h3>
+      <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Collapse this section to reduce clutter.">COLLAPSE</button>
+    </div>
+    <div class="clusterBody">
+      <div class="controlRow">
+        <div>
+          <label for="standFixtureSelect">SELECT FIXTURE <span class="infoTip" title="Pick one fixture to edit its routing mode toggles below.">?</span></label>
+          <select id="standFixtureSelect">
+            <option value="">select fixture</option>
+          </select>
+        </div>
+        <div class="routeModesWrap">
+          <label>ROUTE MODES <span class="infoTip" title="ENGINE = audio rave engine. TWITCH = /color reward events (can run with either mode).">?</span></label>
+          <div class="routeChipGroup">
+            <button id="standRouteEngine" type="button" class="routeChipToggle" data-on="false" aria-pressed="false" title="Enable this fixture for live audio rave engine output.">ENGINE</button>
+            <button id="standRouteTwitch" type="button" class="routeChipToggle" data-on="false" aria-pressed="false" title="Enable this fixture for Twitch/color route events.">TWITCH</button>
+          </div>
+        </div>
+        <div class="grid2">
+          <button id="standRouteApplyBtn" type="button" title="Save the ENGINE/TWITCH mode toggles for the selected fixture.">APPLY ROUTING</button>
+          <button id="standRefreshBtn" type="button" title="Reload fixture list from server before editing routes.">REFRESH FIXTURES</button>
+          <button id="standConnectivityBtn" type="button" title="Run a live connectivity test for the selected fixture host/IP.">TEST CONNECTIVITY</button>
+        </div>
+        <div>
+          <label for="standRouteStatus">STATUS <span class="infoTip" title="Shows selected fixture and its currently active route modes.">?</span></label>
+          <input id="standRouteStatus" type="text" value="Select fixture and routing options." readonly>
+          <label for="standConnectivityStatus">CONNECTIVITY</label>
+          <input id="standConnectivityStatus" type="text" value="No connectivity test yet." readonly>
+        </div>
+      </div>
+      <p class="hint"><code>ENGINE</code> and <code>TWITCH</code> can run together. New fixtures default to <code>ENGINE + TWITCH</code>.</p>
+
+      <div class="fixtureToolbar">
+        <div>
+          <label for="routeHueInput">DERIVED HUE_STATE <span class="infoTip" title="Derived automatically from Hue fixtures that have ENGINE enabled.">?</span></label>
+          <input id="routeHueInput" type="text" readonly>
+        </div>
+        <div>
+          <label for="routeWizInput">DERIVED WIZ_PULSE <span class="infoTip" title="Derived automatically from WiZ fixtures that have ENGINE enabled.">?</span></label>
+          <input id="routeWizInput" type="text" readonly>
+        </div>
+        <div>
+          <label for="routeTwitchHueInput">DERIVED TWITCH_HUE <span class="infoTip" title="Derived automatically from Hue fixtures that have TWITCH enabled.">?</span></label>
+          <input id="routeTwitchHueInput" type="text" readonly>
+        </div>
+        <div>
+          <label for="routeTwitchWizInput">DERIVED TWITCH_WIZ <span class="infoTip" title="Derived automatically from WiZ fixtures that have TWITCH enabled.">?</span></label>
+          <input id="routeTwitchWizInput" type="text" readonly>
+        </div>
+        <div>
+          <label for="fixturesReloadBtn">ROUTING CONFIG</label>
+          <button id="fixturesReloadBtn" type="button" title="Reload fixtures.config.json and route table from disk.">RELOAD CFG</button>
+        </div>
+      </div>
+      <p class="hint">These route values are read-only and updated automatically from fixture toggles.</p>
+
+      <div class="twitchPrefixPanel">
+        <h3>TWITCH COLOR COMMAND ROUTING</h3>
+        <div class="twitchPrefixGrid">
+          <p class="prefixSyntax">
+            Build prefix rules by target (brand or exact fixture), then save.
+            Use unprefixed routing below for plain <code>/color red</code> commands.
+          </p>
+          <div class="prefixQuickGrid">
+            <div>
+              <label for="colorPrefixDefaultTarget">UNPREFIXED /color GOES TO</label>
+              <select id="colorPrefixDefaultTarget">
+                <option value="both">both (Hue + WiZ sync)</option>
+                <option value="hue">hue only</option>
+                <option value="wiz">wiz only</option>
+              </select>
+            </div>
+            <div>
+              <label for="colorPrefixRuleScope">RULE SCOPE</label>
+              <select id="colorPrefixRuleScope">
+                <option value="brand">brand</option>
+                <option value="fixture">fixture</option>
+              </select>
+            </div>
+            <div>
+              <label for="colorPrefixRuleValue">PREFIX TOKEN</label>
+              <input id="colorPrefixRuleValue" type="text" placeholder="e.g. desk">
+            </div>
+          </div>
+          <div class="prefixRuleTargetGrid">
+            <div id="colorPrefixRuleBrandWrap">
+              <label for="colorPrefixRuleBrand">TARGET BRAND</label>
+              <select id="colorPrefixRuleBrand">
+                <option value="hue">hue</option>
+                <option value="wiz">wiz</option>
+              </select>
+            </div>
+            <div id="colorPrefixRuleFixtureWrap" class="hidden">
+              <label for="colorPrefixRuleFixture">TARGET FIXTURE</label>
+              <select id="colorPrefixRuleFixture">
+                <option value="">select fixture...</option>
+              </select>
+            </div>
+            <div class="grid2">
+              <button id="colorPrefixRuleAddBtn" type="button">ADD / UPDATE RULE</button>
+              <button id="colorPrefixRuleRemoveBtn" type="button">REMOVE SELECTED RULE</button>
+            </div>
+          </div>
+          <div class="prefixRuleListWrap">
+            <label for="colorPrefixRuleList">ACTIVE PREFIX RULES</label>
+            <select id="colorPrefixRuleList" class="prefixRuleList" size="8"></select>
+            <p class="prefixSyntax">
+              Pick <code>brand</code> or <code>fixture</code>, choose target, enter prefix, then click
+              <code>ADD / UPDATE RULE</code>. Leave prefix blank to clear that target (unprefixed). Fixture rules override brand rules.
+            </p>
+          </div>
+          <div class="prefixActions">
+            <button id="colorPrefixSaveBtn" type="button">SAVE PREFIX CONFIG</button>
+            <button id="colorPrefixResetBtn" type="button">RESET PREFIX DEFAULTS</button>
+          </div>
+
+          <details class="prefixSection" open>
+            <summary>RAVE OFF End Color Profile</summary>
+            <div class="prefixSectionBody">
+              <div class="prefixAdvancedGrid">
+                <div>
+                  <label for="colorRaveOffEnabled">RAVE OFF PROFILE</label>
+                  <select id="colorRaveOffEnabled">
+                    <option value="1">enabled</option>
+                    <option value="0">disabled</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="colorRaveOffDefault">DEFAULT RAVE OFF COMMAND</label>
+                  <input id="colorRaveOffDefault" type="text" placeholder="e.g. random">
+                </div>
+                <div class="prefixFullRow">
+                  <label for="colorRaveOffGroupMap">GROUP RULES (OPTIONAL) <span class="infoTip" title="One line per group: key=command. key can be hue, wiz, hue:zone, or wiz:zone.">?</span></label>
+                  <textarea id="colorRaveOffGroupMap" placeholder="hue=random&#10;wiz=random&#10;hue:desk=purple"></textarea>
+                  <p class="prefixSyntax">Syntax: <code>hue=command</code>, <code>wiz=command</code>, or <code>hue:zone=command</code>.</p>
+                </div>
+                <div class="prefixFullRow">
+                  <label for="colorRaveOffFixtureMap">FIXTURE RULES (OPTIONAL) <span class="infoTip" title="One line per fixture: fixtureId=command. Fixture override wins over group/default.">?</span></label>
+                  <textarea id="colorRaveOffFixtureMap" placeholder="hue-main-1=dim red&#10;wiz-background-1=blue"></textarea>
+                  <p class="prefixSyntax">Syntax: <code>fixtureId=command</code> (one rule per line).</p>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+        <p id="colorPrefixStatus" class="hint">
+          Set optional prefixes for Hue/WiZ, choose where unprefixed <code>/color</code> goes, then save.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

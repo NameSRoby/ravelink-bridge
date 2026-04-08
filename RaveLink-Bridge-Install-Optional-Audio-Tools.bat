@@ -1,55 +1,56 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
+REM [TITLE] Script: RaveLink-Bridge-Install-Optional-Audio-Tools.bat
+REM [TITLE] Purpose: local helper to bootstrap optional runtime dependencies used by audio + mod lanes
+REM [TITLE] Functionality Index:
+REM [TITLE] - ensures npm dependencies are installed via scripts\bootstrap-runtime.js
+REM [TITLE] - installs Playwright browser runtimes used by mod browser-driver integrations
+REM [TITLE] - leaves shell open with clear diagnostics on failure
+
 cd /d "%~dp0"
 
-echo [RaveLink] Optional audio tools bootstrap
+echo [RaveLink] Optional runtime tools bootstrap
 echo.
-echo This installs optional Windows dependencies used by app/process-isolation audio capture:
-echo   - ffmpeg
-echo   - Python 3.13
-echo   - proc-tap + psutil
+echo This helper will:
+echo   1) install/update Node dependencies
+echo   2) install Playwright browser runtimes
 echo.
-echo It may use internet access and winget.
+echo Note: ffmpeg/system-level audio tooling may still require manual install.
 echo.
 
-set "NODE_BIN="
-set "LOCAL_NODE=%CD%\runtime\node.exe"
-if exist "%LOCAL_NODE%" (
-  set "NODE_BIN=%LOCAL_NODE%"
-) else (
-  where node >nul 2>&1
-  if not errorlevel 1 set "NODE_BIN=node"
+where node >nul 2>&1
+if errorlevel 1 (
+  echo [RaveLink][ERROR] Node.js is not installed or not on PATH.
+  pause
+  exit /b 1
 )
 
-if not defined NODE_BIN (
-  echo [RaveLink][ERROR] Node runtime not found.
-  echo Expected bundled runtime: runtime\node.exe
-  echo Or install Node.js LTS from https://nodejs.org
+if not exist "scripts\bootstrap-runtime.js" (
+  echo [RaveLink][ERROR] Missing script: scripts\bootstrap-runtime.js
+  pause
+  exit /b 1
+)
+
+echo [RaveLink] Step 1/2: bootstrap Node dependencies...
+node scripts\bootstrap-runtime.js --force-install
+if errorlevel 1 (
+  echo [RaveLink][ERROR] Dependency bootstrap failed.
+  pause
+  exit /b 1
+)
+
+echo.
+echo [RaveLink] Step 2/2: install Playwright browser runtimes...
+call npx playwright install
+if errorlevel 1 (
+  echo [RaveLink][WARN] Playwright browser install failed.
+  echo [RaveLink][WARN] You can retry manually with: npx playwright install
   echo.
   pause
   exit /b 1
 )
 
-if not exist "scripts\start-bridge.js" (
-  echo [RaveLink][ERROR] scripts\start-bridge.js not found.
-  echo.
-  pause
-  exit /b 1
-)
-
-set "RAVELINK_BOOTSTRAP_DEPS=1"
-set "RAVELINK_BOOTSTRAP_SYSTEM_DEPS=1"
-set "RAVELINK_BOOTSTRAP_ONLY=1"
-
-"%NODE_BIN%" scripts\start-bridge.js
-set "EXIT_CODE=%ERRORLEVEL%"
-
 echo.
-if "%EXIT_CODE%"=="0" (
-  echo [RaveLink] Optional audio tools bootstrap completed.
-) else (
-  echo [RaveLink][WARN] Optional bootstrap exited with code %EXIT_CODE%.
-)
-echo.
+echo [RaveLink] Optional runtime tools bootstrap completed.
 pause
-exit /b %EXIT_CODE%
+exit /b 0

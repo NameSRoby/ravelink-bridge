@@ -1,55 +1,43 @@
 @echo off
-setlocal EnableExtensions
-cd /d "%~dp0"
+setlocal EnableExtensions EnableDelayedExpansion
+REM [TITLE] Script: RaveLink-Bridge-Stop.bat
+REM [TITLE] Purpose: graceful local bridge shutdown helper for Windows
+REM [TITLE] Functionality Index:
+REM [TITLE] - resolves host/port defaults used by the bridge launcher
+REM [TITLE] - requests /system/stop to trigger deterministic graceful shutdown
+REM [TITLE] - falls back between curl and node-fetch transport paths
 
-set "NODE_BIN="
-set "LOCAL_NODE=%CD%\runtime\node.exe"
-if exist "%LOCAL_NODE%" (
-  set "NODE_BIN=%LOCAL_NODE%"
-) else (
-  where node >nul 2>&1
-  if not errorlevel 1 set "NODE_BIN=node"
-)
+set "BRIDGE_HOST=%HOST%"
+if "%BRIDGE_HOST%"=="" set "BRIDGE_HOST=127.0.0.1"
+set "BRIDGE_PORT=%PORT%"
+if "%BRIDGE_PORT%"=="" set "BRIDGE_PORT=5050"
+set "STOP_URL=http://%BRIDGE_HOST%:%BRIDGE_PORT%/system/stop"
 
-if not defined NODE_BIN (
-  echo [RaveLink][ERROR] Node runtime not found.
-  echo Expected bundled runtime: runtime\node.exe
-  echo Or install Node.js LTS from https://nodejs.org
-  echo.
-  pause
-  exit /b 1
-)
+echo [RaveLink] Requesting graceful stop via %STOP_URL%
 
-if not exist "package.json" (
-  echo [RaveLink][ERROR] package.json not found in this folder.
-  echo.
-  pause
-  exit /b 1
-)
-
-if exist "scripts\stop-bridge.js" (
-  "%NODE_BIN%" scripts\stop-bridge.js
-) else (
-  set "LOCAL_NPM_CLI=%CD%\runtime\node_modules\npm\bin\npm-cli.js"
-  if exist "%LOCAL_NPM_CLI%" (
-    "%NODE_BIN%" "%LOCAL_NPM_CLI%" run stop
-  ) else (
-    set "NPM_BIN="
-    where npm.cmd >nul 2>&1
-    if not errorlevel 1 set "NPM_BIN=npm.cmd"
-    if not defined NPM_BIN (
-      where npm >nul 2>&1
-      if not errorlevel 1 set "NPM_BIN=npm"
-    )
-    if not defined NPM_BIN (
-      echo [RaveLink][ERROR] npm is not available in PATH.
-      echo Install Node.js LTS from https://nodejs.org and run again.
-      echo.
-      pause
-      exit /b 1
-    )
-    call %NPM_BIN% run stop
+where curl >nul 2>&1
+if not errorlevel 1 (
+  curl -sS -X POST "%STOP_URL%" -H "Content-Type: application/json" -d "{}"
+  if not errorlevel 1 (
+    echo.
+    echo [RaveLink] Stop request sent.
+    exit /b 0
   )
+  echo [STOP] curl stop request failed; trying node fallback...
 )
+
+where node >nul 2>&1
+if errorlevel 1 (
+  echo [STOP] Neither curl nor node is available on PATH.
+  exit /b 1
+)
+
+node -e "const u=process.argv[1];(async function(){try{const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const t=await r.text();if(t)process.stdout.write(t);process.exit(r.ok?0:1);}catch(e){console.error('[STOP] request failed: '+(e&&e.message?e.message:String(e)));process.exit(1);}})();" "%STOP_URL%"
+if errorlevel 1 (
+  echo [STOP] node fallback stop request failed.
+  exit /b 1
+)
+
 echo.
-pause
+echo [RaveLink] Stop request sent.
+exit /b 0

@@ -1,0 +1,98 @@
+// [TITLE] Module: public/assets/js/domains/ui-tooltips-system-runtime-ui.js
+// [TITLE] Purpose: System tab tooltip copy ownership
+// [TITLE] Functionality Index:
+// [TITLE] - system settings/update/readiness tooltips
+// [TITLE] - route console, gateway, rust worker, and widget tooltips
+
+function applySystemUiTooltips({ el, setNodeTitle }) {
+  setNodeTitle(el.systemStartTab, "Default tab to open when this UI loads.");
+  setNodeTitle(el.systemConfirmActions, "Require confirms for panic/reload/stop actions.");
+  setNodeTitle(el.systemPollingMode, "Pause or resume automatic telemetry polling.");
+  setNodeTitle(el.systemAutoLaunchBrowser, "Enable/disable browser auto-launch when the server starts.");
+  setNodeTitle(el.systemAudioBackendStrategy, "Capture startup policy: Auto (Rust-first fallback on Rust startup failure) or Force Rust.");
+  setNodeTitle(el.systemUnsafeSensitiveLogs, "Dangerous DEV option: disable server-side redaction and allow sensitive credentials/ids/tokens to appear in logs.");
+  setNodeTitle(el.systemUpdateChecksEnabled, "Enable one GitHub release check when the server launches.");
+  setNodeTitle(el.systemUpdateStartupPromptEnabled, "When enabled, UI shows startup prompt if an update is available. Disable for manual-only checks.");
+  setNodeTitle(el.systemUpdateCheckNowBtn, "Run a manual release check now.");
+  setNodeTitle(el.systemUpdateOpenReleaseBtn, "Open release page for the latest checked version.");
+  setNodeTitle(el.systemUpdateApplyBtn, "Apply the latest release files in-place using safe backup+rollback flow. Restart server after success.");
+  setNodeTitle(el.systemUpdateStatus, "Current update-check result and latest version status.");
+  setNodeTitle(el.systemSettingsSaveBtn, "Persist local settings plus server browser-launch, Hue transport, audio backend strategy, and log-redaction settings.");
+  setNodeTitle(el.systemSettingsResetBtn, "Reset system settings back to defaults.");
+  setNodeTitle(el.systemPollNowBtn, "Run one immediate telemetry/config poll.");
+  setNodeTitle(el.systemClearCacheBtn, "Clear UI local/session/cache memory and reload this page.");
+  setNodeTitle(el.systemSettingsStatus, "Current saved system settings summary.");
+  setNodeTitle(el.systemStartupReadinessRefreshBtn, "Refresh startup readiness lane diagnostics from /system/startup-readiness.");
+  setNodeTitle(el.systemStartupReadinessCopyBtn, "Copy the current startup-readiness diagnostics JSON snapshot for bug reports/handoff.");
+  setNodeTitle(el.systemStartupReadinessStatus, "Boot/current readiness summary for config, profiles, mods, midi, hue, and wiz lanes.");
+  setNodeTitle(el.systemStartupReadinessBootAt, "Server startup timestamp captured for readiness diagnostics.");
+  setNodeTitle(el.systemStartupReadinessCapturedAt, "Timestamp of the currently rendered startup-readiness snapshot.");
+  setNodeTitle(el.systemStartupReadinessAge, "Age of current server runtime since startup.");
+  setNodeTitle(el.systemStartupReadinessCoreStatus, "Core lane + required service health from /system/core-status.");
+  setNodeTitle(el.systemStartupReadinessLaunchStatus, "Browser auto-launch diagnostics state and launcher strategy used at boot.");
+  setNodeTitle(el.systemStartupReadinessRows, "Lane table showing boot state versus current runtime state.");
+  setNodeTitle(el.systemRouteCatalogSelect, "Catalog of backend routes discovered from server-side route registration sources.");
+  setNodeTitle(el.systemRouteCatalogLoadBtn, "Fetch backend route catalog from /system/routes/catalog.");
+  setNodeTitle(el.systemRouteCatalogApplyBtn, "Copy selected catalog entry into method/path request fields.");
+  setNodeTitle(el.systemRouteConsoleMethod, "HTTP method used by the route console request.");
+  setNodeTitle(el.systemRouteConsolePath, "API path to call (relative path, e.g. /system/core-status).");
+  setNodeTitle(el.systemRouteConsoleBody, "JSON request body used for POST/PUT/PATCH route console requests.");
+  setNodeTitle(el.systemRouteConsoleSendBtn, "Run direct API request from route console fields.");
+  setNodeTitle(el.systemRouteConsoleCopyBtn, "Copy latest route console response JSON.");
+  setNodeTitle(el.systemRouteConsoleStatus, "Route console execution status line.");
+  setNodeTitle(el.systemRouteConsoleOutput, "Latest route console request/response payload snapshot.");
+  setNodeTitle(el.systemGatewayStatusRefreshBtn, "Refresh the safe outbound internet-gateway worker used for OAuth, Twitch Helix, and mod egress.");
+  setNodeTitle(el.systemWidgetReconcileStatusRefreshBtn, "Refresh Twitch Helix redemption sync status: auto-complete/refund readiness, in-flight work, and last result.");
+  setNodeTitle(el.systemGatewayStatusText, "Combined summary of safe internet gateway health, Helix OAuth readiness, and Twitch redemption sync.");
+  setNodeTitle(el.systemWidgetReconcileRewardIds, "Optional reward IDs to target. Blank lets reconcile scan managed reward IDs.");
+  setNodeTitle(el.systemWidgetReconcileStatus, "Target redemption status for pending items: FULFILLED or CANCELED.");
+  setNodeTitle(el.systemWidgetReconcileReason, "Reason token sent with reconciliation patches.");
+  setNodeTitle(el.systemWidgetReconcileMaxRewards, "Maximum rewards to inspect during one reconcile pass.");
+  setNodeTitle(el.systemWidgetReconcileMaxRedemptions, "Maximum pending redemptions to process per reconcile run.");
+  setNodeTitle(el.systemWidgetReconcileRunBtn, "Run one immediate pending-redemption sync pass now.");
+  setNodeTitle(el.systemWidgetReconcileCopyBtn, "Copy latest reconcile result JSON for diagnostics/handoff.");
+  setNodeTitle(el.systemWidgetReconcileDump, "Latest reconcile/gateway diagnostic snapshot JSON.");
+  setNodeTitle(el.systemRustWorkerStatusRefreshBtn, "Refresh rust transport worker status from /audio/rust/transport-worker/status.");
+  setNodeTitle(el.systemRustWorkerAdaptersRefreshBtn, "Request and refresh adapter catalog from /audio/rust/transport-worker/adapters?refresh=1.");
+  setNodeTitle(el.systemRustWorkerWatchdogRefreshBtn, "Request and refresh watchdog snapshot from /audio/rust/transport-worker/watchdog?refresh=1.");
+  setNodeTitle(el.systemRustWorkerCopyBtn, "Copy combined rust transport worker diagnostics JSON.");
+  setNodeTitle(el.systemRustWorkerStatusText, "Rust transport worker lifecycle summary and latest error state.");
+  setNodeTitle(el.systemRustWorkerEnabled, "Enable or disable worker runtime lane.");
+  setNodeTitle(el.systemRustWorkerAutoStart, "When enabled, worker auto-starts and restarts after failures.");
+  setNodeTitle(el.systemRustWorkerAdapterPreference, "Adapter preference token sent to worker config.set payload.");
+  setNodeTitle(el.systemRustWorkerWatchdogMs, "Worker watchdog cadence in milliseconds.");
+  setNodeTitle(el.systemRustWorkerRestartBackoffMs, "Auto-restart backoff delay in milliseconds.");
+  setNodeTitle(el.systemRustWorkerCommandPath, "Optional explicit executable path or command name for transport worker.");
+  setNodeTitle(el.systemRustWorkerConfigApplyBtn, "Apply config patch to /audio/rust/transport-worker/config.");
+  setNodeTitle(el.systemRustWorkerStartBtn, "Start worker via /audio/rust/transport-worker/start.");
+  setNodeTitle(el.systemRustWorkerStopBtn, "Stop worker via /audio/rust/transport-worker/stop.");
+  setNodeTitle(el.systemRustWorkerRestartBtn, "Restart worker via /audio/rust/transport-worker/restart.");
+  setNodeTitle(el.systemRustWorkerDump, "Combined status, adapter catalog, and watchdog JSON snapshot.");
+  setNodeTitle(el.systemWidgetColorRewardId, "Sensitive: Twitch channel points reward ID used for Change Lights.");
+  setNodeTitle(el.systemWidgetTeachRewardId, "Sensitive: Twitch channel points reward ID used for Teach Color.");
+  setNodeTitle(el.systemWidgetRaveRewardId, "Sensitive: Twitch channel points reward ID used for RAVE activation.");
+  setNodeTitle(el.systemWidgetBaseUrl, "Bridge base URL used by the generated StreamElements widget.");
+  setNodeTitle(el.systemWidgetRaveAutoOffSec, "RAVE runtime in seconds before auto-off is sent.");
+  setNodeTitle(typeof document !== "undefined" ? document.getElementById("systemWidgetRaveAutoOffResetOnRepeat") : null, "When enabled (recommended), repeated RAVE redemptions reset the auto-off timer; when disabled, repeats do not extend an already-running timer.");
+  setNodeTitle(el.systemWidgetEnableStatusSync, "Enable widget-side Helix fulfillment/refund calls for color and teach rewards; OAuth resolves from System OAuth profile first, then DEV override, then mod fallback.");
+  setNodeTitle(el.systemWidgetSeBotEnabled, "Enable StreamElements bot chat announcements from generated widget runtime.");
+  setNodeTitle(el.systemWidgetSeBotChannelId, "StreamElements bot channel id used by kappa/v2/bot/{channelId}/say.");
+  setNodeTitle(el.systemWidgetSeBotJwt, "StreamElements bot JWT bearer token used for bot chat API requests.");
+  setNodeTitle(el.systemWidgetSeBotPrefix, "Optional text prefix prepended to bot chat messages.");
+  setNodeTitle(el.systemWidgetTwitchClientId, "DEV-only OAuth vault input: Twitch app client ID. Value is write-only, wiped from input after seed, and persists only after sync to mod vault.");
+  setNodeTitle(el.systemWidgetTwitchUserAccessToken, "DEV-only OAuth vault input: Twitch user token with channel:manage:redemptions scope. Wiped from input after seed.");
+  setNodeTitle(el.systemWidgetTwitchBroadcasterId, "DEV-only OAuth vault input: broadcaster numeric Twitch user ID. Wiped from input after seed.");
+  setNodeTitle(el.systemWidgetSensitiveToggleBtn, "Reveal or hide DEV OAuth vault input fields while entering values.");
+  setNodeTitle(el.systemWidgetOauthSeedBtn, "Write entered OAuth values into volatile DEV vault (memory only) and wipe input fields. Use sync to persist in encrypted mod vault.");
+  setNodeTitle(el.systemWidgetOauthClearBtn, "Clear volatile DEV OAuth vault and wipe local OAuth inputs.");
+  setNodeTitle(el.systemWidgetRaveOffAnnounceEnabled, "Post a chat line when widget-triggered RAVE auto-off fires.");
+  setNodeTitle(el.systemWidgetRaveOffAnnounceMessage, "Chat line sent when RAVE auto-off re-enables Change Lights usage.");
+  setNodeTitle(el.systemWidgetBlockedMessage, "Chat line sent when a color reward is blocked because RAVE is active.");
+  setNodeTitle(el.systemWidgetGenerateBtn, "Generate widget JavaScript from current fields and active toggles.");
+  setNodeTitle(el.systemWidgetCopyBtn, "Copy generated widget JavaScript to clipboard.");
+  setNodeTitle(el.systemWidgetOauthOpenBtn, "Open Twitch device activation page.");
+  setNodeTitle(el.systemWidgetOauthCopyBtn, "Copy Twitch device activation link.");
+  setNodeTitle(el.systemWidgetOauthSyncToModBtn, "Optional bridge action: push current System/DEV OAuth values into Music Request mod policy when both lanes should stay aligned.");
+  setNodeTitle(el.systemWidgetOutput, "Generated StreamElements widget script output.");
+  setNodeTitle(el.systemWidgetStatus, "Generator status and active parameter summary.");
+}

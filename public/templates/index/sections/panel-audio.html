@@ -1,0 +1,479 @@
+<!-- [TITLE] Section Template: public/templates/index/sections/panel-audio.html -->
+<!-- [DEV] Purpose: AUDIO tab panel markup. -->
+<div class="panel tabPage" data-tab="audio">
+  <div class="cluster">
+    <h3>AUDIO CONTROL <span class="infoTip" title="Configure input source and sensitivity. Hover labels/buttons for what each control changes.">?</span></h3>
+    <div class="audioGuide">
+      <div class="audioGuideGrid">
+        <div class="audioGuideCard">
+          <strong>1) Quick setup first</strong>
+          <span>Pick <b>INPUT DEVICES</b>, then set <b>SOURCE ROUTING + APP ISOLATION</b> right below. Most setups only need this section.</span>
+        </div>
+        <div class="audioGuideCard">
+          <strong>2) Apply + verify</strong>
+          <span>Click <b>APPLY + START AUDIO</b>, verify <b>APP ISO STATUS</b>, then switch to <b>ADVANCED MODE</b> to inspect <b>AUDIO RUNTIME SNAPSHOT</b> while your app is playing.</span>
+        </div>
+        <div class="audioGuideCard">
+          <strong>3) Use advanced only if needed</strong>
+          <span>Expand <b>ADVANCED AUDIO TUNING</b> only for thresholds, limiter behavior, and watchdog/debug controls.</span>
+        </div>
+      </div>
+    </div>
+    <div id="aOptionalToolsBanner" class="audioOptionalToolsBanner hidden">
+      <div class="audioOptionalToolsHead">
+        <strong>OPTIONAL AUDIO TOOLS</strong>
+        <span id="aOptionalToolsBadge" class="statusPill warn">CHECKING</span>
+      </div>
+      <p id="aOptionalToolsText" class="hint audioOptionalToolsBody">
+        Checking optional app-isolation tools...
+      </p>
+      <div class="audioOptionalToolsActions">
+        <button id="aOptionalToolsInfoBtn" type="button">HOW TO INSTALL</button>
+        <button id="aOptionalToolsDismissBtn" type="button">DISMISS</button>
+      </div>
+    </div>
+    <div class="subcluster audioProfileTopPanel">
+      <h3>AUDIO CONFIG PROFILES <span class="infoTip" title="Save complete audio tab settings as named profiles, then apply with one click.">?</span></h3>
+      <div class="liveProfileRow audioProfileRow">
+        <input id="aProfileName" type="text" maxlength="40" placeholder="profile name" autocomplete="off" spellcheck="false" />
+        <select id="aProfileSelect">
+          <option value="">select saved profile...</option>
+        </select>
+        <button id="aProfileSaveBtn" type="button" title="Save current audio config into this profile name.">SAVE PROFILE</button>
+        <button id="aProfileLoadBtn" type="button" title="Apply selected profile to audio runtime now.">LOAD PROFILE</button>
+        <button id="aProfileDeleteBtn" type="button" class="warn" title="Delete selected saved profile.">DELETE PROFILE</button>
+      </div>
+      <p class="hint">Profiles store the full Audio tab setup. Use this first, then tune the capture source below if the Windows output changed.</p>
+      <input id="aProfileStatus" class="audioActionStatusGlobal" type="text" value="Audio profiles idle." readonly>
+    </div>
+    <div class="subcluster">
+      <h3>QUICK SETUP</h3>
+      <p class="hint">For most users: pick a device, choose sample rate + frames, then apply.</p>
+      <div class="controlRow">
+        <div>
+          <label for="aDevices">CAPTURE SOURCES <span class="infoTip" title="Active desktop output endpoints (Rust loopback) plus detected PortAudio input devices.">?</span></label>
+          <select id="aDevices"></select>
+        </div>
+        <div>
+          <label for="aDeviceMatch">DEVICE MATCH <span class="infoTip" title="Optional partial device name match. Example: stereo mix, loopback, cable output.">?</span></label>
+          <input id="aDeviceMatch" type="text" value="" placeholder="optional name match (e.g. stereo mix)" />
+        </div>
+        <div>
+          <label for="aSampleRate">SAMPLE RATE <span class="infoTip" title="Higher rate can be cleaner but uses more CPU. 44100/48000 are common stable defaults.">?</span></label>
+          <select id="aSampleRate">
+            <option value="44100">44100</option>
+            <option value="48000">48000</option>
+            <option value="96000">96000</option>
+          </select>
+        </div>
+        <div>
+          <label for="aFrames">FRAMES/BUFFER <span class="infoTip" title="Lower = lower latency but can crackle/drop on weak systems. Higher = steadier but slower reaction.">?</span></label>
+          <select id="aFrames">
+            <option value="128">128</option>
+            <option value="256">256</option>
+            <option value="512">512</option>
+            <option value="1024">1024</option>
+          </select>
+        </div>
+      </div>
+      <div class="audioQuickSecondaryRow">
+        <div>
+          <label for="aChannels">CHANNELS <span class="infoTip" title="Use 2 for stereo devices. Use 1 only for mono input capture.">?</span></label>
+          <select id="aChannels">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+          </select>
+        </div>
+        <div>
+          <label for="aGain">GAIN <span class="infoTip" title="Input amplification before feature extraction. Increase if levels stay low; reduce if clipping/overreaction.">?</span></label>
+          <input id="aGain" type="number" step="0.01" min="0.2" max="3.0" value="1.00" />
+        </div>
+      </div>
+      <div class="subcluster audioDailyActionPanel">
+        <h3>DAILY AUDIO ACTIONS <span class="infoTip" title="Use these after selecting a capture source or loading an audio profile.">?</span></h3>
+        <p class="hint">Normal flow: choose source -> apply + start audio -> verify the status. Scan/refresh only when Windows devices or app sources changed.</p>
+        <div class="grid2 audioQuickActionRow">
+          <button id="aRefreshBtn" type="button" title="Reload current audio config from server.">REFRESH CFG</button>
+          <button id="aScanBtn" type="button" title="Rescan input devices from the audio backend.">SCAN DEVICES</button>
+        </div>
+        <div class="grid3 audioQuickActionRow">
+          <button id="aApplyBtn" type="button" class="warn" title="Save these audio settings and start/restart the capture pipeline immediately.">APPLY + START AUDIO</button>
+          <button id="aRestartBtn" type="button" title="Restart audio capture pipeline with current settings.">RESTART AUDIO</button>
+          <button id="aResetDefaultsBtn" type="button" class="warn" title="Restore audio settings to defaults and apply immediately.">RESET AUDIO DEFAULTS</button>
+        </div>
+        <input id="aAudioActionStatus" class="audioActionStatusGlobal" type="text" value="Audio actions idle." readonly>
+      </div>
+      <div class="subcluster collapsible" data-collapsible-key="audioSourceIsolationQuick" data-collapsed-default="0" data-collapsed-default-mobile="0">
+        <div class="clusterHeaderRow">
+          <h3>SOURCE ROUTING + APP ISOLATION</h3>
+          <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide source routing and app isolation setup.">COLLAPSE</button>
+        </div>
+        <div class="clusterBody">
+          <p class="hint">Quick setup: choose main app + backup app, verify source devices, then apply audio config. Advanced controls remain available.</p>
+          <div class="audioCaptureModeRow audioCaptureModeToggle" role="group" aria-label="Audio capture mode">
+            <input id="aCaptureModeDesktop" class="audioCaptureModeToggleInput" type="radio" name="aCaptureMode" checked>
+            <label for="aCaptureModeDesktop" class="audioCaptureModeToggleBtn">
+              <strong>DESKTOP LISTEN</strong>
+              <span>NO APP LOCK</span>
+            </label>
+            <input id="aCaptureModeAppIso" class="audioCaptureModeToggleInput" type="radio" name="aCaptureMode">
+            <label for="aCaptureModeAppIso" class="audioCaptureModeToggleBtn">
+              <strong>APP ISOLATION</strong>
+              <span>AUTO SWITCH</span>
+            </label>
+          </div>
+          <p id="aCaptureModeHint" class="hint audioCaptureModeHint">Desktop Listen: capture configured desktop input source(s) with no forced app target.</p>
+          <p class="hint audioCaptureModeJump audioIsoOnly">Select the app to isolate in <b>MAIN APP (AUTO SWITCH)</b> below. <a href="#aAppPrimary">Jump to app selector</a>.</p>
+          <div class="audioRouteModeRow audioIsoOnly">
+            <label><input id="aIsoSimpleMode" type="checkbox" checked> SIMPLE MODE (RECOMMENDED)</label>
+            <label><input id="aAppsShowAll" type="checkbox"> SHOW ALL PROCESSES (ADVANCED)</label>
+          </div>
+          <p id="aAppsFilterHint" class="hint audioAppsFilterHint audioIsoOnly">APP LIST MODE: likely audio apps.</p>
+          <div class="controlRow">
+            <div>
+              <label for="aInputBackend">CAPTURE BACKEND <span class="infoTip" title="AUTO is rust-first for app isolation (with machine capability checks) and falls back to legacy paths when needed. You can force legacy preference with the toggle below.">?</span></label>
+              <select id="aInputBackend">
+                <option value="auto">auto (rust-first)</option>
+                <option value="portaudio">portaudio</option>
+                <option value="ffmpeg">ffmpeg</option>
+                <option value="rustloop">rustloop (direct loopback)</option>
+              </select>
+            </div>
+            <div>
+              <label><input id="aPreferLegacyCapture" type="checkbox"> PREFER LEGACY CAPTURE (FFMPEG/PROCTAP) <span class="infoTip" title="When CAPTURE BACKEND is AUTO and app isolation is enabled, OFF = rust-first auto-select, ON = legacy ffmpeg/proctap first.">?</span></label>
+              <label><input id="aUseRustAudioKernel" type="checkbox" checked> USE RUST AUDIO KERNEL (RECOMMENDED) <span class="infoTip" title="When ON, rust capture uses ravelink-audio-kernel as primary worker. When OFF, rustloop uses legacy rust-audio-isolator path before ffmpeg/proctap fallback.">?</span></label>
+              <label><input id="aUseRustSourceResolver" type="checkbox" checked> USE COMPANION PROCESS RESOLVER (RECOMMENDED) <span class="infoTip" title="When ON, app scan includes companion-process heuristics for likely audio subprocess suggestions. When OFF, only direct process/audio hints are used.">?</span></label>
+            </div>
+            <div>
+              <label for="aRustLoopbackFormat">RUST LOOPBACK FORMAT <span class="infoTip" title="f32le: highest precision, higher throughput. s16le: lowest bandwidth/CPU, less headroom. s24le: high dynamic range with lower bandwidth than f32. s32le: integer full-scale precision, highest throughput.">?</span></label>
+              <select id="aRustLoopbackFormat">
+                <option value="f32le">f32le (quality-first)</option>
+                <option value="s24le">s24le (balanced)</option>
+                <option value="s16le">s16le (efficient)</option>
+                <option value="s32le">s32le (high-throughput int)</option>
+              </select>
+              <p id="aRustLoopbackFormatHint" class="hint">f32le: best precision and compatibility for analyzer math, with higher bandwidth cost.</p>
+            </div>
+            <div class="audioIsoAdvanced">
+              <label for="aFfmpegFormat">FFMPEG INPUT FORMAT <span class="infoTip" title="Use dshow/wasapi device names for legacy capture backends.">?</span></label>
+              <select id="aFfmpegFormat">
+                <option value="dshow">dshow</option>
+                <option value="wasapi">wasapi</option>
+              </select>
+            </div>
+            <div>
+              <label for="aFfmpegDevice">PRIMARY INPUT DEVICE (FFMPEG) <span class="infoTip" title="For dshow/wasapi, use device display name. Leave blank to use auto-detect where available.">?</span></label>
+              <input id="aFfmpegDevice" type="text" value="" placeholder="leave blank for auto-detect">
+            </div>
+            <div>
+              <label for="aFfmpegSources">DEFAULT SOURCE DEVICE(S) <span class="infoTip" title="One source per line (or comma-separated). First source is used by default.">?</span></label>
+              <textarea id="aFfmpegSources" rows="3" placeholder="leave blank for auto-detect"></textarea>
+            </div>
+            <p id="aCaptureGuidanceHint" class="hint audioCaptureGuidanceHint">Capture guidance: rust loopback usually works without virtual cable. Legacy capture may need virtual cable only when no loopback source is available (common on some USB output paths).</p>
+          </div>
+          <div class="controlRow audioIsoOnly">
+            <div>
+              <input id="aAppIsolationEnabled" type="checkbox" hidden aria-hidden="true" tabindex="-1">
+              <p class="hint audioIsoModeOwner">APP ISOLATION MODE IS CONTROLLED ABOVE (DESKTOP LISTEN / APP ISOLATION).</p>
+              <div class="audioIsoAdvanced">
+                <label><input id="aAppIsolationMultiSource" type="checkbox"> MIX MULTIPLE SOURCES (AMIX)</label>
+                <label><input id="aAppIsolationStrict" type="checkbox"> STRICT APP ISOLATION (NO FALLBACK)</label>
+                <label for="aAppIsolationCheckMs">APP ISO CHECK INTERVAL</label>
+                <select id="aAppIsolationCheckMs">
+                  <option value="60000">1 MIN</option>
+                  <option value="120000">2 MIN</option>
+                  <option value="300000" selected>5 MIN</option>
+                  <option value="600000">10 MIN</option>
+                  <option value="900000">15 MIN</option>
+                </select>
+                <p class="hint">When MIX is OFF, only the first source is used. When ON, all listed sources are mixed.</p>
+              </div>
+            </div>
+            <div>
+              <label for="aAppPrimary">MAIN APP (AUTO SWITCH)</label>
+              <select id="aAppPrimary"></select>
+            </div>
+            <div>
+              <label for="aAppFallback">BACKUP APP (IF MAIN IS CLOSED)</label>
+              <select id="aAppFallback"></select>
+            </div>
+            <div class="audioIsoAdvanced">
+              <label for="aAppPrimarySources">PRIORITY APP SOURCES <span class="infoTip" title="Optional override source list for the priority app. Leave blank to use DEFAULT ISOLATED SOURCES.">?</span></label>
+              <textarea id="aAppPrimarySources" rows="3" placeholder="optional override"></textarea>
+            </div>
+            <div class="audioIsoAdvanced">
+              <label for="aAppFallbackSources">FALLBACK APP SOURCES <span class="infoTip" title="Optional override source list for fallback app or fallback mode when priority app is missing.">?</span></label>
+              <textarea id="aAppFallbackSources" rows="3" placeholder="optional fallback override"></textarea>
+            </div>
+          </div>
+          <div class="grid2 audioQuickActionRow audioIsoOnly">
+            <button id="aAppsRefreshBtn" type="button" title="Refresh running app list for app-isolation selectors.">REFRESH APP LIST</button>
+            <input id="aAppIsolationStatus" class="audioAppSearchStatus" type="text" value="App source scan idle." readonly>
+          </div>
+          <div class="controlRow audioIsoOnly">
+            <div>
+              <label for="aAppIsoManualCaptureToken">MANUAL CAPTURE PROCESS OVERRIDE (OPTIONAL)</label>
+              <input id="aAppIsoManualCaptureToken" type="text" value="" placeholder="e.g. amplibraryagent.exe">
+              <p class="hint">If an app plays through a subprocess, enter that process name here and click SET MANUAL CAPTURE. Suggested likely-audio processes are listed in the dropdown below.</p>
+              <div id="aAppIsoCompanionAssist" class="audioIsoCompanionAssist hidden">
+                <label for="aAppIsoCompanionSelect">LIKELY SUBPROCESS CAPTURE (SUGGESTED)</label>
+                <select id="aAppIsoCompanionSelect">
+                  <option value="">select suggested subprocess...</option>
+                </select>
+                <p id="aAppIsoCompanionAssistHint" class="hint">Some apps output audio from helper/agent subprocesses. Pick one suggestion, then click SET MANUAL CAPTURE.</p>
+              </div>
+              <div id="aAppIsoManualSuggestions" class="audioIsoManualSuggestions"></div>
+              <p id="aAppIsoManualSuggestionHint" class="hint audioIsoManualSuggestionsHint">Select MAIN APP to see likely audio subprocess suggestions.</p>
+            </div>
+            <div>
+              <div class="grid2">
+                <button id="aAppIsoManualSetBtn" type="button" title="Lock selected MAIN APP to this capture process token.">SET MANUAL CAPTURE</button>
+                <button id="aAppIsoManualClearBtn" type="button" title="Clear manual process override for selected MAIN APP.">CLEAR MANUAL CAPTURE</button>
+              </div>
+            </div>
+          </div>
+          <p class="hint audioIsoOnly">Windows workflow: use native loopback sources when available. Use virtual cable mapping only when your system has no usable loopback source for the selected backend.</p>
+        </div>
+      </div>
+      <div class="audioTuningModeTabs" role="tablist" aria-label="Audio tuning mode tabs">
+        <button
+          id="aTuningModeEasyBtn"
+          type="button"
+          class="audioTuningModeBtn active"
+          data-audio-tuning-mode="easy"
+          role="tab"
+          aria-selected="true"
+        >
+          EASY MODE
+        </button>
+        <button
+          id="aTuningModeAdvancedBtn"
+          type="button"
+          class="audioTuningModeBtn"
+          data-audio-tuning-mode="advanced"
+          role="tab"
+          aria-selected="false"
+        >
+          ADVANCED MODE
+        </button>
+      </div>
+      <p id="aTuningModeHint" class="hint">
+        Easy mode keeps everyday tuning visible. Switch to advanced mode for thresholds, limiter shaping, and debug/restart controls.
+      </p>
+      <div id="aTuningEasyPane" class="audioTuningPane">
+        <div class="subcluster collapsible" data-collapsible-key="audioQuickTuning" data-collapsed-default="0" data-collapsed-default-mobile="1">
+        <div class="clusterHeaderRow">
+          <h3>QUICK AUDIO TUNING <span class="infoTip" title="Simple sliders for common system-to-system tuning. Move sliders, then apply.">?</span></h3>
+          <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide quick audio tuning controls.">COLLAPSE</button>
+        </div>
+        <div class="clusterBody">
+        <div class="audioQuickTuneMeta">
+          <label><input id="aQuickSnapStages" type="checkbox" checked> SNAP STAGES</label>
+          <button id="aQuickTuneResetBtn" type="button" title="Reset quick audio sliders to default tuned values.">RESET QUICK SLIDERS</button>
+        </div>
+        <div class="audioQuickTuneGrid">
+          <div class="audioQuickTuneCard">
+            <div class="slider">
+              <label for="aQuickProfileMix">
+                <span>SYSTEM MATCH (MULTI)</span>
+                <span id="aQuickProfileMixVal" class="sliderValue">50%</span>
+              </label>
+              <input id="aQuickProfileMix" type="range" min="0" max="100" step="1" value="50" />
+            </div>
+            <div id="aQuickProfileStage" class="audioQuickTuneStage">STAGE: BALANCED</div>
+            <div class="audioQuickTuneAffects">AFFECTS: sensitivity, silence gate, low-volume boost, boost activity gate, high-volume control</div>
+          </div>
+          <div class="audioQuickTuneCard">
+            <div class="slider">
+              <label for="aQuickGain">
+                <span>SENSITIVITY</span>
+                <span id="aQuickGainVal" class="sliderValue">1.00x</span>
+              </label>
+              <input id="aQuickGain" type="range" min="0" max="100" step="1" value="35" />
+            </div>
+            <div id="aQuickGainStage" class="audioQuickTuneStage">STAGE: BALANCED</div>
+            <div class="audioQuickTuneAffects">AFFECTS: output gain</div>
+          </div>
+          <div class="audioQuickTuneCard">
+            <div class="slider">
+              <label for="aQuickNoiseGate">
+                <span>SILENCE GATE</span>
+                <span id="aQuickNoiseGateVal" class="sliderValue">0.00045</span>
+              </label>
+              <input id="aQuickNoiseGate" type="range" min="0" max="100" step="1" value="28" />
+            </div>
+            <div id="aQuickNoiseGateStage" class="audioQuickTuneStage">STAGE: CLEAN ROOM</div>
+            <div class="audioQuickTuneAffects">AFFECTS: noise floor minimum gate</div>
+          </div>
+          <div class="audioQuickTuneCard">
+            <div class="slider">
+              <label for="aQuickAutoTarget">
+                <span>LOW-VOLUME BOOST</span>
+                <span id="aQuickAutoTargetVal" class="sliderValue">0.028</span>
+              </label>
+              <input id="aQuickAutoTarget" type="range" min="0" max="100" step="1" value="31" />
+            </div>
+            <div id="aQuickAutoTargetStage" class="audioQuickTuneStage">STAGE: BALANCED</div>
+            <div class="audioQuickTuneAffects">AFFECTS: auto target RMS</div>
+          </div>
+          <div class="audioQuickTuneCard">
+            <div class="slider">
+              <label for="aQuickAutoGate">
+                <span>BOOST ACTIVITY GATE</span>
+                <span id="aQuickAutoGateVal" class="sliderValue">0.007</span>
+              </label>
+              <input id="aQuickAutoGate" type="range" min="0" max="100" step="1" value="25" />
+            </div>
+            <div id="aQuickAutoGateStage" class="audioQuickTuneStage">STAGE: NORMAL</div>
+            <div class="audioQuickTuneAffects">AFFECTS: auto-level activation gate</div>
+          </div>
+          <div class="audioQuickTuneCard">
+            <div class="slider">
+              <label for="aQuickLimiter">
+                <span>HIGH-VOLUME CONTROL</span>
+                <span id="aQuickLimiterVal" class="sliderValue">82%</span>
+              </label>
+              <input id="aQuickLimiter" type="range" min="0" max="100" step="1" value="70" />
+            </div>
+            <div id="aQuickLimiterStage" class="audioQuickTuneStage">STAGE: BALANCED</div>
+            <div class="audioQuickTuneAffects">AFFECTS: limiter threshold</div>
+          </div>
+        </div>
+        <div class="audioQuickTuneApplyRow grid2">
+          <button id="aQuickTuneApplyBtn" type="button" title="Apply only quick audio tuning sliders now.">APPLY QUICK TUNING</button>
+        </div>
+        <p class="hint">These sliders mirror detailed fields below and are safe for everyday tuning when apps play too low or too loud.</p>
+        </div>
+      </div>
+      <div>
+        <label>AUDIO QUALITY PROFILES <span class="infoTip" title="One-click presets for common sample-rate/buffer combos. Apply after selecting.">?</span></label>
+        <div class="grid4 audioQuickPresetGrid">
+          <button type="button" data-audio-quick="safe" title="Safer stability profile: 48000 / 512">SAFE</button>
+          <button type="button" data-audio-quick="balanced" title="Balanced profile: 48000 / 256">BALANCED</button>
+          <button type="button" data-audio-quick="fast" title="Lower latency profile: 48000 / 128">FAST</button>
+          <button type="button" data-audio-quick="hires" title="High-rate profile: 96000 / 256">HI-RES</button>
+        </div>
+        <p class="hint audioQuickPresetHint">Profiles only change sample rate + frames/buffer.</p>
+      </div>
+      </div>
+      <div id="aTuningAdvancedPane" class="audioTuningPane hidden">
+        <div class="subcluster collapsible" data-collapsible-key="audioRuntimeSnapshot" data-collapsed-default="1" data-collapsed-default-mobile="1">
+          <div class="clusterHeaderRow">
+            <h3>AUDIO RUNTIME SNAPSHOT</h3>
+            <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide runtime capture/analyzer telemetry.">COLLAPSE</button>
+          </div>
+          <div class="clusterBody">
+            <p class="hint">Live runtime capture + analyzer state from current engine telemetry contract.</p>
+            <div class="telemetry">
+              <div>RMS<br><span id="aLevel">0.00</span></div>
+              <div>SOURCE LVL<br><span id="aRaw">0.00</span></div>
+              <div>PEAK<br><span id="aPeak">0.00</span></div>
+              <div>BPM<br><span id="aZcr">-</span></div>
+              <div>TRANSIENT<br><span id="aTransient">0.00</span></div>
+              <div>BAND LOW<br><span id="aBandLow">0.00</span></div>
+              <div>BAND MID<br><span id="aBandMid">0.00</span></div>
+              <div>BAND HIGH<br><span id="aBandHigh">0.00</span></div>
+              <div>FLUX<br><span id="aFlux">0.00</span></div>
+              <div>BEAT CONF<br><span id="aAutoGain">0%</span></div>
+              <div>AUTO / EFF GAIN<br><span id="aEffectiveGain">1.00 / 1.00</span></div>
+              <div>BACKEND + TARGET<br><span id="aDevice">-</span></div>
+              <div>CAPTURE<br><span id="aRunning">NO</span></div>
+              <div>SESSION<br><span id="aRestart">-</span></div>
+              <div>ERROR<br><span id="aError">-</span></div>
+            </div>
+          </div>
+        </div>
+        <div id="aAdvancedTuningCluster" class="subcluster collapsible" data-collapsible-key="audioAdvancedTuning" data-collapsed-default="1" data-collapsed-default-mobile="1">
+          <div class="clusterHeaderRow">
+            <h3>ADVANCED AUDIO TUNING</h3>
+            <button type="button" class="collapseBtn" data-collapse-btn aria-expanded="true" title="Show or hide advanced audio tuning controls.">COLLAPSE</button>
+          </div>
+          <div class="clusterBody">
+            <p class="hint">Use these when troubleshooting edge cases, room noise behavior, limiter response, or backend restart behavior.</p>
+            <div class="controlRow">
+              <div>
+                <label for="aDeviceId">DEVICE ID (blank = auto) <span class="infoTip" title="Numeric input device id. Leave blank to auto-select based on match/fallback.">?</span></label>
+                <input id="aDeviceId" type="text" placeholder="auto" />
+              </div>
+              <div>
+                <label for="aNoise">NOISE FLOOR MIN <span class="infoTip" title="Minimum signal floor to ignore background hum. Raise if room noise triggers effects.">?</span></label>
+                <input id="aNoise" type="number" step="0.00001" min="0" max="0.02" value="0.00045" />
+              </div>
+              <div>
+                <label for="aPeakDecay">PEAK DECAY <span class="infoTip" title="How quickly peaks fall back down. Higher holds peak longer; lower decays faster.">?</span></label>
+                <input id="aPeakDecay" type="number" step="0.001" min="0.5" max="0.9995" value="0.93" />
+              </div>
+              <div>
+                <label for="aRestartMs">RESTART MS <span class="infoTip" title="Watchdog restart delay when audio stream stalls.">?</span></label>
+                <input id="aRestartMs" type="number" step="50" min="250" max="20000" value="1500" />
+              </div>
+            </div>
+            <div class="controlRow">
+              <div>
+                <label><input id="aAutoLevelEnabled" type="checkbox" checked> AUTO LEVEL COMPENSATION <span class="infoTip" title="Tracks source loudness and gently boosts or attenuates when app volume changes.">?</span></label>
+              </div>
+              <div>
+                <label for="aAutoLevelTarget">AUTO TARGET RMS <span class="infoTip" title="Target raw input RMS for auto compensation. Lower = calmer, higher = stronger drive.">?</span></label>
+                <input id="aAutoLevelTarget" type="number" step="0.001" min="0.005" max="0.2" value="0.028" />
+              </div>
+              <div>
+                <label for="aAutoLevelMinGain">AUTO MIN GAIN <span class="infoTip" title="Lower bound of auto compensation multiplier.">?</span></label>
+                <input id="aAutoLevelMinGain" type="number" step="0.01" min="0.2" max="3.0" value="0.45" />
+              </div>
+              <div>
+                <label for="aAutoLevelMaxGain">AUTO MAX GAIN <span class="infoTip" title="Upper bound of auto compensation multiplier.">?</span></label>
+                <input id="aAutoLevelMaxGain" type="number" step="0.01" min="0.2" max="4.0" value="1.55" />
+              </div>
+              <div>
+                <label for="aAutoLevelGate">AUTO LEVEL GATE <span class="infoTip" title="Minimum loudness before auto-level compensation engages. Lower catches quieter apps.">?</span></label>
+                <input id="aAutoLevelGate" type="number" step="0.001" min="0" max="0.03" value="0.007" />
+              </div>
+            </div>
+            <div class="controlRow">
+              <div>
+                <label for="aFfmpegPath">FFMPEG PATH <span class="infoTip" title="Executable path or command name for ffmpeg.">?</span></label>
+                <input id="aFfmpegPath" type="text" value="ffmpeg" placeholder="ffmpeg">
+              </div>
+            </div>
+            <div class="controlRow">
+              <div>
+                <label for="aBandLowHz">BAND LOW HZ <span class="infoTip" title="Upper edge of low-frequency band used by reactive analysis.">?</span></label>
+                <input id="aBandLowHz" type="number" step="1" min="60" max="500" value="180" />
+              </div>
+              <div>
+                <label for="aBandMidHz">BAND MID HZ <span class="infoTip" title="Upper edge of mid-frequency band. Higher values shift more content from highs into mids.">?</span></label>
+                <input id="aBandMidHz" type="number" step="1" min="700" max="8000" value="2200" />
+              </div>
+              <div>
+                <label for="aLimiterThreshold">LIMITER THRESHOLD <span class="infoTip" title="Peak limiter threshold. Lower means stronger limiting.">?</span></label>
+                <input id="aLimiterThreshold" type="number" step="0.01" min="0.4" max="0.99" value="0.82" />
+              </div>
+              <div>
+                <label for="aLimiterKnee">LIMITER KNEE <span class="infoTip" title="Limiter knee softness. Higher is smoother; lower is harder clamp.">?</span></label>
+                <input id="aLimiterKnee" type="number" step="0.01" min="0.02" max="0.8" value="0.16" />
+              </div>
+            </div>
+            <div class="grid2">
+              <div>
+                <label for="aLogTicks">LOG EVERY TICKS <span class="infoTip" title="Internal debug logging interval. Higher values = less log noise.">?</span></label>
+                <input id="aLogTicks" type="number" step="1" min="10" max="2000" value="60" />
+              </div>
+            </div>
+            <h3>LIMITER PRESETS</h3>
+            <div class="grid3">
+              <button type="button" data-limiter-preset="transparent">TRANSPARENT</button>
+              <button type="button" data-limiter-preset="balanced">BALANCED</button>
+              <button type="button" data-limiter-preset="hard">HARD</button>
+            </div>
+            <p class="hint">Preset buttons only change limiter threshold and knee.</p>
+            <div class="grid2 audioQuickActionRow">
+              <button id="aRefreshAdvancedBtn" type="button" title="Reload advanced tuning fields from current server config.">REFRESH ADVANCED TUNING</button>
+            </div>
+            <p class="hint">Changed advanced fields are not live until you apply. Use APPLY + START AUDIO below.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

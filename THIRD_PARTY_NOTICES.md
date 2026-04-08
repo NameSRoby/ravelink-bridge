@@ -1,40 +1,47 @@
-# Third-Party Notices and References
+# Third-Party Notices
 
-This project is distributed under the ISC license (`LICENSE`) and uses third-party open-source software and protocol documentation.
+This file tracks third-party code usage, adapted logic, and required attribution for `v1.6.2`.
 
-## Runtime Dependencies (NPM)
+## Policy
 
-Direct runtime dependencies declared in `package.json`:
+- If code is adapted from an external source or repository, add an entry before merge.
+- Include source URL, license, and impacted local files.
+- Keep entries specific and auditable.
 
-- `axios` (`1.13.5`) - MIT
-  Source: https://github.com/axios/axios
-  Homepage: https://axios-http.com
-- `express` (`5.2.1`) - MIT
-  Source: https://github.com/expressjs/express
-  Homepage: https://expressjs.com
-- `hue-sync` (`0.1.3`) - Apache-2.0
-  Source: https://github.com/jdmg94/Hue-Sync
-  Homepage: https://github.com/jdmg94/Hue-Sync
-- `midi` (`2.0.0`) - MIT
-  Source: https://github.com/justinlatimer/node-midi
-- `naudiodon` (`2.3.6`) - Apache-2.0
-  Source: https://github.com/Streampunk/naudiodon
-- `semver` (`7.7.4`) - ISC
-  Source: https://github.com/npm/node-semver
+## Entry Template
 
-License data above is taken from each package's `node_modules/<name>/package.json`.
+Use this format for each source:
 
-## Protocol and Platform Documentation References
+```text
+Name:
+Source:
+License:
+Used In:
+Notes:
+```
 
-The project behavior and integration model reference public platform docs:
+## Current Notices
 
-- Philips Hue Developer Portal: https://developers.meethue.com/
-- Philips Hue API v2 docs: https://developers.meethue.com/develop/hue-api-v2/
-- Philips Hue Entertainment docs: https://developers.meethue.com/develop/hue-entertainment/
-- WiZ local control reference (official support FAQ): https://gitlab.com/wizconnected/wiz/-/blob/master/FAQ.md?ref_type=heads#q-do-you-support-local-control
-- WiZ local API/community documentation portal: https://wizconnected.notion.site/Wiz-API-fd0b8acd621c4f86897ec48d8e14d4ff
+- Name: hue-sync
+  Source: https://www.npmjs.com/package/hue-sync
+  License: MIT (per package metadata)
+  Used In: `src/adapters/brands/hue-entertainment.runtime.js`
+  Notes: optional transport dependency for Hue Entertainment DTLS session start/send/stop.
 
-## Notes for Redistribution
+- Name: node-dtls-client
+  Source: https://www.npmjs.com/package/node-dtls-client
+  License: MIT (per package metadata)
+  Used In: transitively through `hue-sync` when Entertainment transport is active.
+  Notes: declared as optional dependency to keep local startup resilient if installation is unavailable.
 
-- Keep this file in redistributable/source releases.
-- If any additional third-party code or snippets are added, record source links and license terms here before publishing.
+- Name: cross-fetch
+  Source: https://www.npmjs.com/package/cross-fetch
+  License: MIT (per package metadata)
+  Used In: `src/adapters/brands/hue-entertainment.runtime.js`
+  Notes: required fetch compatibility shim for Hue Entertainment runtime behavior (`hue-sync` peer dependency).
+
+- Name: WiZ Local Control Documentation
+  Source: https://gitlab.com/wizlighting/wiz-local-control/-/raw/master/README.md
+  License: Documentation reference only (no code copied; license not specified in the referenced README)
+  Used In: `src/adapters/brands/wiz-bridge.adapter.js`, `src/domains/engine-v2/engine.runtime.js`
+  Notes: used to confirm local `setPilot` dimming contract (`10..100`) and keep WiZ brightness mapping and protocol constraints explicit.
