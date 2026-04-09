@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 REM [TITLE] Script: RaveLink-Bridge-Install-Optional-Audio-Tools.bat
 REM [TITLE] Purpose: local helper to bootstrap optional runtime dependencies used by audio + mod lanes
 REM [TITLE] Functionality Index:
-REM [TITLE] - ensures npm dependencies are installed via scripts\bootstrap-runtime.js
+REM [TITLE] - verifies packaged dependencies or bootstraps local ones when needed
 REM [TITLE] - installs Playwright browser runtimes used by mod browser-driver integrations
 REM [TITLE] - leaves shell open with clear diagnostics on failure
 
@@ -12,8 +12,8 @@ cd /d "%~dp0"
 echo [RaveLink] Optional runtime tools bootstrap
 echo.
 echo This helper will:
-echo   1) install/update Node dependencies
-echo   2) install Playwright browser runtimes
+echo   1) verify packaged Node dependencies ^(or bootstrap local ones if needed^)
+echo   2) install Playwright browser runtimes into your user profile
 echo.
 echo Note: ffmpeg/system-level audio tooling may still require manual install.
 echo.
@@ -31,20 +31,29 @@ if not exist "scripts\bootstrap-runtime.js" (
   exit /b 1
 )
 
-echo [RaveLink] Step 1/2: bootstrap Node dependencies...
-node scripts\bootstrap-runtime.js --force-install
+echo [RaveLink] Step 1/2: verify runtime dependencies...
+node scripts\bootstrap-runtime.js
 if errorlevel 1 (
-  echo [RaveLink][ERROR] Dependency bootstrap failed.
+  echo [RaveLink][ERROR] Runtime dependency check/bootstrap failed.
   pause
   exit /b 1
 )
 
+if not defined PLAYWRIGHT_BROWSERS_PATH (
+  if defined LOCALAPPDATA (
+    set "PLAYWRIGHT_BROWSERS_PATH=%LOCALAPPDATA%\RaveLink Bridge\playwright-browsers"
+  )
+)
+
 echo.
 echo [RaveLink] Step 2/2: install Playwright browser runtimes...
-call npx playwright install
+if defined PLAYWRIGHT_BROWSERS_PATH (
+  echo [RaveLink] Playwright browser path: %PLAYWRIGHT_BROWSERS_PATH%
+)
+call npx playwright install chromium firefox
 if errorlevel 1 (
   echo [RaveLink][WARN] Playwright browser install failed.
-  echo [RaveLink][WARN] You can retry manually with: npx playwright install
+  echo [RaveLink][WARN] You can retry manually with: npx playwright install chromium firefox
   echo.
   pause
   exit /b 1

@@ -72,23 +72,39 @@ function createZipFromDirectory(sourceDir, targetZip) {
     throw new Error(`missing required directory: ${sourceDir}`);
   }
   if (fileExists(targetZip)) fs.rmSync(targetZip, { force: true });
-  const escapedSource = sourceDir.replace(/'/g, "''");
-  const escapedTarget = targetZip.replace(/'/g, "''");
-  const psScript = [
-    "$ErrorActionPreference = 'Stop'",
-    "Add-Type -AssemblyName 'System.IO.Compression.FileSystem'",
-    `$source = '${escapedSource}'`,
-    `$target = '${escapedTarget}'`,
-    "[System.IO.Compression.ZipFile]::CreateFromDirectory($source, $target, [System.IO.Compression.CompressionLevel]::Optimal, $false)"
-  ].join("; ");
-  run("powershell.exe", [
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-Command",
-    psScript
-  ]);
+  const parentDir = path.dirname(sourceDir);
+  const leafName = path.basename(sourceDir);
+  try {
+    // [DEV] tar.exe handles long Windows dependency paths more reliably than
+    // System.IO.Compression in packaged node_modules trees.
+    run("tar.exe", ["-a", "-c", "-f", targetZip, "-C", sourceDir, "."], {
+      cwd: parentDir
+    });
+    return;
+  } catch (tarError) {
+    const escapedSource = sourceDir.replace(/'/g, "''");
+    const escapedTarget = targetZip.replace(/'/g, "''");
+    const psScript = [
+      "$ErrorActionPreference = 'Stop'",
+      "Add-Type -AssemblyName 'System.IO.Compression.FileSystem'",
+      `$source = '${escapedSource}'`,
+      `$target = '${escapedTarget}'`,
+      "[System.IO.Compression.ZipFile]::CreateFromDirectory($source, $target, [System.IO.Compression.CompressionLevel]::Optimal, $false)"
+    ].join("; ");
+    try {
+      run("powershell.exe", [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        psScript
+      ]);
+      return;
+    } catch (zipError) {
+      throw new Error(`unable to create zip via tar.exe or powershell for ${leafName}: ${zipError.message || tarError.message}`);
+    }
+  }
 }
 
 function findIsccPath() {
@@ -135,9 +151,11 @@ function writeInstallerScript() {
     "AppVersion={#AppVersion}",
     "AppPublisher=NameSRoby",
     "DefaultDirName={localappdata}\\Programs\\RaveLink Bridge",
+    "UsePreviousAppDir=no",
     "DefaultGroupName=RaveLink Bridge",
     "PrivilegesRequired=lowest",
     "PrivilegesRequiredOverridesAllowed=dialog",
+    "DisableDirPage=no",
     "DisableProgramGroupPage=yes",
     "OutputDir={#OutputDir}",
     "OutputBaseFilename={#OutputBaseFilename}",

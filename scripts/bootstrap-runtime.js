@@ -17,7 +17,6 @@ const ROOT = process.cwd();
 const PACKAGE_JSON_PATH = path.join(ROOT, "package.json");
 const PACKAGE_LOCK_PATH = path.join(ROOT, "package-lock.json");
 const NODE_MODULES_PATH = path.join(ROOT, "node_modules");
-const HASH_CACHE_PATH = path.join(ROOT, "runtime", "bootstrap", "deps-lock.sha256");
 
 const args = new Set(process.argv.slice(2).map(item => String(item || "").trim().toLowerCase()));
 const forceInstall = args.has("--force-install");
@@ -45,9 +44,51 @@ function readTextFileOrEmpty(filePath) {
   }
 }
 
-function writeHashCache(value) {
-  fs.mkdirSync(path.dirname(HASH_CACHE_PATH), { recursive: true });
-  fs.writeFileSync(HASH_CACHE_PATH, `${String(value || "").trim()}\n`, "utf8");
+function getUserStateRoot(env = process.env, platform = process.platform) {
+  if (platform === "win32") {
+    const localAppData = String(env.LOCALAPPDATA || "").trim();
+    if (localAppData) return path.join(localAppData, "RaveLink Bridge");
+    const userProfile = String(env.USERPROFILE || "").trim();
+    if (userProfile) return path.join(userProfile, "AppData", "Local", "RaveLink Bridge");
+  }
+
+  const xdgDataHome = String(env.XDG_DATA_HOME || "").trim();
+  if (xdgDataHome) return path.join(xdgDataHome, "ravelink-bridge");
+
+  const home = String(env.HOME || env.USERPROFILE || "").trim();
+  if (home) return path.join(home, ".local", "share", "ravelink-bridge");
+
+  return path.join(ROOT, "runtime");
+}
+
+function pathStartsWith(rootPath, candidatePath) {
+  const left = String(rootPath || "").trim().toLowerCase();
+  const right = String(candidatePath || "").trim().toLowerCase();
+  return Boolean(left && right && left.startsWith(right));
+}
+
+function isProtectedInstallRoot(rootPath = ROOT, env = process.env, platform = process.platform) {
+  if (platform !== "win32") return false;
+  const protectedPrefixes = [
+    env.ProgramFiles,
+    env["ProgramFiles(x86)"],
+    env.ProgramW6432
+  ]
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+  return protectedPrefixes.some(prefix => pathStartsWith(rootPath, prefix));
+}
+
+function getHashCachePath(rootPath = ROOT, env = process.env, platform = process.platform) {
+  if (isProtectedInstallRoot(rootPath, env, platform)) {
+    return path.join(getUserStateRoot(env, platform), "runtime", "bootstrap", "deps-lock.sha256");
+  }
+  return path.join(rootPath, "runtime", "bootstrap", "deps-lock.sha256");
+}
+
+function writeHashCache(value, filePath = getHashCachePath()) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${String(value || "").trim()}\n`, "utf8");
 }
 
 function getDependencyNames(packageJson) {
@@ -178,6 +219,52 @@ function syncBundledRustAudioTools() {
   }
 }
 
+function shouldInstallDependencies({
+  forceInstallRequested = false,
+  modulesPresent = false,
+  cachedHash = "",
+  lockHash = "",
+  protectedInstallRoot = false
+} = {}) {
+  if (protectedInstallRoot && forceInstallRequested) {
+    return {
+      needsInstall: false,
+      reason: "protected_install_uses_packaged_dependencies",
+      ignoreForceInstall: true
+    };
+  }
+
+  if (protectedInstallRoot && modulesPresent) {
+    return {
+      needsInstall: false,
+      reason: "protected_install_uses_packaged_dependencies",
+      ignoreForceInstall: false
+    };
+  }
+
+  const needsInstall =
+    forceInstallRequested ||
+    !modulesPresent ||
+    !cachedHash ||
+    cachedHash !== lockHash;
+
+  const reason = forceInstallRequested
+    ? "forced"
+    : !modulesPresent
+      ? "node_modules_missing_or_incomplete"
+      : !cachedHash
+        ? "hash_cache_missing"
+        : cachedHash !== lockHash
+          ? "lock_hash_changed"
+          : "dependencies_ready";
+
+  return {
+    needsInstall,
+    reason,
+    ignoreForceInstall: false
+  };
+}
+
 function main() {
   if (!fs.existsSync(PACKAGE_JSON_PATH) || !fs.existsSync(PACKAGE_LOCK_PATH)) {
     throw new Error("package.json or package-lock.json is missing");
@@ -186,33 +273,42 @@ function main() {
   const packageJson = readJsonFile(PACKAGE_JSON_PATH);
   const deps = getDependencyNames(packageJson);
   const lockHash = sha256File(PACKAGE_LOCK_PATH);
-  const cachedHash = readTextFileOrEmpty(HASH_CACHE_PATH);
+  const hashCachePath = getHashCachePath(ROOT, process.env, process.platform);
+  const cachedHash = readTextFileOrEmpty(hashCachePath);
   const modulesPresent = hasRequiredModules(deps);
-
-  const needsInstall =
-    forceInstall ||
-    !modulesPresent ||
-    !cachedHash ||
-    cachedHash !== lockHash;
+  const protectedInstallRoot = isProtectedInstallRoot(ROOT, process.env, process.platform);
+  const installDecision = shouldInstallDependencies({
+    forceInstallRequested: forceInstall,
+    modulesPresent,
+    cachedHash,
+    lockHash,
+    protectedInstallRoot
+  });
 
   if (skipInstall) {
     console.log("[BOOTSTRAP] --skip-install set, dependency check/install skipped.");
     return;
   }
 
-  if (needsInstall) {
-    const reason = forceInstall
-      ? "forced"
-      : !modulesPresent
-        ? "node_modules_missing_or_incomplete"
-        : !cachedHash
-          ? "hash_cache_missing"
-          : "lock_hash_changed";
-    console.log(`[BOOTSTRAP] installing dependencies (${reason})...`);
+  if (protectedInstallRoot && installDecision.ignoreForceInstall) {
+    console.warn("[BOOTSTRAP] protected install detected; ignoring --force-install and using packaged dependencies.");
+  }
+
+  if (protectedInstallRoot && !modulesPresent) {
+    throw new Error("protected install is missing packaged dependencies; reinstall the release or move it to a writable folder");
+  }
+
+  if (protectedInstallRoot && modulesPresent) {
+    console.log("[BOOTSTRAP] protected install detected; using packaged dependencies and per-user bootstrap cache.");
+  }
+
+  if (installDecision.needsInstall) {
+    console.log(`[BOOTSTRAP] installing dependencies (${installDecision.reason})...`);
     runInstall();
-    writeHashCache(lockHash);
+    writeHashCache(lockHash, hashCachePath);
     console.log("[BOOTSTRAP] dependencies ready.");
   } else {
+    writeHashCache(lockHash, hashCachePath);
     console.log("[BOOTSTRAP] dependencies up to date (fast path).");
   }
 
@@ -225,9 +321,18 @@ function main() {
   }
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(`[BOOTSTRAP] ${error.message}`);
-  process.exit(1);
+module.exports = {
+  getUserStateRoot,
+  getHashCachePath,
+  isProtectedInstallRoot,
+  shouldInstallDependencies
+};
+
+if (require.main === module) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`[BOOTSTRAP] ${error.message}`);
+    process.exit(1);
+  }
 }
