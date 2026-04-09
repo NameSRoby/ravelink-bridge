@@ -45,20 +45,21 @@ function readTextFileOrEmpty(filePath) {
 }
 
 function getUserStateRoot(env = process.env, platform = process.platform) {
+  const pathApi = platform === "win32" ? path.win32 : path;
   if (platform === "win32") {
     const localAppData = String(env.LOCALAPPDATA || "").trim();
-    if (localAppData) return path.join(localAppData, "RaveLink Bridge");
+    if (localAppData) return pathApi.join(localAppData, "RaveLink Bridge");
     const userProfile = String(env.USERPROFILE || "").trim();
-    if (userProfile) return path.join(userProfile, "AppData", "Local", "RaveLink Bridge");
+    if (userProfile) return pathApi.join(userProfile, "AppData", "Local", "RaveLink Bridge");
   }
 
   const xdgDataHome = String(env.XDG_DATA_HOME || "").trim();
-  if (xdgDataHome) return path.join(xdgDataHome, "ravelink-bridge");
+  if (xdgDataHome) return pathApi.join(xdgDataHome, "ravelink-bridge");
 
   const home = String(env.HOME || env.USERPROFILE || "").trim();
-  if (home) return path.join(home, ".local", "share", "ravelink-bridge");
+  if (home) return pathApi.join(home, ".local", "share", "ravelink-bridge");
 
-  return path.join(ROOT, "runtime");
+  return pathApi.join(ROOT, "runtime");
 }
 
 function pathStartsWith(rootPath, candidatePath) {
@@ -80,10 +81,11 @@ function isProtectedInstallRoot(rootPath = ROOT, env = process.env, platform = p
 }
 
 function getHashCachePath(rootPath = ROOT, env = process.env, platform = process.platform) {
+  const pathApi = platform === "win32" ? path.win32 : path;
   if (isProtectedInstallRoot(rootPath, env, platform)) {
-    return path.join(getUserStateRoot(env, platform), "runtime", "bootstrap", "deps-lock.sha256");
+    return pathApi.join(getUserStateRoot(env, platform), "runtime", "bootstrap", "deps-lock.sha256");
   }
-  return path.join(rootPath, "runtime", "bootstrap", "deps-lock.sha256");
+  return pathApi.join(rootPath, "runtime", "bootstrap", "deps-lock.sha256");
 }
 
 function writeHashCache(value, filePath = getHashCachePath()) {
