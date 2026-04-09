@@ -8,6 +8,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $distRoot = Join-Path $root "dist"
 $stageRoot = Join-Path $distRoot "RaveLink-Bridge-v$Version"
 $zipPath = Join-Path $distRoot "RaveLink-Bridge-v$Version.zip"
+$buildId = if ($env:RAVELINK_RELEASE_BUILD_ID) { "$($env:RAVELINK_RELEASE_BUILD_ID)".Trim() } else { "build-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" }
 
 function Reset-Path([string]$Path) {
   if (Test-Path -LiteralPath $Path) {
@@ -39,6 +40,7 @@ $includePaths = @(
   "node_modules",
   "package.json",
   "package-lock.json",
+  "RELEASE_BUILD.json",
   "README.md",
   "THIRD_PARTY_NOTICES.md",
   "RaveLink-Bridge-Start.bat",
@@ -51,6 +53,16 @@ foreach ($relativePath in $includePaths) {
   $destination = Join-Path $stageRoot $relativePath
   Copy-ItemSafe $source $destination
 }
+
+$releaseBuild = [ordered]@{
+  version = "$Version"
+  buildId = "$buildId"
+  channel = "release"
+  releaseTag = "v$Version"
+  source = "packaged-release"
+}
+$releaseBuildPath = Join-Path $stageRoot "RELEASE_BUILD.json"
+$releaseBuild | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $releaseBuildPath -Encoding UTF8
 
 $modsDir = Join-Path $stageRoot "mods"
 New-Item -ItemType Directory -Force -Path $modsDir | Out-Null

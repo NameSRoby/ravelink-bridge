@@ -17,6 +17,7 @@ const DEFAULT_ALLOWED_UPDATE_PATHS = Object.freeze([
   "src",
   "public",
   "scripts",
+  "RELEASE_BUILD.json",
   "package.json",
   "package-lock.json",
   "README.md",

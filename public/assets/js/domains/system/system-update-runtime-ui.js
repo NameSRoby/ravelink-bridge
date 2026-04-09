@@ -135,6 +135,13 @@ function createSystemUpdateRuntimeUi(deps = {}) {
     return String(snapshot?.lastCheck?.latest?.releaseUrl || "").trim();
   }
 
+  function isSameVersionHotfixSnapshot(snapshot = {}) {
+    const current = String(snapshot?.currentVersion || "").trim();
+    const latest = String(snapshot?.lastCheck?.latest?.version || snapshot?.lastCheck?.latest?.tagName || "").trim();
+    const detail = String(snapshot?.lastCheck?.detail || "").trim().toLowerCase();
+    return detail === "same_version_hotfix_available" && !!current && current === latest;
+  }
+
   function renderSystemUpdateStatus(snapshot = null) {
     const normalized = normalizeSystemUpdateSnapshot(snapshot || ui.systemUpdateStatusSnapshot || {});
     ui.systemUpdateStatusSnapshot = normalized;
@@ -158,7 +165,9 @@ function createSystemUpdateRuntimeUi(deps = {}) {
     } else if (normalized.lastCheck.ok === true && normalized.lastCheck.updateAvailable === true) {
       const current = normalized.currentVersion || "unknown";
       const latest = normalized.lastCheck.latest.version || normalized.lastCheck.latest.tagName || "unknown";
-      text = `UPDATE AVAILABLE | ${current} -> ${latest} | CHECKED ${checkedAtLabel}`;
+      text = isSameVersionHotfixSnapshot(normalized)
+        ? `HOTFIX AVAILABLE | ${current} | CHECKED ${checkedAtLabel}`
+        : `UPDATE AVAILABLE | ${current} -> ${latest} | CHECKED ${checkedAtLabel}`;
     } else if (normalized.lastCheck.ok === true) {
       const current = normalized.currentVersion || "unknown";
       text = `UP TO DATE (${current}) | CHECKED ${checkedAtLabel}`;
@@ -216,21 +225,33 @@ function createSystemUpdateRuntimeUi(deps = {}) {
     }
   }
 
-  function maybePromptForStartupUpdate(snapshot = {}) {
+  async function maybePromptForStartupUpdate(snapshot = {}) {
     if (!shouldShowStartupUpdatePrompt(snapshot)) return false;
     markStartupUpdatePromptShown(snapshot);
     const current = String(snapshot.currentVersion || "unknown");
     const latest = String(snapshot?.lastCheck?.latest?.version || snapshot?.lastCheck?.latest?.tagName || "unknown");
     const releaseUrl = String(snapshot?.lastCheck?.latest?.releaseUrl || "").trim();
+    const hotfixLabel = isSameVersionHotfixSnapshot(snapshot)
+      ? `${latest} hotfix`
+      : latest;
     const message =
-      `New RaveLink release detected (${current} -> ${latest}).\n\n` +
-      `Open release page now?\n\n` +
+      `New RaveLink update detected (${current} -> ${hotfixLabel}).\n\n` +
+      `Apply the update now?\n\n` +
+      `RaveLink will stage the update in place and ask for a restart when complete.\n\n` +
       `Tip: set STARTUP UPDATE PROMPTS to disabled in System settings if you don't want startup prompts.`;
-    const openNow = windowRef.confirm(message);
-    if (openNow && releaseUrl) {
-      windowRef.open(releaseUrl, "_blank", "noopener");
-      setBadge(el.health, "ok", "UPDATE PAGE OPENED");
-      return true;
+    const applyNow = windowRef.confirm(message);
+    if (applyNow) {
+      return applySystemUpdate({ announce: true, forceCheck: false });
+    }
+    if (releaseUrl) {
+      const openReleaseNotes = windowRef.confirm(
+        "Open the release page instead so you can review the update before applying it?"
+      );
+      if (openReleaseNotes) {
+        windowRef.open(releaseUrl, "_blank", "noopener");
+        setBadge(el.health, "ok", "UPDATE PAGE OPENED");
+        return true;
+      }
     }
     return false;
   }
@@ -275,7 +296,7 @@ function createSystemUpdateRuntimeUi(deps = {}) {
       }
     }
     if (options.triggerStartupPrompt === true) {
-      maybePromptForStartupUpdate(snapshot);
+      await maybePromptForStartupUpdate(snapshot);
     }
     if (options.announce === true) {
       if (snapshot.lastCheck.ok === true && snapshot.lastCheck.updateAvailable === true) {

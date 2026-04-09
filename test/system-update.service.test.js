@@ -78,6 +78,97 @@ test("system update service manual check reports update available", async () => 
   assert.equal(status.lastCheck.latest.version, "1.6.3");
 });
 
+test("system update service detects same-version hotfix releases via build id", async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ravelink-update-hotfix-"));
+  fs.writeFileSync(
+    path.join(tmpRoot, "RELEASE_BUILD.json"),
+    JSON.stringify({
+      version: "1.6.2",
+      buildId: "build-old",
+      channel: "release",
+      releaseTag: "v1.6.2",
+      source: "packaged-release"
+    }),
+    "utf8"
+  );
+
+  const service = createSystemUpdateService({
+    rootDir: tmpRoot,
+    currentVersion: "1.6.2",
+    repoOwner: "NameSRoby",
+    repoName: "ravelink-bridge",
+    getSystemConfig: () => ({
+      updateChecksEnabled: true,
+      updateStartupPromptEnabled: true
+    }),
+    httpClient: {
+      get: async () => ({
+        status: 200,
+        data: {
+          tag_name: "v1.6.2",
+          name: "RaveLink Bridge v1.6.2",
+          html_url: "https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.6.2",
+          prerelease: false,
+          draft: false,
+          body: "<!-- ravelink-build-id: build-new -->"
+        }
+      })
+    }
+  });
+
+  const status = await service.checkForUpdates({ mode: "manual", force: true });
+  assert.equal(status.ok, true);
+  assert.equal(status.lastCheck.ok, true);
+  assert.equal(status.lastCheck.updateAvailable, true);
+  assert.equal(status.lastCheck.detail, "same_version_hotfix_available");
+  assert.equal(status.lastCheck.latest.buildId, "build-new");
+});
+
+test("system update service keeps same-version releases up to date when build id matches", async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ravelink-update-hotfix-same-"));
+  fs.writeFileSync(
+    path.join(tmpRoot, "RELEASE_BUILD.json"),
+    JSON.stringify({
+      version: "1.6.2",
+      buildId: "build-same",
+      channel: "release",
+      releaseTag: "v1.6.2",
+      source: "packaged-release"
+    }),
+    "utf8"
+  );
+
+  const service = createSystemUpdateService({
+    rootDir: tmpRoot,
+    currentVersion: "1.6.2",
+    repoOwner: "NameSRoby",
+    repoName: "ravelink-bridge",
+    getSystemConfig: () => ({
+      updateChecksEnabled: true,
+      updateStartupPromptEnabled: true
+    }),
+    httpClient: {
+      get: async () => ({
+        status: 200,
+        data: {
+          tag_name: "v1.6.2",
+          name: "RaveLink Bridge v1.6.2",
+          html_url: "https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.6.2",
+          prerelease: false,
+          draft: false,
+          body: "<!-- ravelink-build-id: build-same -->"
+        }
+      })
+    }
+  });
+
+  const status = await service.checkForUpdates({ mode: "manual", force: true });
+  assert.equal(status.ok, true);
+  assert.equal(status.lastCheck.ok, true);
+  assert.equal(status.lastCheck.updateAvailable, false);
+  assert.equal(status.lastCheck.detail, "up_to_date");
+});
+
 test("system update service apply returns no_update_available when already up to date", async () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ravelink-update-none-"));
   const service = createSystemUpdateService({

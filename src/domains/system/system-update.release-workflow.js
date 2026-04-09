@@ -14,6 +14,7 @@ const DEFAULT_RELEASE_API_BASE = "https://api.github.com";
 const DEFAULT_RELEASE_CHECK_TIMEOUT_MS = 4500;
 const DEFAULT_ARCHIVE_DOWNLOAD_TIMEOUT_MS = 30000;
 const DEFAULT_HISTORY_LIMIT = 24;
+const DEFAULT_RELEASE_BUILD_PATH = "RELEASE_BUILD.json";
 const RELEASE_BODY_METADATA_SIGNATURE_KEYS = Object.freeze([
   "ravelink-metadata-signature",
   "metadata-signature"
@@ -22,6 +23,11 @@ const RELEASE_BODY_ARCHIVE_SHA256_KEYS = Object.freeze([
   "ravelink-archive-sha256",
   "archive-sha256",
   "archive_sha256"
+]);
+const RELEASE_BODY_BUILD_ID_KEYS = Object.freeze([
+  "ravelink-build-id",
+  "build-id",
+  "build_id"
 ]);
 
 function asString(value) {
@@ -183,6 +189,55 @@ function extractDirectiveFromReleaseBody(bodyText = "", keys = []) {
   return "";
 }
 
+function extractLooseDirectiveFromReleaseBody(bodyText = "", keys = []) {
+  const text = String(bodyText || "");
+  for (const key of (Array.isArray(keys) ? keys : [])) {
+    const token = asString(key);
+    if (!token) continue;
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`${escaped}\\s*:\\s*([^\\n\\r<>]+)`, "i");
+    const match = text.match(regex);
+    if (!match) continue;
+    const value = asString(match[1] || "")
+      .replace(/\s*-->$/, "")
+      .replace(/\s*--$/, "")
+      .trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function readReleaseBuildInfo(filePath = "") {
+  const targetPath = asString(filePath);
+  if (!targetPath) {
+    return {
+      version: "",
+      buildId: "",
+      channel: "",
+      releaseTag: "",
+      source: ""
+    };
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.resolve(targetPath), "utf8"));
+    return {
+      version: normalizeVersionToken(parsed?.version || ""),
+      buildId: asString(parsed?.buildId || ""),
+      channel: asString(parsed?.channel || ""),
+      releaseTag: asString(parsed?.releaseTag || ""),
+      source: asString(parsed?.source || "")
+    };
+  } catch {
+    return {
+      version: "",
+      buildId: "",
+      channel: "",
+      releaseTag: "",
+      source: ""
+    };
+  }
+}
+
 function buildReleaseSignaturePayload(release = {}) {
   const source = asObject(release, {});
   return JSON.stringify({
@@ -215,7 +270,12 @@ function readReleaseIntegrityHints(release = {}) {
   );
   return {
     metadataSignature: normalizeBase64Token(metadataSignatureRaw),
-    archiveSha256: normalizeSha256Hex(archiveSha256Raw)
+    archiveSha256: normalizeSha256Hex(archiveSha256Raw),
+    buildId: asString(
+      source.buildId ||
+      source.build_id ||
+      extractLooseDirectiveFromReleaseBody(body, RELEASE_BODY_BUILD_ID_KEYS)
+    )
   };
 }
 
@@ -256,6 +316,7 @@ function normalizeReleaseSnapshot(payload = {}) {
     id: Number(source.id || 0) || 0,
     tagName,
     version: version || normalizeVersionToken(tagName),
+    buildId: asString(source.buildId || source.build_id || ""),
     name: asString(source.name || tagName),
     releaseUrl: asString(source.html_url || source.releaseUrl),
     apiUrl: asString(source.url || source.apiUrl),
@@ -264,6 +325,7 @@ function normalizeReleaseSnapshot(payload = {}) {
     prerelease: source.prerelease === true,
     draft: source.draft === true,
     publishedAt: Number.isFinite(publishedAt) ? publishedAt : 0,
+    updatedAt: Number(new Date(String(source.updated_at || source.updatedAt || publishedAtRaw || "").trim()).getTime() || 0),
     body: asString(source.body || source.notes || "").slice(0, 20_000),
     assets
   };
@@ -384,6 +446,7 @@ function createSystemUpdateReleaseWorkflow(options = {}) {
   const getCurrentVersion = typeof options.getCurrentVersion === "function"
     ? options.getCurrentVersion
     : (() => normalizeVersionToken(options.currentVersion || readPackageVersion(rootDir, "0.0.0")) || "0.0.0");
+  const releaseBuildPath = path.resolve(asString(options.releaseBuildPath || path.join(rootDir, DEFAULT_RELEASE_BUILD_PATH)));
 
   const startup = {
     launchAt: Number(now() || Date.now()),
@@ -461,6 +524,7 @@ function createSystemUpdateReleaseWorkflow(options = {}) {
 
     return {
       ...release,
+      buildId: hints.buildId || release.buildId || "",
       integrity: {
         metadataSignaturePresent: signaturePresent,
         metadataSignatureVerified: signaturePresent ? signatureVerified : false,
@@ -536,16 +600,30 @@ function createSystemUpdateReleaseWorkflow(options = {}) {
     try {
       const release = await fetchLatestRelease();
       const latestVersion = release.version || normalizeVersionToken(release.tagName);
+      const currentVersion = getCurrentVersion();
+      const currentBuild = readReleaseBuildInfo(releaseBuildPath);
+      const versionComparison = release.draft === true
+        ? 0
+        : compareVersionTokens(latestVersion, currentVersion);
+      const sameVersionHotfixAvailable =
+        release.draft !== true &&
+        versionComparison === 0 &&
+        asString(release.buildId) &&
+        asString(release.buildId) !== asString(currentBuild.buildId);
       const updateAvailable = release.draft === true
         ? false
-        : compareVersionTokens(latestVersion, getCurrentVersion()) > 0;
+        : versionComparison > 0 || sameVersionHotfixAvailable;
       setCheckSnapshot({
         ok: true,
         mode,
         checkedAt: timestamp,
         updateAvailable,
         error: "",
-        detail: updateAvailable ? "update_available" : "up_to_date",
+        detail: updateAvailable
+          ? sameVersionHotfixAvailable
+            ? "same_version_hotfix_available"
+            : "update_available"
+          : "up_to_date",
         latest: release
       });
       if (mode === "startup") {
