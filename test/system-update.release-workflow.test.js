@@ -131,3 +131,35 @@ test("release workflow prepares verified source root from downloaded archive", a
   assert.equal(prep.archiveDigestVerified, true);
   assert.equal(fs.existsSync(path.join(prep.sourceRoot, "src", "app", "index.js")), true);
 });
+
+test("release workflow extracts build id from HTML comment release metadata safely", async () => {
+  const workflow = makeWorkflow({
+    currentVersion: "1.6.2",
+    httpClient: {
+      get: async () => ({
+        status: 200,
+        data: {
+          tag_name: "v1.6.2",
+          name: "v1.6.2",
+          html_url: "https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.6.2",
+          zipball_url: "https://example.invalid/release.zip",
+          prerelease: false,
+          draft: false,
+          published_at: "2026-03-28T12:00:00.000Z",
+          body: [
+            "User-facing notes only.",
+            "<!-- ravelink-build-id: v1.6.2-r6 -->"
+          ].join("\n")
+        }
+      })
+    },
+    rootDir: fs.mkdtempSync(path.join(os.tmpdir(), "ravelink-update-buildid-"))
+  });
+
+  const status = await workflow.checkForUpdates({ mode: "manual", force: true });
+  assert.equal(status.ok, true);
+  assert.equal(status.lastCheck.ok, true);
+  assert.equal(status.lastCheck.updateAvailable, true);
+  assert.equal(status.lastCheck.detail, "same_version_hotfix_available");
+  assert.equal(status.lastCheck.latest.buildId, "v1.6.2-r6");
+});

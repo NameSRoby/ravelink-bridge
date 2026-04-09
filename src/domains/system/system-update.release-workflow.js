@@ -198,10 +198,20 @@ function extractLooseDirectiveFromReleaseBody(bodyText = "", keys = []) {
     const regex = new RegExp(`${escaped}\\s*:\\s*([^\\n\\r<>]+)`, "i");
     const match = text.match(regex);
     if (!match) continue;
-    const value = asString(match[1] || "")
-      .replace(/\s*-->$/, "")
-      .replace(/\s*--$/, "")
-      .trim();
+    let value = asString(match[1] || "");
+    while (true) {
+      const trimmed = value.trimEnd();
+      if (trimmed.endsWith("-->")) {
+        value = trimmed.slice(0, -3).trimEnd();
+        continue;
+      }
+      if (trimmed.endsWith("--")) {
+        value = trimmed.slice(0, -2).trimEnd();
+        continue;
+      }
+      value = trimmed;
+      break;
+    }
     if (value) return value;
   }
   return "";
