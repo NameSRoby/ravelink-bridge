@@ -762,6 +762,7 @@ button.audioNeedsApplyPulse:not(.busy):not(:disabled){
   margin:14px 12px 0;
   display:flex;
   align-items:center;
+  justify-content:flex-start;
   gap:8px;
   overflow-x:auto;
   overflow-y:hidden;
@@ -863,6 +864,26 @@ button.audioNeedsApplyPulse:not(.busy):not(:disabled){
 
 .modUiDynamicNavItem{
   flex:0 0 auto;
+}
+
+.tabs.tabsBalanced{
+  justify-content:center;
+  overflow-x:hidden;
+}
+
+.tabs.tabsBalanced .tabNavItem{
+  flex:1 1 0;
+  min-width:0;
+  max-width:228px;
+}
+
+.tabs.tabsBalanced .modUiDynamicNavItem{
+  max-width:260px;
+}
+
+.tabs.tabsBalanced .tabBtn{
+  width:100%;
+  max-width:none;
 }
 
 @media (max-width:980px){

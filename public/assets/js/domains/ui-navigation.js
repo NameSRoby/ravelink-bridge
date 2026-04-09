@@ -9,6 +9,33 @@
 // [DEV] Keep this module as the single owner of tab button click wiring so
 // [DEV] dynamic tab behavior stays deterministic across domain extraction slices.
 
+let tabsBarLayoutSyncQueued = false;
+
+function syncTabsBarLayout() {
+  if (!el.tabsBar) return false;
+  const visibleItems = Array.from(el.tabsBar.children).filter(node =>
+    node instanceof Element && !node.classList.contains("hidden")
+  );
+  const hasVisibleItems = visibleItems.length > 0;
+  const fitsViewport = hasVisibleItems && el.tabsBar.scrollWidth <= (el.tabsBar.clientWidth + 6);
+  el.tabsBar.classList.toggle("tabsBalanced", fitsViewport);
+  el.tabsBar.classList.toggle("tabsOverflowing", hasVisibleItems && !fitsViewport);
+  return fitsViewport;
+}
+
+function scheduleTabsBarLayoutSync() {
+  if (!el.tabsBar || tabsBarLayoutSyncQueued) return;
+  tabsBarLayoutSyncQueued = true;
+  const windowRef = typeof window === "object" ? window : null;
+  const scheduler = typeof windowRef?.requestAnimationFrame === "function"
+    ? windowRef.requestAnimationFrame.bind(windowRef)
+    : (callback => setTimeout(callback, 0));
+  scheduler(() => {
+    tabsBarLayoutSyncQueued = false;
+    syncTabsBarLayout();
+  });
+}
+
 function showTab(name) {
   const requested = String(name || "").trim().toLowerCase();
   const activeTabButtons = Array.from(document.querySelectorAll("[data-tab-btn]"));
@@ -69,6 +96,7 @@ function showTab(name) {
 
   updateMonitorRenderingState();
   syncDynamicModUiTabButtons();
+  scheduleTabsBarLayoutSync();
 }
 
 function activateTabAndScroll(tabName, sectionId) {
@@ -92,6 +120,29 @@ if (el.tabsBar) {
       showTab(tabBtn.dataset.tabBtn);
     }
   };
+
+  if (typeof MutationObserver === "function") {
+    const tabsBarObserver = new MutationObserver(() => {
+      scheduleTabsBarLayoutSync();
+    });
+    tabsBarObserver.observe(el.tabsBar, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+  }
+
+  if (typeof ResizeObserver === "function") {
+    const tabsBarResizeObserver = new ResizeObserver(() => {
+      scheduleTabsBarLayoutSync();
+    });
+    tabsBarResizeObserver.observe(el.tabsBar);
+  } else if (typeof window === "object" && typeof window.addEventListener === "function") {
+    window.addEventListener("resize", scheduleTabsBarLayoutSync);
+  }
+
+  scheduleTabsBarLayoutSync();
 }
 
 
