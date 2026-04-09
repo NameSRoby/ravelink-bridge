@@ -104,6 +104,7 @@ test("audio UI input adapter normalizes devices and tokens deterministically", (
   assert.equal(adapter.normalizeAudioAppTokenUi("spotify.exe"), "spotify");
   assert.equal(adapter.normalizeAudioAppTokenUi("Firefox Nightly.exe"), "firefox");
   assert.equal(adapter.normalizeAudioAppTokenUi("Mozilla Firefox"), "firefox");
+  assert.equal(adapter.normalizeAudioAppTokenUi("nightly"), "firefox");
   assert.equal(adapter.normalizeAudioProfileNameUi("  My* Profile !!! "), "My Profile");
 });
 

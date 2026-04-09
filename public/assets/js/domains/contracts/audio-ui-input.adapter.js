@@ -48,6 +48,10 @@ function createAudioUiInputAdapter() {
     if (
       compact === "firefox"
       || compact === "mozillafirefox"
+      || compact === "nightly"
+      || compact === "developer"
+      || compact === "developeredition"
+      || compact === "devedition"
       || compact === "firefoxnightly"
       || compact === "firefoxdeveloperedition"
       || compact === "firefoxdeveloper"

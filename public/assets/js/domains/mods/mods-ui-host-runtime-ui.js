@@ -107,11 +107,13 @@ function syncDynamicModUiTabButtons() {
 
 function rebuildDynamicModUiTabs() {
   if (!el.tabsBar) return;
-  Array.from(el.tabsBar.querySelectorAll(".modUiDynamicTab")).forEach(node => node.remove());
+  Array.from(el.tabsBar.querySelectorAll(".modUiDynamicNavItem")).forEach(node => node.remove());
 
   for (const item of ui.modUiCatalog) {
     const id = normalizeModUiId(item?.id);
     if (!id || !item.loaded) continue;
+    const wrap = documentRef.createElement("div");
+    wrap.className = "tabNavItem modUiDynamicNavItem";
     const btn = documentRef.createElement("button");
     btn.type = "button";
     btn.className = "tabBtn modUiDynamicTab";
@@ -120,7 +122,8 @@ function rebuildDynamicModUiTabs() {
     btn.textContent = formatModUiTabLabel(item);
     const route = `/mods-ui/${encodeURIComponent(id)}/`;
     btn.title = `Open ${item.title || id} UI (${route})`;
-    el.tabsBar.appendChild(btn);
+    wrap.appendChild(btn);
+    el.tabsBar.appendChild(wrap);
   }
 
   syncDynamicModUiTabButtons();

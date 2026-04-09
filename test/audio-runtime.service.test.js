@@ -375,6 +375,30 @@ test("app isolation selection maps Firefox Nightly aliases to firefox token", ()
   assert.equal(result.running, true);
 });
 
+test("app isolation selection accepts bare nightly token as Firefox Nightly", () => {
+  const result = createAudioRuntimeService.resolveAppIsolationTargetSelection(
+    {
+      ffmpegAppIsolationPrimaryApp: "nightly",
+      ffmpegAppIsolationPrimaryDevices: ["Headphones (FOX)"]
+    },
+    {
+      apps: [{ displayName: "firefox.exe" }],
+      audioHints: {
+        audioTokens: ["firefox.exe"],
+        companionMap: {}
+      }
+    },
+    {}
+  );
+
+  assert.equal(result.selectedSourceToken, "firefox");
+  assert.equal(result.selectedSourceChannelHint, "nightly");
+  assert.equal(result.captureToken, "firefox");
+  assert.equal(result.captureChannelHint, "nightly");
+  assert.equal(result.captureReason, "source_active");
+  assert.equal(result.running, true);
+});
+
 test("representative pid selection prefers Firefox Nightly window when channel hint is nightly", () => {
   const paths = makeTempAudioPaths();
   const service = createAudioRuntimeService({
