@@ -97,6 +97,8 @@ const {
   openSystemWidgetOauthAuthorizeUrl,
   copySystemWidgetOauthAuthorizeUrl,
   loadSystemWidgetOauthSyncProfile,
+  saveSystemOauthClientIdOverride,
+  clearBundledSystemOauthClientId,
   syncSystemWidgetOauthToMod,
   seedSystemWidgetOauthDevVaultFromUi,
   clearSystemWidgetOauthDevVault,

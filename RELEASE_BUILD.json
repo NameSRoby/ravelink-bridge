@@ -1,7 +1,7 @@
 {
-  "version": "1.6.2",
-  "buildId": "v1.6.2-r6",
+  "version": "1.6.3",
+  "buildId": "v1.6.3-r1",
   "channel": "release",
-  "releaseTag": "v1.6.2",
+  "releaseTag": "v1.6.3",
   "source": "public-repo"
 }

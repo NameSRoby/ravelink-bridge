@@ -16,11 +16,15 @@ function loadWidgetRuntimeContext(extraContext = {}) {
     console: { log() {}, warn() {}, error() {} },
     setTimeout,
     clearTimeout,
+    setInterval,
+    clearInterval,
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     window: {
       location: { origin: "https://example.local" },
       open: () => ({ closed: false }),
-      getSelection: () => ({ removeAllRanges() {} })
+      getSelection: () => ({ removeAllRanges() {} }),
+      setInterval,
+      clearInterval
     },
     document: {
       getElementById: () => null,
@@ -140,14 +144,25 @@ test("system widget template composes OAuth device-flow actions through the syst
   const calls = [];
   const opened = [];
   const copied = [];
+  const scheduled = [];
   const context = loadWidgetRuntimeContext({
+    setInterval(fn) {
+      scheduled.push(fn);
+      return fn;
+    },
+    clearInterval() {},
     window: {
       location: { origin: "https://example.local" },
       open: url => {
         opened.push(String(url || ""));
         return { closed: false };
       },
-      getSelection: () => ({ removeAllRanges() {} })
+      getSelection: () => ({ removeAllRanges() {} }),
+      setInterval(fn) {
+        scheduled.push(fn);
+        return fn;
+      },
+      clearInterval() {}
     },
     navigator: {
       clipboard: { writeText: async value => copied.push(String(value || "")) }
@@ -224,6 +239,134 @@ test("system widget template can append a compatible mod widget when combined mo
   assert.equal(modCalls[0].modId, "music-request-engine");
   assert.equal(modCalls[0].action, "admin_widget_template_get");
   assert.equal(modCalls[0].payload.songRewardId, "song-reward");
+});
+
+test("system widget template polls pending System OAuth until credentials are ready", async () => {
+  const calls = [];
+  const badges = [];
+  const scheduled = [];
+  const cleared = [];
+  const elements = createSystemWidgetElements();
+  const context = loadWidgetRuntimeContext({
+    setInterval(fn) {
+      scheduled.push(fn);
+      return fn;
+    },
+    clearInterval(handle) {
+      cleared.push(handle);
+    },
+    window: {
+      location: { origin: "https://example.local" },
+      open: () => ({ closed: false }),
+      getSelection: () => ({ removeAllRanges() {} }),
+      setInterval(fn) {
+        scheduled.push(fn);
+        return fn;
+      },
+      clearInterval(handle) {
+        cleared.push(handle);
+      }
+    }
+  });
+  let deviceStatusCalls = 0;
+  const runtime = context.createSystemWidgetTemplateRuntimeUi({
+    el: elements,
+    ui: { devDebugMode: true },
+    systemEndpointsAdapter: {
+      async startSystemOauth(payload = {}) {
+        calls.push({ method: "startSystemOauth", payload });
+        return { ok: true, data: { ok: true, userCode: "START-1234", verificationUriComplete: "https://www.twitch.tv/activate" } };
+      },
+      async getSystemOauthDeviceStatus(payload = {}) {
+        calls.push({ method: "getSystemOauthDeviceStatus", payload });
+        deviceStatusCalls += 1;
+        if (deviceStatusCalls === 1) {
+          return {
+            ok: true,
+            data: {
+              ok: true,
+              presence: { twitchClientId: true, twitchBroadcasterId: false, twitchUserAccessToken: false },
+              helix: { ready: false },
+              deviceFlow: {
+                userCode: "READY-9876",
+                status: "pending",
+                verificationUriComplete: "https://www.twitch.tv/activate",
+                intervalSec: 2,
+                expiresAt: Date.now() + 120_000
+              }
+            }
+          };
+        }
+        return {
+          ok: true,
+          data: {
+            ok: true,
+            presence: { twitchClientId: true, twitchBroadcasterId: true, twitchUserAccessToken: true },
+            helix: { ready: true },
+            deviceFlow: {
+              userCode: "READY-9876",
+              status: "connected",
+              verificationUriComplete: "https://www.twitch.tv/activate"
+            }
+          }
+        };
+      },
+      async getSystemOauthStatus() {
+        calls.push({ method: "getSystemOauthStatus" });
+        return {
+          ok: true,
+          hasValues: false,
+          presence: { twitchClientId: true, twitchBroadcasterId: false, twitchUserAccessToken: false },
+          helix: { ready: false },
+          deviceFlow: {
+            userCode: "READY-9876",
+            status: "pending",
+            verificationUriComplete: "https://www.twitch.tv/activate",
+            intervalSec: 2,
+            expiresAt: Date.now() + 120_000
+          }
+        };
+      },
+      async seedSystemOauthProfile(payload = {}) {
+        calls.push({ method: "seedSystemOauthProfile", payload });
+        return { ok: true, data: { ok: true, presence: { twitchClientId: true, twitchBroadcasterId: true, twitchUserAccessToken: true } } };
+      },
+      async clearSystemOauthProfile() {
+        calls.push({ method: "clearSystemOauthProfile" });
+        return { ok: true, data: { ok: true } };
+      },
+      async syncSystemOauthToMod(payload = {}) {
+        calls.push({ method: "syncSystemOauthToMod", payload });
+        return {
+          ok: true,
+          data: {
+            ok: true,
+            targetModId: "music-request-engine",
+            status: { presence: { twitchClientId: true, twitchBroadcasterId: true, twitchUserAccessToken: true } }
+          }
+        };
+      },
+      async generateWidgetTemplate(payload = {}) {
+        calls.push({ method: "generateWidgetTemplate", payload });
+        return { ok: true, data: { ok: true, script: "/* widget */", active: payload } };
+      }
+    },
+    windowRef: context.window,
+    documentRef: context.document,
+    navigatorRef: context.navigator,
+    localStorageRef: context.localStorage,
+    setBadge: (...args) => badges.push(args)
+  });
+
+  assert.equal(await runtime.loadSystemWidgetOauthSyncProfile({ announce: true }), true);
+  assert.equal(scheduled.length, 1);
+  await scheduled[0]();
+  await scheduled[0]();
+
+  assert.equal(calls.filter(call => call.method === "getSystemOauthStatus").length, 1);
+  assert.equal(calls.filter(call => call.method === "getSystemOauthDeviceStatus").length, 2);
+  assert.equal(elements.systemWidgetStatus.textContent, "System OAuth connected. Widget status-sync credentials are ready.");
+  assert.equal(badges.some(args => args[2] === "SYSTEM OAUTH READY"), true);
 });
 
 test("system widget template composes OAuth vault seed clear and mod sync through the vault runtime", async () => {

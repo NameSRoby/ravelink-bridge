@@ -40,6 +40,22 @@ test("getStatus reports Helix incomplete when the token is expired and no refres
   assert.equal(status?.helix?.reason, "token_expired_refresh_missing");
 });
 
+test("clearProfile can permanently disable the bundled client id for this install", () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ravelink-oauth-clear-bundled-"));
+  const service = createSystemOauthService({
+    vaultPath: path.join(tmpRoot, "oauth.vault.json"),
+    profileDefaults: {
+      twitchClientId: "bundled-client"
+    }
+  });
+
+  assert.equal(service.getStatus().clientIdSource, "bundled");
+  const cleared = service.clearProfile({ clearBundledClientId: true });
+  assert.equal(cleared.clientIdSource, "cleared");
+  assert.equal(cleared.bundledClientIdDisabled, true);
+  assert.equal(cleared.presence.twitchClientId, false);
+});
+
 test("reconcilePendingRedemptions auto-discovers manageable rewards and fulfills pending redemptions", async () => {
   const getCalls = [];
   const patchCalls = [];
@@ -444,6 +460,86 @@ test("startDeviceFlow uses internet gateway oauth device lane when available", a
   assert.equal(gatewayCalls[0]?.target?.serviceKey, "twitch_oauth");
   assert.equal(gatewayCalls[0]?.target?.path, "/oauth2/device");
   assert.equal(gatewayCalls[0]?.operation, "oauth2_device_start");
+});
+
+test("startDeviceFlow auto-polls on the server and persists credentials after approval", async () => {
+  const timerQueue = [];
+  const httpClient = {
+    async post(url) {
+      const requestUrl = String(url || "");
+      if (requestUrl.endsWith("/oauth2/device")) {
+        return {
+          status: 200,
+          data: {
+            user_code: "ABCD-EFGH",
+            device_code: "device-55",
+            verification_uri: "https://www.twitch.tv/activate",
+            verification_uri_complete: "https://www.twitch.tv/activate?device-code=ABCD-EFGH",
+            interval: 2,
+            expires_in: 600
+          }
+        };
+      }
+      if (requestUrl.endsWith("/oauth2/token")) {
+        return {
+          status: 200,
+          data: {
+            access_token: "token-auto",
+            refresh_token: "refresh-auto",
+            expires_in: 3600
+          }
+        };
+      }
+      throw new Error(`unexpected_post:${requestUrl}`);
+    },
+    async get(url) {
+      if (String(url || "").includes("/oauth2/validate")) {
+        return {
+          status: 200,
+          data: {
+            user_id: "broadcaster-auto"
+          }
+        };
+      }
+      throw new Error(`unexpected_get:${url}`);
+    },
+    async patch() {
+      throw new Error("unexpected_patch");
+    }
+  };
+
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ravelink-oauth-auto-poll-"));
+  const service = createSystemOauthService({
+    vaultPath: path.join(tmpRoot, "oauth.vault.json"),
+    profileDefaults: {
+      twitchClientId: "client-a"
+    },
+    httpClient,
+    setTimeoutRef(handler, delayMs) {
+      const handle = {
+        handler,
+        delayMs,
+        unref() {}
+      };
+      timerQueue.push(handle);
+      return handle;
+    },
+    clearTimeoutRef() {}
+  });
+
+  const started = await service.startDeviceFlow({
+    clientId: "client-a"
+  });
+  assert.equal(started?.ok, true);
+  assert.equal(timerQueue.length, 1);
+
+  await timerQueue[0].handler();
+
+  const status = service.getStatus();
+  assert.equal(status?.presence?.twitchClientId, true);
+  assert.equal(status?.presence?.twitchBroadcasterId, true);
+  assert.equal(status?.presence?.twitchUserAccessToken, true);
+  assert.equal(status?.helix?.ready, true);
 });
 
 test("startDeviceFlow does not direct-fallback when gateway lane is present but unavailable", async () => {

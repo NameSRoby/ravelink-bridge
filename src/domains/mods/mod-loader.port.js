@@ -2,6 +2,7 @@
 // [TITLE] Purpose: filesystem-backed mod loader with sandboxed execution runtime
 // [TITLE] Functionality Index:
 // [TITLE] - discover `mods/*/mod.json` and persist `mods.config.json`
+// [TITLE] - prefer untracked `mods.local.config.json` for local-only overrides
 // [TITLE] - execute enabled mods inside bounded VM sandboxes
 // [TITLE] - expose hooks/actions/import/config routes without monolith logic
 // [DEV] Complex Flow:
@@ -126,6 +127,7 @@ module.exports = function createModRuntime(options = {}) {
   const projectRoot = path.resolve(String(options.rootDir || process.cwd()));
   const modsRoot = path.resolve(String(options.modsRoot || path.join(projectRoot, "mods")));
   const configPath = path.resolve(String(options.configPath || path.join(modsRoot, "mods.config.json")));
+  const localConfigPath = path.resolve(String(options.localConfigPath || path.join(path.dirname(configPath), "mods.local.config.json")));
   const modSandboxAllowedBuiltins = Array.isArray(options.modSandboxAllowedBuiltins) && options.modSandboxAllowedBuiltins.length
     ? options.modSandboxAllowedBuiltins.map(item => String(item || "").trim()).filter(Boolean)
     : [...MOD_SANDBOX_ALLOWED_BUILTINS_DEFAULT];
@@ -149,6 +151,7 @@ module.exports = function createModRuntime(options = {}) {
   };
   let config = normalizeConfigShape({});
   let loadedAt = 0;
+  let activeConfigPath = configPath;
   const catalogById = new Map();
   const runtimeById = new Map();
 
@@ -162,11 +165,14 @@ module.exports = function createModRuntime(options = {}) {
   }
 
   function persistConfig() {
-    writeJsonFile(configPath, config);
+    writeJsonFile(activeConfigPath, config);
   }
 
   function readConfig() {
-    config = normalizeConfigShape(readJsonFile(configPath, {}));
+    const baseConfig = readJsonFile(configPath, {});
+    const hasLocalOverride = fs.existsSync(localConfigPath);
+    activeConfigPath = hasLocalOverride ? localConfigPath : configPath;
+    config = normalizeConfigShape(hasLocalOverride ? readJsonFile(localConfigPath, {}) : baseConfig);
   }
 
   function incrementCounter(name = "", amount = 1) {
@@ -685,6 +691,31 @@ module.exports = function createModRuntime(options = {}) {
     }
   }
 
+  async function handleHttp(request = {}) {
+    const source = request && typeof request === "object" && !Array.isArray(request) ? request : {};
+    const modId = normalizeModId(source.modId || source.id || "");
+    const actionPath = String(source.actionPath || source.action || "").trim();
+    const method = String(source.method || "GET").trim().toUpperCase() || "GET";
+    if (!modId || !actionPath) {
+      return {
+        handled: false,
+        status: 404,
+        body: {
+          ok: false,
+          error: "mod_action_not_found"
+        }
+      };
+    }
+    const response = await invokeAction(modId, actionPath, method, source);
+    return {
+      handled: true,
+      status: Number(response?.status || 200),
+      body: response?.body && typeof response.body === "object"
+        ? cloneJsonSafe(response.body, { ok: true })
+        : { ok: true }
+    };
+  }
+
   function resolveUiAsset(modIdRaw = "", requestedPath = "") {
     const modId = normalizeModId(modIdRaw);
     const mod = catalogById.get(modId);
@@ -742,6 +773,7 @@ module.exports = function createModRuntime(options = {}) {
     getUiCatalog,
     importMods,
     invokeAction,
+    handleHttp,
     resolveUiAsset,
     shutdown
   };

@@ -34,7 +34,8 @@ test("oauth vault helper normalizes legacy profile fields and defaults", () => {
     twitchBroadcasterId: "default-broadcaster",
     twitchUserAccessToken: "loaded-token",
     twitchRefreshToken: "default-refresh",
-    tokenExpiresAt: 0
+    tokenExpiresAt: 0,
+    bundledClientIdDisabled: false
   });
 
   const normalized = normalizeProfileShape({
@@ -45,6 +46,14 @@ test("oauth vault helper normalizes legacy profile fields and defaults", () => {
   assert.equal(normalized.twitchBroadcasterId, "b-123");
   assert.equal(normalized.twitchRefreshToken, "r-456");
   assert.equal(normalized.tokenExpiresAt, 1234);
+  assert.equal(normalized.bundledClientIdDisabled, false);
+
+  const bundledCleared = mergeProfileWithDefaults(
+    { twitchClientId: "bundled-client" },
+    { bundledClientIdDisabled: true }
+  );
+  assert.equal(bundledCleared.twitchClientId, "");
+  assert.equal(bundledCleared.bundledClientIdDisabled, true);
 });
 
 test("oauth vault helper reports Helix readiness and profile presence correctly", () => {
@@ -128,10 +137,8 @@ test("oauth vault helper roundtrips encrypted data on Windows", () => {
 
   const written = writeVaultToDisk(profile, vaultPath);
   if (process.platform !== "win32") {
-    assert.equal(written.ok, true);
-    assert.equal(written.volatileOnly, true);
-    assert.equal(written.provider, "volatile_only");
-    assert.equal(fs.existsSync(vaultPath), false);
+    assert.equal(written.ok, false);
+    assert.equal(written.error, "oauth_vault_requires_windows_dpapi");
     return;
   }
 

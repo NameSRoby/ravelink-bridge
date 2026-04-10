@@ -353,6 +353,26 @@ if (el.systemWidgetOauthClearBtn) {
   };
 }
 
+if (el.systemOauthClientIdSaveBtn) {
+  el.systemOauthClientIdSaveBtn.onclick = () => {
+    saveSystemOauthClientIdOverride().catch(err => {
+      const message = String(err?.message || err || "app id save failed");
+      setSystemWidgetTemplateStatus(message);
+      setBadge(el.health, "warn", "APP ID SAVE FAILED");
+    });
+  };
+}
+
+if (el.systemOauthBundledClientIdClearBtn) {
+  el.systemOauthBundledClientIdClearBtn.onclick = () => {
+    clearBundledSystemOauthClientId().catch(err => {
+      const message = String(err?.message || err || "bundled app id clear failed");
+      setSystemWidgetTemplateStatus(message);
+      setBadge(el.health, "warn", "APP ID CLEAR FAILED");
+    });
+  };
+}
+
 if (el.systemWidgetOauthSyncToModBtn) {
   el.systemWidgetOauthSyncToModBtn.onclick = () => {
     syncSystemWidgetOauthToMod().catch(err => {

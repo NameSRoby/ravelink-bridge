@@ -9,6 +9,8 @@
 // [DEV] the system route family instead of stretching the top-level compat composer.
 
 const OAUTH_SYNC_TARGET_MOD_IDS = Object.freeze(["music-request-engine", "song-request-mod"]);
+const OAUTH_SYSTEM_SYNC_ACTION = "oauth_twitch_sync_from_system";
+const OAUTH_SYSTEM_READ_ACTION = "oauth_twitch_profile_for_system";
 
 function createSystemCompatOauthHelpers(deps = {}) {
   const modRuntime = deps.modRuntime;
@@ -33,7 +35,12 @@ function createSystemCompatOauthHelpers(deps = {}) {
     const profile = {
       twitchClientId: normalizeToken(payload.twitchClientId, 512),
       twitchUserAccessToken: normalizeToken(payload.twitchUserAccessToken, 4096),
-      twitchBroadcasterId: normalizeToken(payload.twitchBroadcasterId, 256)
+      twitchBroadcasterId: normalizeToken(payload.twitchBroadcasterId, 256),
+      bundledClientIdDisabled: (
+        payload.bundledClientIdDisabled === true ||
+        payload.clearBundledClientId === true ||
+        payload.useBundledClientId === false
+      )
     };
     return {
       profile,
@@ -86,10 +93,26 @@ function createSystemCompatOauthHelpers(deps = {}) {
     if (source.twitchClientId) patch.clientId = String(source.twitchClientId);
     if (source.twitchUserAccessToken) patch.userAccessToken = String(source.twitchUserAccessToken);
     if (source.twitchBroadcasterId) patch.broadcasterId = String(source.twitchBroadcasterId);
+    if (source.twitchRefreshToken) patch.refreshToken = String(source.twitchRefreshToken);
+    if (Math.max(0, Number(source.tokenExpiresAt || 0)) > 0) {
+      patch.tokenExpiresAt = clampNumber(source.tokenExpiresAt, 0, 4_102_444_800_000, 0);
+    }
     if (Object.keys(patch).length) {
       patch.enabled = true;
     }
     return patch;
+  }
+
+  async function invokeOauthSyncAction(targetModId = "", action = "", payload = {}) {
+    const result = await modRuntime.invokeAction(targetModId, action, "POST", payload);
+    const resultStatus = Number(result?.status || 0);
+    const resultBody = getRequestMap(result?.body);
+    return {
+      ok: Boolean(result && resultStatus >= 200 && resultStatus < 300 && resultBody.ok === true),
+      status: resultStatus,
+      body: resultBody,
+      raw: result
+    };
   }
 
   function mergeOauthProfileIntoWidgetPayload(targetPayload = {}, profile = {}) {
@@ -144,7 +167,6 @@ function createSystemCompatOauthHelpers(deps = {}) {
     const source = getRequestMap(input);
     return Boolean(
       normalizeToken(source.twitchClientId, 512) ||
-      normalizeToken(source.twitchBroadcasterId, 256) ||
       normalizeToken(source.twitchUserAccessToken, 4096) ||
       normalizeToken(source.twitchRefreshToken, 4096) ||
       Math.max(0, Number(source.tokenExpiresAt || 0)) > 0
@@ -185,25 +207,43 @@ function createSystemCompatOauthHelpers(deps = {}) {
       return { ok: false, error: "mods_target_unavailable" };
     }
     try {
-      const response = await modRuntime.invokeAction(targetModId, "state", "GET", {});
-      const responseStatus = Number(response?.status || 0);
-      const responseBody = getRequestMap(response?.body);
-      if (!response || responseStatus < 200 || responseStatus >= 300 || responseBody.ok !== true) {
-        return {
-          ok: false,
-          targetModId,
-          error: String(responseBody?.error || response?.error || "mods_state_read_failed"),
-          detail: String(responseBody?.detail || "").trim()
-        };
+      let refund = {};
+      let internalReadError = "";
+      const internalResponse = await modRuntime.invokeAction(targetModId, OAUTH_SYSTEM_READ_ACTION, "POST", {
+        body: {
+          __internalSystemOauthRead: true
+        }
+      });
+      const internalStatus = Number(internalResponse?.status || 0);
+      const internalBody = getRequestMap(internalResponse?.body);
+      if (internalResponse && internalStatus >= 200 && internalStatus < 300 && internalBody.ok === true) {
+        refund = getRequestMap(internalBody?.profile);
+      } else {
+        internalReadError = String(internalBody?.error || internalResponse?.error || "").trim();
       }
-      const refund = getRequestMap(responseBody?.result?.config?.twitchRefund);
+      if (!Object.keys(refund).length) {
+        const response = await modRuntime.invokeAction(targetModId, "state", "GET", {});
+        const responseStatus = Number(response?.status || 0);
+        const responseBody = getRequestMap(response?.body);
+        if (!response || responseStatus < 200 || responseStatus >= 300 || responseBody.ok !== true) {
+          return {
+            ok: false,
+            targetModId,
+            error: String(responseBody?.error || response?.error || internalReadError || "mods_state_read_failed"),
+            detail: String(responseBody?.detail || "").trim()
+          };
+        }
+        refund = getRequestMap(responseBody?.result?.config?.twitchRefund);
+      }
       return {
         ok: true,
         targetModId,
         profile: {
           twitchClientId: normalizeToken(refund.clientId, 512),
           twitchUserAccessToken: normalizeToken(refund.userAccessToken, 4096),
-          twitchBroadcasterId: normalizeToken(refund.broadcasterId, 256)
+          twitchBroadcasterId: normalizeToken(refund.broadcasterId, 256),
+          twitchRefreshToken: normalizeToken(refund.refreshToken, 4096),
+          tokenExpiresAt: clampNumber(refund.tokenExpiresAt, 0, 4_102_444_800_000, 0)
         }
       };
     } catch (error) {
@@ -225,21 +265,40 @@ function createSystemCompatOauthHelpers(deps = {}) {
     }
     const targetModId = resolveOauthSyncTargetModId(hintModId);
     try {
-      const result = await modRuntime.invokeAction(targetModId, "admin_policy_set", "POST", {
+      const syncPayload = {
         body: {
+          profile: {
+            twitchClientId: normalizeToken(profile.twitchClientId, 512),
+            twitchUserAccessToken: normalizeToken(profile.twitchUserAccessToken, 4096),
+            twitchBroadcasterId: normalizeToken(profile.twitchBroadcasterId, 256),
+            twitchRefreshToken: normalizeToken(profile.twitchRefreshToken, 4096),
+            tokenExpiresAt: clampNumber(profile.tokenExpiresAt, 0, 4_102_444_800_000, 0)
+          },
           patch: {
             twitchRefund: patch
-          }
+          },
+          source: "system_oauth"
         }
-      });
-      const resultStatus = Number(result?.status || 0);
-      const resultBody = getRequestMap(result?.body);
-      if (!result || resultStatus < 200 || resultStatus >= 300 || resultBody.ok !== true) {
+      };
+      let result = await invokeOauthSyncAction(targetModId, OAUTH_SYSTEM_SYNC_ACTION, syncPayload);
+      if (
+        !result.ok &&
+        (result.status === 404 || String(result.body?.error || "") === "mod_action_not_found")
+      ) {
+        result = await invokeOauthSyncAction(targetModId, "admin_policy_set", {
+          body: {
+            patch: {
+              twitchRefund: patch
+            }
+          }
+        });
+      }
+      if (!result.ok) {
         return {
           ok: false,
-          status: resultStatus >= 400 ? resultStatus : 502,
-          error: String(resultBody?.error || result?.error || "system_oauth_mod_sync_failed"),
-          detail: String(resultBody?.detail || "").trim(),
+          status: result.status >= 400 ? result.status : 502,
+          error: String(result.body?.error || result.raw?.error || "system_oauth_mod_sync_failed"),
+          detail: String(result.body?.detail || "").trim(),
           targetModId
         };
       }

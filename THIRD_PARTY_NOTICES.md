@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-This file tracks third-party code usage, adapted logic, and required attribution for `v1.6.2`.
+This file tracks third-party code usage, adapted logic, and required attribution for `v1.6.3`.
 
 ## Policy
 

@@ -1,5 +1,5 @@
 param(
-  [string]$Version = "1.6.2"
+  [string]$Version = "1.6.3"
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,12 +66,8 @@ $releaseBuild | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $releaseBuild
 
 $modsDir = Join-Path $stageRoot "mods"
 New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
-@'
-No mods are bundled in this release.
-
-Place optional local mods inside this folder after install.
-The current song-request mod is intentionally excluded from the public repository and packaged release.
-'@ | Set-Content -LiteralPath (Join-Path $modsDir "README.txt") -Encoding UTF8
+Copy-ItemSafe (Join-Path $root "mods\README.md") (Join-Path $modsDir "README.md")
+Copy-ItemSafe (Join-Path $root "mods\mods.config.json") (Join-Path $modsDir "mods.config.json")
 
 Compress-Archive -Path (Join-Path $stageRoot "*") -DestinationPath $zipPath -CompressionLevel Optimal
 Write-Host "[PACKAGE] Created $zipPath"

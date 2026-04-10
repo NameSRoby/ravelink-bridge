@@ -12,6 +12,16 @@ function createSystemWidgetOauthFlowRuntimeUi(deps = {}) {
   const windowRef = deps.windowRef || window;
   const documentRef = deps.documentRef || document;
   const navigatorRef = deps.navigatorRef || navigator;
+  const setIntervalRef = typeof deps.setIntervalRef === "function"
+    ? deps.setIntervalRef
+    : (typeof windowRef.setInterval === "function"
+      ? windowRef.setInterval.bind(windowRef)
+      : (typeof setInterval === "function" ? setInterval : null));
+  const clearIntervalRef = typeof deps.clearIntervalRef === "function"
+    ? deps.clearIntervalRef
+    : (typeof windowRef.clearInterval === "function"
+      ? windowRef.clearInterval.bind(windowRef)
+      : (typeof clearInterval === "function" ? clearInterval : null));
   const setBadge = typeof deps.setBadge === "function" ? deps.setBadge : (() => {});
   const setSystemWidgetTemplateStatus = typeof deps.setSystemWidgetTemplateStatus === "function"
     ? deps.setSystemWidgetTemplateStatus
@@ -39,6 +49,8 @@ function createSystemWidgetOauthFlowRuntimeUi(deps = {}) {
       throw new Error(`system widget oauth flow runtime missing adapter method: ${methodName}`);
     }
   }
+  let systemOauthPollingTimer = null;
+  let systemOauthPollingInFlight = false;
 
   function buildSystemWidgetTwitchAuthorizeUrl() {
     return {
@@ -84,8 +96,97 @@ function createSystemWidgetOauthFlowRuntimeUi(deps = {}) {
       userCode,
       status,
       url: buildTwitchActivateUrlWithUserCode(verificationUrl || oauthFallbackUrl, userCode),
-      source: String(sourceInput || "unknown")
+      source: String(sourceInput || "unknown"),
+      intervalSec: Math.max(2, Math.round(Number(flow.intervalSec || payload.intervalSec || 5) || 5)),
+      expiresAt: Math.max(0, Number(flow.expiresAt || payload.expiresAt || 0)),
+      lastError: String(flow.lastError || payload.lastError || "").trim()
     };
+  }
+
+  function stopSystemOauthDeviceFlowPolling() {
+    if (systemOauthPollingTimer && clearIntervalRef) {
+      clearIntervalRef(systemOauthPollingTimer);
+    }
+    systemOauthPollingTimer = null;
+    systemOauthPollingInFlight = false;
+  }
+
+  function isSystemOauthReady(payloadInput = {}) {
+    const payload = payloadInput && typeof payloadInput === "object" ? payloadInput : {};
+    const presence = payload.presence && typeof payload.presence === "object" ? payload.presence : {};
+    const helix = payload.helix && typeof payload.helix === "object" ? payload.helix : {};
+    return helix.ready === true || (
+      presence.twitchClientId === true &&
+      presence.twitchBroadcasterId === true &&
+      presence.twitchUserAccessToken === true
+    );
+  }
+
+  async function resumeSystemOauthDeviceFlowPolling(flowInput = {}) {
+    const source = flowInput && typeof flowInput === "object" ? flowInput : {};
+    const snapshot = extractTwitchDeviceFlowSnapshot(source, source.source || "system:status");
+    if (!snapshot.userCode || !String(snapshot.source || "").startsWith("system:")) {
+      stopSystemOauthDeviceFlowPolling();
+      return false;
+    }
+    if (isSystemOauthReady(source)) {
+      stopSystemOauthDeviceFlowPolling();
+      setSystemWidgetTemplateStatus("System OAuth connected. Widget status-sync credentials are ready.");
+      setBadge(el.health, "ok", "SYSTEM OAUTH READY");
+      return true;
+    }
+    if (!setIntervalRef || !clearIntervalRef) {
+      return false;
+    }
+    if (systemOauthPollingTimer) {
+      return true;
+    }
+    const pollIntervalMs = Math.max(1500, snapshot.intervalSec * 1000);
+    const remainingMs = snapshot.expiresAt > Date.now()
+      ? snapshot.expiresAt - Date.now()
+      : 300_000;
+    const maxAttempts = Math.max(60, Math.ceil(remainingMs / pollIntervalMs) + 4);
+    let attempts = 0;
+    systemOauthPollingTimer = setIntervalRef(async () => {
+      if (systemOauthPollingInFlight) return;
+      systemOauthPollingInFlight = true;
+      try {
+        attempts += 1;
+        const response = await systemEndpointsAdapter.getSystemOauthDeviceStatus({
+          poll: true
+        }).catch(() => null);
+        if (!response || response.ok !== true || response.data?.ok !== true) {
+          if (attempts >= maxAttempts) {
+            stopSystemOauthDeviceFlowPolling();
+            setSystemWidgetTemplateStatus("System OAuth approval timed out.");
+            setBadge(el.health, "warn", "SYSTEM OAUTH TIMED OUT");
+          }
+          return;
+        }
+        if (isSystemOauthReady(response.data)) {
+          stopSystemOauthDeviceFlowPolling();
+          setSystemWidgetTemplateStatus("System OAuth connected. Widget status-sync credentials are ready.");
+          setBadge(el.health, "ok", "SYSTEM OAUTH READY");
+          return;
+        }
+        const deviceFlowStatus = String(response.data?.deviceFlow?.status || "").trim().toLowerCase();
+        const deviceFlowError = String(response.data?.deviceFlow?.lastError || "").trim();
+        if (deviceFlowStatus === "expired" || deviceFlowStatus === "error") {
+          stopSystemOauthDeviceFlowPolling();
+          setSystemWidgetTemplateStatus(deviceFlowError || "System OAuth device flow expired. Start the activation flow again.");
+          setBadge(el.health, "warn", "SYSTEM OAUTH EXPIRED");
+          return;
+        }
+        if (attempts >= maxAttempts) {
+          stopSystemOauthDeviceFlowPolling();
+          setSystemWidgetTemplateStatus("System OAuth approval timed out.");
+          setBadge(el.health, "warn", "SYSTEM OAUTH TIMED OUT");
+        }
+      } finally {
+        systemOauthPollingInFlight = false;
+      }
+    }, pollIntervalMs);
+    return true;
   }
 
   function buildInlineSystemOauthSeedPayload() {
@@ -291,6 +392,7 @@ function createSystemWidgetOauthFlowRuntimeUi(deps = {}) {
     const userCode = String(modFlow?.userCode || "").trim();
     if (userCode) {
       setSystemWidgetTemplateStatus(`Opened Twitch activation page with code ${userCode}.`);
+      resumeSystemOauthDeviceFlowPolling(modFlow);
     } else {
       setSystemWidgetTemplateStatus("Opened Twitch activation page without an active code. Seed System OAuth client ID first (or run mod Connect OAuth), then retry.");
     }
@@ -318,6 +420,7 @@ function createSystemWidgetOauthFlowRuntimeUi(deps = {}) {
     const userCode = String(modFlow?.userCode || "").trim();
     if (userCode) {
       setSystemWidgetTemplateStatus(`Twitch activation link copied with active code ${userCode}.`);
+      resumeSystemOauthDeviceFlowPolling(modFlow);
     } else {
       setSystemWidgetTemplateStatus("Twitch activation link copied without active code. Seed System OAuth client ID first (or run mod Connect OAuth), then retry.");
     }
@@ -335,6 +438,8 @@ function createSystemWidgetOauthFlowRuntimeUi(deps = {}) {
     startTwitchDeviceCodeFromSystem,
     resolveSystemWidgetActivationTarget,
     copyTextToClipboard,
+    stopSystemOauthDeviceFlowPolling,
+    resumeSystemOauthDeviceFlowPolling,
     openSystemWidgetOauthAuthorizeUrl,
     copySystemWidgetOauthAuthorizeUrl
   };

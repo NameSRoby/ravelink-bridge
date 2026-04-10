@@ -163,7 +163,12 @@ function normalizeProfileShape(input = {}) {
     twitchBroadcasterId: asString(source.twitchBroadcasterId || source.broadcasterId || ""),
     twitchUserAccessToken: asString(source.twitchUserAccessToken || source.userAccessToken || ""),
     twitchRefreshToken: asString(source.twitchRefreshToken || source.refreshToken || ""),
-    tokenExpiresAt: clampInt(source.tokenExpiresAt, 0, 4_102_444_800_000, 0)
+    tokenExpiresAt: clampInt(source.tokenExpiresAt, 0, 4_102_444_800_000, 0),
+    bundledClientIdDisabled: (
+      source.bundledClientIdDisabled === true ||
+      source.clearBundledClientId === true ||
+      source.useBundledClientId === false
+    )
   };
 }
 
@@ -171,11 +176,15 @@ function mergeProfileWithDefaults(defaults = {}, loaded = {}) {
   const base = normalizeProfileShape(defaults);
   const source = normalizeProfileShape(loaded);
   return normalizeProfileShape({
-    twitchClientId: asString(source.twitchClientId || base.twitchClientId || ""),
+    twitchClientId: asString(
+      source.twitchClientId ||
+      (source.bundledClientIdDisabled === true ? "" : base.twitchClientId || "")
+    ),
     twitchBroadcasterId: asString(source.twitchBroadcasterId || base.twitchBroadcasterId || ""),
     twitchUserAccessToken: asString(source.twitchUserAccessToken || base.twitchUserAccessToken || ""),
     twitchRefreshToken: asString(source.twitchRefreshToken || base.twitchRefreshToken || ""),
-    tokenExpiresAt: Math.max(0, Number(source.tokenExpiresAt || base.tokenExpiresAt || 0))
+    tokenExpiresAt: Math.max(0, Number(source.tokenExpiresAt || base.tokenExpiresAt || 0)),
+    bundledClientIdDisabled: source.bundledClientIdDisabled === true
   });
 }
 
@@ -307,7 +316,8 @@ function readVaultFromDisk(vaultPath = "") {
       ? source.encrypted
       : {};
     const out = {
-      tokenExpiresAt: clampInt(source.tokenExpiresAt, 0, 4_102_444_800_000, 0)
+      tokenExpiresAt: clampInt(source.tokenExpiresAt, 0, 4_102_444_800_000, 0),
+      bundledClientIdDisabled: source.bundledClientIdDisabled === true
     };
     for (const [field, mapped] of Object.entries(OAUTH_VAULT_FIELD_MAP)) {
       const cipher = asString(encrypted[field] || "");
@@ -347,7 +357,7 @@ function writeVaultToDisk(profileInput = {}, vaultPath = "") {
     };
   }
   const profile = normalizeProfileShape(profileInput);
-  const hasData = hasAnyProfileValue(profile);
+  const hasData = hasAnyProfileValue(profile) || profile.bundledClientIdDisabled === true;
   if (!hasData) {
     try {
       if (fs.existsSync(targetPath)) {
@@ -391,6 +401,7 @@ function writeVaultToDisk(profileInput = {}, vaultPath = "") {
     version: OAUTH_VAULT_VERSION,
     provider: "windows_dpapi",
     tokenExpiresAt: Math.max(0, Number(profile.tokenExpiresAt || 0)),
+    bundledClientIdDisabled: profile.bundledClientIdDisabled === true,
     updatedAt: Date.now(),
     encrypted
   };

@@ -34,7 +34,7 @@ function createDeviceDiscovery(overrides = {}) {
       resolver: false,
       resolverPath: ""
     })),
-    rootDir: "D:\\RaveLink-Bridge-Windows-v1.6.2_DEV"
+    rootDir: "D:\\RaveLink-Bridge"
   });
 }
 

@@ -84,7 +84,7 @@ function createSessionHelper(overrides = {}) {
         reason: meta?.reason || ""
       }
     })),
-    rootDir: overrides.rootDir || "D:\\RaveLink-Bridge-Windows-v1.6.2_DEV"
+    rootDir: overrides.rootDir || "D:\\RaveLink-Bridge"
   });
   return {
     helper,

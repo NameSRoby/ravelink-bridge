@@ -17,6 +17,12 @@ function clampInt(value, min, max, fallback = 0) {
 
 module.exports = function createSystemOauthDeviceFlow(options = {}) {
   const now = typeof options.now === "function" ? options.now : Date.now;
+  const setTimeoutRef = typeof options.setTimeoutRef === "function"
+    ? options.setTimeoutRef
+    : (typeof setTimeout === "function" ? setTimeout : null);
+  const clearTimeoutRef = typeof options.clearTimeoutRef === "function"
+    ? options.clearTimeoutRef
+    : (typeof clearTimeout === "function" ? clearTimeout : null);
   const buildActivateUrl = options.buildActivateUrl;
   const buildPublicDeviceFlowSnapshot = options.buildPublicDeviceFlowSnapshot;
   const createEmptyDeviceFlowState = options.createEmptyDeviceFlowState;
@@ -41,6 +47,42 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
     });
   const OAUTH_SCOPES = Array.isArray(options.oauthScopes) ? options.oauthScopes.slice() : [];
   const OAUTH_CLIENT_TYPE = asString(options.oauthClientType || "public") || "public";
+  let deviceFlowPollTimer = null;
+
+  function stopAutoDeviceFlowPolling() {
+    if (deviceFlowPollTimer && clearTimeoutRef) {
+      clearTimeoutRef(deviceFlowPollTimer);
+    }
+    deviceFlowPollTimer = null;
+  }
+
+  function scheduleAutoDeviceFlowPolling(delayMs = null) {
+    if (!setTimeoutRef || !clearTimeoutRef) return false;
+    const flow = getDeviceFlow();
+    const status = asString(flow.status || "").toLowerCase();
+    if (status !== "pending") {
+      stopAutoDeviceFlowPolling();
+      return false;
+    }
+    if (deviceFlowPollTimer) return true;
+    const nowMs = Number(now() || Date.now());
+    const nextDelayMs = delayMs == null
+      ? Math.max(250, Number(flow.nextPollAt || 0) - nowMs)
+      : Math.max(250, Number(delayMs || 0));
+    deviceFlowPollTimer = setTimeoutRef(async () => {
+      deviceFlowPollTimer = null;
+      try {
+        await pollDeviceFlow({ force: true, source: "auto_timer" });
+      } catch {
+        const latest = getDeviceFlow();
+        if (asString(latest.status || "").toLowerCase() === "pending") {
+          scheduleAutoDeviceFlowPolling(clampInt(latest.intervalSec, 2, 45, 5) * 1000);
+        }
+      }
+    }, nextDelayMs);
+    deviceFlowPollTimer.unref?.();
+    return true;
+  }
 
   async function startDeviceFlow(input = {}) {
     const source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
@@ -117,6 +159,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
       next.lastError = "";
       next.completedAt = 0;
       setDeviceFlow(next);
+      scheduleAutoDeviceFlowPolling(intervalSec * 1000);
       return {
         ok: true,
         status: 200,
@@ -146,6 +189,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
     let deviceFlow = getDeviceFlow();
     const currentStatus = asString(deviceFlow.status || "").toLowerCase();
     if (currentStatus !== "pending") {
+      stopAutoDeviceFlowPolling();
       return {
         ok: true,
         deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -160,12 +204,14 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
         completedAt: nowMs
       };
       setDeviceFlow(deviceFlow);
+      stopAutoDeviceFlowPolling();
       return {
         ok: true,
         deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
       };
     }
     if (source.force !== true && Number(deviceFlow.nextPollAt || 0) > nowMs) {
+      scheduleAutoDeviceFlowPolling();
       return {
         ok: true,
         deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -181,6 +227,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
         lastError: "device_flow_missing_runtime_fields"
       };
       setDeviceFlow(deviceFlow);
+      stopAutoDeviceFlowPolling();
       return {
         ok: true,
         deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -244,6 +291,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
           nextPollAt: 0
         };
         setDeviceFlow(deviceFlow);
+        stopAutoDeviceFlowPolling();
         return {
           ok: true,
           deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -260,6 +308,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
           lastError: ""
         };
         setDeviceFlow(deviceFlow);
+        scheduleAutoDeviceFlowPolling(clampInt(deviceFlow.intervalSec, 2, 30, 5) * 1000);
         return {
           ok: true,
           deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -275,6 +324,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
           lastError: ""
         };
         setDeviceFlow(deviceFlow);
+        scheduleAutoDeviceFlowPolling(intervalSec * 1000);
         return {
           ok: true,
           deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -288,6 +338,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
           lastError: "device_flow_expired_token"
         };
         setDeviceFlow(deviceFlow);
+        stopAutoDeviceFlowPolling();
         return {
           ok: true,
           deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -301,6 +352,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
           lastError: "device_flow_access_denied"
         };
         setDeviceFlow(deviceFlow);
+        stopAutoDeviceFlowPolling();
         return {
           ok: true,
           deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -313,6 +365,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
         lastError: errorToken || `device_flow_poll_http_${response.status}`
       };
       setDeviceFlow(deviceFlow);
+      stopAutoDeviceFlowPolling();
       return {
         ok: true,
         deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -325,6 +378,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
         lastError: asString(error?.message || "device_flow_poll_failed")
       };
       setDeviceFlow(deviceFlow);
+      scheduleAutoDeviceFlowPolling(clampInt(deviceFlow.intervalSec, 2, 30, 5) * 1000);
       return {
         ok: true,
         deviceFlow: buildPublicDeviceFlowSnapshot(deviceFlow)
@@ -386,6 +440,7 @@ module.exports = function createSystemOauthDeviceFlow(options = {}) {
       tokenExpiresAt: 0
     }));
     setDeviceFlow(createEmptyDeviceFlowState());
+    stopAutoDeviceFlowPolling();
     persistProfile("disconnect");
     return {
       ok: true,

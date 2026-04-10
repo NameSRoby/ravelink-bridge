@@ -218,6 +218,21 @@
       <p class="gatewayHelixNote">Optional but strict: if you enable this, OAuth readiness and gateway status should both be healthy before reconcile can reliably complete/refund Twitch redemptions.</p>
       <div class="controlRow">
         <div>
+          <label for="systemOauthClientIdOverride">TWITCH APP CLIENT ID (OPTIONAL OVERRIDE)</label>
+          <input id="systemOauthClientIdOverride" type="password" placeholder="leave blank to keep current app-id mode" autocomplete="new-password" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+        </div>
+        <div class="grid2">
+          <button id="systemOauthClientIdSaveBtn" type="button">SAVE CUSTOM APP ID</button>
+          <button id="systemOauthBundledClientIdClearBtn" type="button" class="warn">CLEAR BUNDLED APP ID</button>
+        </div>
+        <div>
+          <label for="systemOauthClientIdStatus">APP ID STATUS</label>
+          <input id="systemOauthClientIdStatus" type="text" value="Bundled Twitch app status loading..." readonly>
+        </div>
+      </div>
+      <p class="hint">A bundled public Twitch app ID can be used for first-run setup. If you clear it, it stays cleared for this install and users must enter their own app ID to use OAuth again.</p>
+      <div class="controlRow">
+        <div>
           <label for="systemWidgetReconcileRewardIds">REWARD IDS (OPTIONAL)</label>
           <input id="systemWidgetReconcileRewardIds" type="text" placeholder="comma-separated reward ids; blank = managed rewards">
         </div>

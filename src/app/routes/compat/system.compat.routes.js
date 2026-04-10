@@ -108,6 +108,54 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
   const oauthWriteRateLimit = createCompatWriteRateLimit("system_oauth", 20, 60_000);
   const widgetWriteRateLimit = createCompatWriteRateLimit("system_widget", 15, 60_000);
 
+  async function hydrateSystemOauthFromModFallback(hintModId = "") {
+    if (
+      !systemOauthService ||
+      typeof systemOauthService.getProfileForInternal !== "function" ||
+      typeof systemOauthService.seedProfile !== "function"
+    ) {
+      return false;
+    }
+    const currentProfile = getRequestMap(systemOauthService.getProfileForInternal());
+    const missingPatch = {};
+    if (!normalizeToken(currentProfile.twitchClientId, 512)) missingPatch.twitchClientId = "";
+    if (!normalizeToken(currentProfile.twitchBroadcasterId, 256)) missingPatch.twitchBroadcasterId = "";
+    if (!normalizeToken(currentProfile.twitchUserAccessToken, 4096)) missingPatch.twitchUserAccessToken = "";
+    if (!normalizeToken(currentProfile.twitchRefreshToken, 4096)) missingPatch.twitchRefreshToken = "";
+    if (Math.max(0, Number(currentProfile.tokenExpiresAt || 0)) <= 0) missingPatch.tokenExpiresAt = 0;
+    if (!Object.keys(missingPatch).length) {
+      return false;
+    }
+    const modOauth = await readOauthProfileFromModState(hintModId);
+    if (!modOauth.ok) {
+      return false;
+    }
+    const patch = {};
+    if (!normalizeToken(currentProfile.twitchClientId, 512) && normalizeToken(modOauth.profile?.twitchClientId, 512)) {
+      patch.twitchClientId = normalizeToken(modOauth.profile.twitchClientId, 512);
+    }
+    if (!normalizeToken(currentProfile.twitchBroadcasterId, 256) && normalizeToken(modOauth.profile?.twitchBroadcasterId, 256)) {
+      patch.twitchBroadcasterId = normalizeToken(modOauth.profile.twitchBroadcasterId, 256);
+    }
+    if (!normalizeToken(currentProfile.twitchUserAccessToken, 4096) && normalizeToken(modOauth.profile?.twitchUserAccessToken, 4096)) {
+      patch.twitchUserAccessToken = normalizeToken(modOauth.profile.twitchUserAccessToken, 4096);
+    }
+    if (!normalizeToken(currentProfile.twitchRefreshToken, 4096) && normalizeToken(modOauth.profile?.twitchRefreshToken, 4096)) {
+      patch.twitchRefreshToken = normalizeToken(modOauth.profile.twitchRefreshToken, 4096);
+    }
+    if (
+      Math.max(0, Number(currentProfile.tokenExpiresAt || 0)) <= 0 &&
+      Math.max(0, Number(modOauth.profile?.tokenExpiresAt || 0)) > 0
+    ) {
+      patch.tokenExpiresAt = Math.max(0, Number(modOauth.profile.tokenExpiresAt || 0));
+    }
+    if (!Object.keys(patch).length) {
+      return false;
+    }
+    systemOauthService.seedProfile(patch, { replace: false });
+    return true;
+  }
+
   app.get("/system/config", (_req, res) => {
     res.json(systemConfigService.getConfig());
   });
@@ -206,10 +254,14 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(result);
   });
 
-  app.get("/system/oauth/status", enforceWriteAccess, (_req, res) => {
+  app.get("/system/oauth/status", enforceWriteAccess, async (_req, res) => {
     if (!systemOauthService || typeof systemOauthService.getStatus !== "function") {
       toCompatError(res, 503, "system_oauth_unavailable");
       return;
+    }
+    const currentStatus = systemOauthService.getStatus();
+    if (currentStatus?.helix?.ready !== true) {
+      await hydrateSystemOauthFromModFallback();
     }
     res.json(systemOauthService.getStatus());
   });
@@ -227,12 +279,15 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(result);
   });
 
-  app.post("/system/oauth/clear", enforceWriteAccess, oauthWriteRateLimit, (_req, res) => {
+  app.post("/system/oauth/clear", enforceWriteAccess, oauthWriteRateLimit, (req, res) => {
     if (!systemOauthService || typeof systemOauthService.clearProfile !== "function") {
       toCompatError(res, 503, "system_oauth_unavailable");
       return;
     }
-    res.json(systemOauthService.clearProfile());
+    const body = getRequestMap(req.body);
+    res.json(systemOauthService.clearProfile({
+      clearBundledClientId: body.clearBundledClientId === true
+    }));
   });
 
   app.post("/system/oauth/start", enforceWriteAccess, oauthWriteRateLimit, async (req, res) => {
@@ -368,6 +423,8 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
         twitchRefreshToken: normalized.twitchRefreshToken,
         tokenExpiresAt: normalized.tokenExpiresAt
       }, { replace: false });
+    } else {
+      await hydrateSystemOauthFromModFallback();
     }
 
     const result = await systemOauthService.patchRedemptionStatus({
@@ -403,6 +460,8 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
         twitchRefreshToken: normalized.twitchRefreshToken,
         tokenExpiresAt: normalized.tokenExpiresAt
       }, { replace: false });
+    } else {
+      await hydrateSystemOauthFromModFallback();
     }
     const result = await systemOauthService.reconcilePendingRedemptions({
       status: normalized.status,

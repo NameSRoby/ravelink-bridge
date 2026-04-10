@@ -1,6 +1,6 @@
 {
   "name": "ravelink-bridge",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "RaveLink Bridge rewrite foundation with modular Twitch, fixture, mods, MIDI, and audio boundaries",
   "main": "src/app/index.js",
   "type": "commonjs",
@@ -15,7 +15,7 @@
     "verify:security": "node scripts/verify-security-baseline.js",
     "verify:audit": "node scripts/verify-dependency-audit.js",
     "verify:readiness": "node scripts/verify-release-readiness.js",
-    "package:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1 -Version 1.6.2",
+    "package:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1 -Version 1.6.3",
     "package:installer": "node scripts/build-windows-setup.js",
     "verify:ui-boot": "node --test test/ui-browser-boot-bindings.test.js",
     "verify:mods": "node -e \"const fs=require('node:fs'); const {spawnSync}=require('node:child_process'); const modPath='mods/song-request-mod'; if(!fs.existsSync(modPath)){console.log('[VERIFY][MODS] local-only song-request mod not present; skipping mod verification'); process.exit(0);} const result=spawnSync(process.execPath,['--test','test/apple-music-se-command.integration.test.js','test/apple-music-widget-announcer.test.js'],{stdio:'inherit'}); process.exit(result.status ?? 1);\"",

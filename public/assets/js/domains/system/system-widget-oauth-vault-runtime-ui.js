@@ -11,6 +11,7 @@
 function createSystemWidgetOauthVaultRuntimeUi(deps = {}) {
   const el = deps.el || {};
   const ui = deps.ui || {};
+  const windowRef = deps.windowRef || window;
   const setBadge = typeof deps.setBadge === "function" ? deps.setBadge : (() => {});
   const setSystemWidgetTemplateStatus = typeof deps.setSystemWidgetTemplateStatus === "function"
     ? deps.setSystemWidgetTemplateStatus
@@ -27,6 +28,9 @@ function createSystemWidgetOauthVaultRuntimeUi(deps = {}) {
   const setSystemWidgetSensitiveFieldsReveal = typeof deps.setSystemWidgetSensitiveFieldsReveal === "function"
     ? deps.setSystemWidgetSensitiveFieldsReveal
     : (() => {});
+  const resumeSystemOauthDeviceFlowPolling = typeof deps.resumeSystemOauthDeviceFlowPolling === "function"
+    ? deps.resumeSystemOauthDeviceFlowPolling
+    : (() => false);
   const systemEndpointsAdapter = deps.systemEndpointsAdapter;
   const requiredAdapterMethods = [
     "getSystemOauthStatus",
@@ -79,6 +83,27 @@ function createSystemWidgetOauthVaultRuntimeUi(deps = {}) {
     return "Helix reward sync is not ready yet.";
   }
 
+  function formatClientIdMode(status = {}) {
+    const source = String(status.clientIdSource || "").trim().toLowerCase();
+    if (source === "bundled") return "Bundled Twitch app ID active.";
+    if (source === "custom") return "Custom Twitch app ID active.";
+    if (source === "cleared") return "Bundled Twitch app ID cleared for this install.";
+    return "No Twitch app ID is active.";
+  }
+
+  function renderSystemOauthClientIdControls(status = {}) {
+    const source = String(status.clientIdSource || "").trim().toLowerCase();
+    if (el.systemOauthClientIdOverride) {
+      el.systemOauthClientIdOverride.value = "";
+      el.systemOauthClientIdOverride.placeholder = source === "custom"
+        ? "Custom app id stored. Enter a new one only to replace it."
+        : "Enter your own Twitch app client id";
+    }
+    if (el.systemOauthClientIdStatus) {
+      el.systemOauthClientIdStatus.value = formatClientIdMode(status);
+    }
+  }
+
   function hasAnyOauthSyncData(profileInput = {}) {
     const presence = getOauthSyncProfilePresence(profileInput);
     return Boolean(
@@ -111,11 +136,18 @@ function createSystemWidgetOauthVaultRuntimeUi(deps = {}) {
       ok: true,
       mode: String(response.mode || "volatile_write_only"),
       hasValues: response.hasValues === true,
+      clientIdSource: String(response.clientIdSource || "").trim(),
+      bundledClientIdAvailable: response.bundledClientIdAvailable === true,
+      bundledClientIdActive: response.bundledClientIdActive === true,
+      bundledClientIdDisabled: response.bundledClientIdDisabled === true,
       presence: response.presence && typeof response.presence === "object"
         ? response.presence
         : {},
       helix: response.helix && typeof response.helix === "object"
         ? response.helix
+        : {},
+      deviceFlow: response.deviceFlow && typeof response.deviceFlow === "object"
+        ? response.deviceFlow
         : {},
       updatedAt: Number(response.updatedAt || 0),
       lastSyncedAt: Number(response.lastSyncedAt || 0),
@@ -133,10 +165,25 @@ function createSystemWidgetOauthVaultRuntimeUi(deps = {}) {
       }
       return false;
     }
+    const deviceFlowStatus = String(status.deviceFlow?.status || "").trim().toLowerCase();
+    if (deviceFlowStatus === "pending") {
+      resumeSystemOauthDeviceFlowPolling({
+        ...status,
+        source: "system:status"
+      });
+    }
     if (announce) {
       const summary = formatOauthSyncPresence("VAULT", status.presence);
       const helixSummary = formatHelixReadinessSummary(status.helix);
-      if (status.helix?.ready === true) {
+      if (deviceFlowStatus === "pending") {
+        const userCode = String(status.deviceFlow?.userCode || "").trim();
+        setSystemWidgetTemplateStatus(
+          userCode
+            ? `System OAuth pending approval (${userCode}). Finish Twitch activation and the vault will update automatically.`
+            : "System OAuth pending approval. Finish Twitch activation and the vault will update automatically."
+        );
+        setBadge(el.health, "warn", "SYSTEM OAUTH PENDING");
+      } else if (status.helix?.ready === true) {
         setSystemWidgetTemplateStatus(`System OAuth profile ready (${summary}). ${helixSummary}`);
         setBadge(el.health, "ok", "SYSTEM OAUTH READY");
       } else if (status.hasValues) {
@@ -147,6 +194,56 @@ function createSystemWidgetOauthVaultRuntimeUi(deps = {}) {
         setBadge(el.health, "warn", "SYSTEM OAUTH EMPTY");
       }
     }
+    renderSystemOauthClientIdControls(status);
+    return true;
+  }
+
+  async function saveSystemOauthClientIdOverride() {
+    const enteredClientId = String(el.systemOauthClientIdOverride?.value || "").trim();
+    if (!enteredClientId) {
+      setSystemWidgetTemplateStatus("Enter a Twitch app client ID first.");
+      setBadge(el.health, "warn", "TWITCH APP ID REQUIRED");
+      return false;
+    }
+    const response = await systemEndpointsAdapter.seedSystemOauthProfile({
+      profile: {
+        twitchClientId: enteredClientId,
+        twitchUserAccessToken: "",
+        twitchRefreshToken: "",
+        tokenExpiresAt: 0,
+        useBundledClientId: false
+      },
+      replace: false
+    });
+    if (!response.ok || response.data?.ok !== true) {
+      const errorText = String(response.data?.error || "system_oauth_client_id_seed_failed");
+      setSystemWidgetTemplateStatus(errorText);
+      setBadge(el.health, "warn", "TWITCH APP ID SAVE FAILED");
+      return false;
+    }
+    renderSystemOauthClientIdControls(response.data || {});
+    setSystemWidgetTemplateStatus("Custom Twitch app ID saved. Reconnect OAuth to authorize it.");
+    setBadge(el.health, "ok", "CUSTOM APP ID SAVED");
+    return true;
+  }
+
+  async function clearBundledSystemOauthClientId() {
+    const confirmed = windowRef.confirm(
+      "Clear the bundled Twitch app ID for this install? After this, OAuth will stop working until you enter your own app ID. The bundled ID will not come back unless you redownload or reinstall the app."
+    );
+    if (!confirmed) return false;
+    const response = await systemEndpointsAdapter.clearSystemOauthProfile({
+      clearBundledClientId: true
+    });
+    if (!response.ok || response.data?.ok !== true) {
+      const errorText = String(response.data?.error || "system_oauth_client_id_clear_failed");
+      setSystemWidgetTemplateStatus(errorText);
+      setBadge(el.health, "warn", "BUNDLED APP ID CLEAR FAILED");
+      return false;
+    }
+    renderSystemOauthClientIdControls(response.data || {});
+    setSystemWidgetTemplateStatus("Bundled Twitch app ID cleared for this install. Enter your own app ID to use OAuth again.");
+    setBadge(el.health, "ok", "BUNDLED APP ID CLEARED");
     return true;
   }
 
@@ -262,11 +359,14 @@ function createSystemWidgetOauthVaultRuntimeUi(deps = {}) {
     getOauthSyncProfilePresence,
     formatOauthSyncPresence,
     formatHelixReadinessSummary,
+    formatClientIdMode,
     hasAnyOauthSyncData,
     isOauthDevDebugEnabled,
     buildSystemWidgetOauthSyncProfilePayload,
     fetchSystemStoredOauthSyncProfile,
     loadSystemWidgetOauthSyncProfile,
+    saveSystemOauthClientIdOverride,
+    clearBundledSystemOauthClientId,
     syncSystemWidgetOauthToMod,
     seedSystemWidgetOauthDevVaultFromUi,
     clearSystemWidgetOauthDevVault

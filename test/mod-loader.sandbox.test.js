@@ -13,11 +13,13 @@ function createTempRoot() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ravelink-mod-loader-"));
   const modsRoot = path.join(dir, "mods");
   const configPath = path.join(modsRoot, "mods.config.json");
+  const localConfigPath = path.join(modsRoot, "mods.local.config.json");
   fs.mkdirSync(modsRoot, { recursive: true });
   return {
     dir,
     modsRoot,
-    configPath
+    configPath,
+    localConfigPath
   };
 }
 
@@ -103,10 +105,14 @@ test("mod loader discovers enabled mod and executes sandbox hook/action", async 
   assert.equal(actionWithPatchVerb.body?.result?.echo?.method, "PATCH");
   assert.equal(actionWithPatchVerb.body?.result?.echo?.body?.value, 7);
 
-  const nestedHttp = await runtime.invokeAction("music-mod", "api/status", "GET", {
+  const nestedHttp = await runtime.handleHttp({
+    modId: "music-mod",
+    actionPath: "api/status",
+    method: "GET",
     query: { source: "unit" },
     body: {}
   });
+  assert.equal(nestedHttp.handled, true);
   assert.equal(nestedHttp.status, 200);
   assert.equal(nestedHttp.body?.ok, true);
   assert.equal(nestedHttp.body?.result?.lane, "api/status");
@@ -166,6 +172,63 @@ test("mod loader import writes files to mods root and enables mod", async () => 
 
   const exists = fs.existsSync(path.join(temp.modsRoot, "pack", "mod.json"));
   assert.equal(exists, true);
+
+  fs.rmSync(temp.dir, { recursive: true, force: true });
+});
+
+test("mod loader prefers local override config and persists updates there", async () => {
+  const temp = createTempRoot();
+  const modRoot = path.join(temp.modsRoot, "music-mod");
+  fs.mkdirSync(modRoot, { recursive: true });
+
+  writeJson(path.join(modRoot, "mod.json"), {
+    id: "music-mod",
+    name: "Music Mod",
+    version: "1.0.0",
+    entry: "index.js"
+  });
+  fs.writeFileSync(path.join(modRoot, "index.js"), "module.exports = {};\n", "utf8");
+
+  writeJson(temp.configPath, {
+    enabled: [],
+    order: [],
+    disabled: []
+  });
+  writeJson(temp.localConfigPath, {
+    enabled: ["music-mod"],
+    order: ["music-mod"],
+    disabled: []
+  });
+
+  const runtime = createModRuntime({
+    modsRoot: temp.modsRoot,
+    configPath: temp.configPath,
+    localConfigPath: temp.localConfigPath
+  });
+  const snapshot = await runtime.load();
+  assert.equal(snapshot.ok, true);
+  assert.equal(snapshot.loaded, 1);
+  assert.equal(snapshot.config.enabled.includes("music-mod"), true);
+
+  await runtime.updateConfig({
+    enabled: [],
+    order: [],
+    disabled: ["music-mod"],
+    reload: false
+  });
+
+  const baseConfig = JSON.parse(fs.readFileSync(temp.configPath, "utf8"));
+  const localConfig = JSON.parse(fs.readFileSync(temp.localConfigPath, "utf8"));
+  assert.deepEqual(baseConfig, {
+    enabled: [],
+    order: [],
+    disabled: []
+  });
+  assert.deepEqual(localConfig, {
+    enabled: [],
+    order: [],
+    disabled: ["music-mod"]
+  });
 
   fs.rmSync(temp.dir, { recursive: true, force: true });
 });

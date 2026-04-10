@@ -18,7 +18,7 @@
  * @property {(payload: Object) => Promise<{ok:boolean,status:number,data:any}>} applyUpdate
  * @property {() => Promise<any>} getSystemOauthStatus
  * @property {(payload: Object) => Promise<{ok:boolean,status:number,data:any}>} seedSystemOauthProfile
- * @property {() => Promise<{ok:boolean,status:number,data:any}>} clearSystemOauthProfile
+ * @property {(payload?: Object) => Promise<{ok:boolean,status:number,data:any}>} clearSystemOauthProfile
  * @property {(payload: Object) => Promise<{ok:boolean,status:number,data:any}>} startSystemOauth
  * @property {(payload: Object) => Promise<{ok:boolean,status:number,data:any}>} getSystemOauthDeviceStatus
  * @property {(payload: Object) => Promise<{ok:boolean,status:number,data:any}>} disconnectSystemOauth
@@ -44,7 +44,7 @@ const systemEndpointsAdapter = Object.freeze({
   checkForUpdates: payload => postJson("/system/update/check", payload),
   applyUpdate: payload => postJson("/system/update/apply", payload),
   seedSystemOauthProfile: payload => postJson("/system/oauth/seed", payload),
-  clearSystemOauthProfile: () => postJson("/system/oauth/clear", {}),
+  clearSystemOauthProfile: payload => postJson("/system/oauth/clear", payload || {}),
   startSystemOauth: payload => postJson("/system/oauth/start", payload),
   getSystemOauthDeviceStatus: payload => postJson("/system/oauth/device-status", payload),
   disconnectSystemOauth: payload => postJson("/system/oauth/disconnect", payload),

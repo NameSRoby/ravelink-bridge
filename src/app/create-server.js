@@ -36,6 +36,7 @@ const { parseBoolean } = require("../shared/validation/parse-boolean");
 const colorSeed = require("../domains/colors/color-library.seed.json");
 const fixtureSeed = require("../domains/fixtures/fixtures.seed.json");
 const packageJson = require("../../package.json");
+const { getBundledTwitchClientId } = require("../shared/twitch-public-client");
 const DEFAULT_ROOT_DIR = path.resolve(__dirname, "../..");
 
 const TWITCH_COLOR_CONFIG_DEFAULT = Object.freeze({
@@ -85,6 +86,7 @@ module.exports = function createServer(options = {}) {
     fixturesStorePath: path.join(runtimeDir, "fixtures", "fixtures.json"),
     modsRootPath: path.join(rootDir, "mods"),
     modsConfigPath: path.join(rootDir, "mods", "mods.config.json"),
+    modsLocalConfigPath: path.join(rootDir, "mods", "mods.local.config.json"),
     twitchConfigPath: path.join(runtimeDir, "twitch", "twitch.color.config.json"),
     liveProfilesStorePath: path.join(runtimeDir, "live", "profiles.json"),
     liveCompatStorePath: path.join(runtimeDir, "live", "compat.state.json"),
@@ -194,6 +196,7 @@ module.exports = function createServer(options = {}) {
     rootDir,
     modsRoot: paths.modsRootPath,
     configPath: paths.modsConfigPath,
+    localConfigPath: paths.modsLocalConfigPath,
     internetGatewayClient: internetGatewayRuntime,
     log: console
   });
@@ -214,7 +217,7 @@ module.exports = function createServer(options = {}) {
   const systemOauthService = createSystemOauthService({
     vaultPath: paths.systemOauthVaultPath,
     profileDefaults: {
-      twitchClientId: String(process.env.RAVELINK_TWITCH_CLIENT_ID || "").trim(),
+      twitchClientId: String(process.env.RAVELINK_TWITCH_CLIENT_ID || "").trim() || getBundledTwitchClientId(),
       twitchBroadcasterId: String(process.env.RAVELINK_TWITCH_BROADCASTER_ID || "").trim(),
       twitchUserAccessToken: String(process.env.RAVELINK_TWITCH_USER_ACCESS_TOKEN || "").trim(),
       twitchRefreshToken: String(process.env.RAVELINK_TWITCH_REFRESH_TOKEN || "").trim()

@@ -370,13 +370,16 @@ function createSystemWidgetTemplateRuntimeUi(deps = {}) {
       collectSystemWidgetTemplatePrefsFromUi,
       saveSystemWidgetTemplatePrefsToStorage,
       clearSystemWidgetOauthSensitiveInputs,
-      setSystemWidgetSensitiveFieldsReveal
+      setSystemWidgetSensitiveFieldsReveal,
+      resumeSystemOauthDeviceFlowPolling: systemWidgetOauthFlowRuntime?.resumeSystemOauthDeviceFlowPolling
     })
     : (() => {
       throw new Error("system widget oauth vault runtime module missing");
     })());
   const {
     loadSystemWidgetOauthSyncProfile,
+    saveSystemOauthClientIdOverride,
+    clearBundledSystemOauthClientId,
     syncSystemWidgetOauthToMod,
     seedSystemWidgetOauthDevVaultFromUi,
     clearSystemWidgetOauthDevVault
@@ -474,6 +477,8 @@ function createSystemWidgetTemplateRuntimeUi(deps = {}) {
     openSystemWidgetOauthAuthorizeUrl,
     copySystemWidgetOauthAuthorizeUrl,
     loadSystemWidgetOauthSyncProfile,
+    saveSystemOauthClientIdOverride,
+    clearBundledSystemOauthClientId,
     syncSystemWidgetOauthToMod,
     seedSystemWidgetOauthDevVaultFromUi,
     clearSystemWidgetOauthDevVault,

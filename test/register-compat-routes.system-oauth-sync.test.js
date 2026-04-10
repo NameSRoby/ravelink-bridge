@@ -197,9 +197,58 @@ test("/system/oauth/sync-to-mod applies system profile to mod policy patch", asy
   });
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].action, "admin_policy_set");
+  assert.equal(calls[0].action, "oauth_twitch_sync_from_system");
   assert.equal(calls[0].method, "POST");
   assert.deepEqual(calls[0].payload?.body?.patch?.twitchRefund, {
+    enabled: true,
+    clientId: "client-from-system",
+    userAccessToken: "token-from-system",
+    broadcasterId: "987654"
+  });
+  assert.deepEqual(calls[0].payload?.body?.profile, {
+    twitchClientId: "client-from-system",
+    twitchUserAccessToken: "token-from-system",
+    twitchBroadcasterId: "987654",
+    twitchRefreshToken: "",
+    tokenExpiresAt: 0
+  });
+});
+
+test("/system/oauth/sync-to-mod falls back to admin policy patch for older mods", async () => {
+  const calls = [];
+  const deps = createDeps({
+    modRuntime: {
+      list: () => ({ ok: true, mods: [{ id: "music-request-engine", enabled: true, loaded: true }] }),
+      getSupportedHooks: () => [],
+      getUiCatalog: () => ({ ok: true, mods: [] }),
+      reload: async () => ({ ok: true }),
+      setDebugEnabled: () => ({ ok: true }),
+      clearDebugBuffer: () => ({ ok: true }),
+      importMods: async () => ({ ok: true }),
+      updateConfig: async () => ({ ok: true }),
+      invokeAction: async (modId, action, method, payload) => {
+        calls.push({ modId, action, method, payload });
+        if (action === "oauth_twitch_sync_from_system") {
+          return { status: 404, body: { ok: false, error: "mod_action_not_found" } };
+        }
+        return { status: 200, body: { ok: true } };
+      },
+      handleHttp: async () => ({ status: 200, body: { ok: true } }),
+      resolveUiAsset: () => ({ ok: false, error: "mod_ui_not_found" })
+    }
+  });
+
+  await withCompatServer(deps, async baseUrl => {
+    const response = await requestJson(baseUrl, "POST", "/system/oauth/sync-to-mod", {});
+    assert.equal(response.status, 200);
+    assert.equal(response.data?.ok, true);
+    assert.equal(response.data?.targetModId, "music-request-engine");
+  });
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].action, "oauth_twitch_sync_from_system");
+  assert.equal(calls[1].action, "admin_policy_set");
+  assert.deepEqual(calls[1].payload?.body?.patch?.twitchRefund, {
     enabled: true,
     clientId: "client-from-system",
     userAccessToken: "token-from-system",
@@ -272,6 +321,107 @@ test("/system/widget-template-get can fall back to oauth profile from mod state"
   assert.equal(capturedPayload?.twitchBroadcasterId, "445566");
 });
 
+test("/system/oauth/status hydrates missing system oauth fields from mod profile", async () => {
+  const profile = {
+    twitchClientId: "client-from-system",
+    twitchUserAccessToken: "",
+    twitchBroadcasterId: "",
+    twitchRefreshToken: "",
+    tokenExpiresAt: 0
+  };
+  const seedCalls = [];
+  const actionCalls = [];
+  const deps = createDeps({
+    systemOauthService: {
+      getProfileForInternal: () => ({ ...profile }),
+      seedProfile: (patch, options = {}) => {
+        seedCalls.push({ patch, options });
+        Object.assign(profile, patch || {});
+        return { ok: true, profile: { ...profile } };
+      },
+      getStatus: () => ({
+        ok: true,
+        profile: { ...profile },
+        presence: {
+          twitchClientId: Boolean(profile.twitchClientId),
+          twitchBroadcasterId: Boolean(profile.twitchBroadcasterId),
+          twitchUserAccessToken: Boolean(profile.twitchUserAccessToken)
+        },
+        helix: {
+          ready: Boolean(
+            profile.twitchClientId &&
+            profile.twitchBroadcasterId &&
+            profile.twitchUserAccessToken
+          )
+        },
+        oauthVault: {
+          clientId: profile.twitchClientId ? "yes" : "no",
+          broadcasterId: profile.twitchBroadcasterId ? "yes" : "no",
+          token: profile.twitchUserAccessToken ? "yes" : "no"
+        }
+      })
+    },
+    modRuntime: {
+      list: () => ({ ok: true, mods: [{ id: "music-request-engine", enabled: true, loaded: true }] }),
+      getSupportedHooks: () => [],
+      getUiCatalog: () => ({ ok: true, mods: [] }),
+      reload: async () => ({ ok: true }),
+      setDebugEnabled: () => ({ ok: true }),
+      clearDebugBuffer: () => ({ ok: true }),
+      importMods: async () => ({ ok: true }),
+      updateConfig: async () => ({ ok: true }),
+      invokeAction: async (_modId, action, _method, payload) => {
+        actionCalls.push({ action, payload });
+        if (action === "oauth_twitch_profile_for_system") {
+          return {
+            status: 200,
+            body: {
+              ok: true,
+              profile: {
+                clientId: "client-from-system",
+                broadcasterId: "445566",
+                userAccessToken: "mod-token",
+                refreshToken: "refresh-mod",
+                tokenExpiresAt: 1234567890
+              }
+            }
+          };
+        }
+        return { status: 200, body: { ok: true } };
+      },
+      handleHttp: async () => ({ status: 200, body: { ok: true } }),
+      resolveUiAsset: () => ({ ok: false, error: "mod_ui_not_found" })
+    }
+  });
+
+  await withCompatServer(deps, async baseUrl => {
+    const response = await requestJson(baseUrl, "GET", "/system/oauth/status");
+    assert.equal(response.status, 200);
+    assert.equal(response.data?.helix?.ready, true);
+    assert.equal(response.data?.presence?.twitchClientId, true);
+    assert.equal(response.data?.presence?.twitchBroadcasterId, true);
+    assert.equal(response.data?.presence?.twitchUserAccessToken, true);
+    assert.equal(response.data?.profile?.twitchBroadcasterId, "445566");
+    assert.equal(response.data?.profile?.twitchUserAccessToken, "mod-token");
+    assert.equal(response.data?.profile?.twitchRefreshToken, "refresh-mod");
+    assert.equal(response.data?.profile?.tokenExpiresAt, 1234567890);
+  });
+
+  assert.equal(seedCalls.length, 1);
+  assert.deepEqual(seedCalls[0], {
+    patch: {
+      twitchBroadcasterId: "445566",
+      twitchUserAccessToken: "mod-token",
+      twitchRefreshToken: "refresh-mod",
+      tokenExpiresAt: 1234567890
+    },
+    options: { replace: false }
+  });
+  assert.equal(actionCalls.length, 1);
+  assert.equal(actionCalls[0]?.action, "oauth_twitch_profile_for_system");
+  assert.equal(actionCalls[0]?.payload?.body?.__internalSystemOauthRead, true);
+});
+
 test("/system/widget-redemption-status forwards payload to system oauth service", async () => {
   const seedCalls = [];
   const patchCalls = [];
@@ -320,6 +470,100 @@ test("/system/widget-redemption-status forwards payload to system oauth service"
     rewardId: "reward-color",
     redemptionId: "redemption-100",
     broadcasterId: "12345",
+    status: "FULFILLED",
+    reason: "ok"
+  });
+});
+
+test("/system/widget-redemption-status hydrates oauth from mod profile when payload omits credentials", async () => {
+  const seedCalls = [];
+  const patchCalls = [];
+  const deps = createDeps({
+    systemOauthService: {
+      getProfileForInternal: () => ({
+        twitchClientId: "client-from-system",
+        twitchUserAccessToken: "",
+        twitchBroadcasterId: "",
+        twitchRefreshToken: "",
+        tokenExpiresAt: 0
+      }),
+      seedProfile: (input, options) => {
+        seedCalls.push({ input, options });
+        return { ok: true };
+      },
+      patchRedemptionStatus: async payload => {
+        patchCalls.push(payload);
+        return {
+          ok: true,
+          status: 200,
+          synced: true,
+          rewardId: String(payload.rewardId || ""),
+          redemptionId: String(payload.redemptionId || ""),
+          broadcasterId: String(payload.broadcasterId || ""),
+          statusApplied: String(payload.status || "")
+        };
+      }
+    },
+    modRuntime: {
+      list: () => ({ ok: true, mods: [{ id: "music-request-engine", enabled: true, loaded: true }] }),
+      getSupportedHooks: () => [],
+      getUiCatalog: () => ({ ok: true, mods: [] }),
+      reload: async () => ({ ok: true }),
+      setDebugEnabled: () => ({ ok: true }),
+      clearDebugBuffer: () => ({ ok: true }),
+      importMods: async () => ({ ok: true }),
+      updateConfig: async () => ({ ok: true }),
+      invokeAction: async (_modId, action) => {
+        if (action === "oauth_twitch_profile_for_system") {
+          return {
+            status: 200,
+            body: {
+              ok: true,
+              profile: {
+                clientId: "client-from-system",
+                broadcasterId: "445566",
+                userAccessToken: "mod-token",
+                refreshToken: "refresh-mod",
+                tokenExpiresAt: 1234567890
+              }
+            }
+          };
+        }
+        return { status: 200, body: { ok: true } };
+      },
+      handleHttp: async () => ({ status: 200, body: { ok: true } }),
+      resolveUiAsset: () => ({ ok: false, error: "mod_ui_not_found" })
+    }
+  });
+
+  await withCompatServer(deps, async baseUrl => {
+    const response = await requestJson(baseUrl, "POST", "/system/widget-redemption-status", {
+      rewardId: "reward-color",
+      redemptionId: "redemption-100",
+      broadcasterId: "445566",
+      status: "FULFILLED",
+      reason: "ok"
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.data?.ok, true);
+    assert.equal(response.data?.statusApplied, "FULFILLED");
+  });
+
+  assert.equal(seedCalls.length, 1);
+  assert.deepEqual(seedCalls[0], {
+    input: {
+      twitchBroadcasterId: "445566",
+      twitchUserAccessToken: "mod-token",
+      twitchRefreshToken: "refresh-mod",
+      tokenExpiresAt: 1234567890
+    },
+    options: { replace: false }
+  });
+  assert.equal(patchCalls.length, 1);
+  assert.deepEqual(patchCalls[0], {
+    rewardId: "reward-color",
+    redemptionId: "redemption-100",
+    broadcasterId: "445566",
     status: "FULFILLED",
     reason: "ok"
   });

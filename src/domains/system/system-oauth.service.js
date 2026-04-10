@@ -67,6 +67,7 @@ module.exports = function createSystemOauthService(options = {}) {
     ? options.internetGatewayClient
     : null;
   const profileDefaults = normalizeProfileShape(options.profileDefaults || {});
+  const bundledClientId = asString(profileDefaults.twitchClientId || "");
   const helixRetryMaxAttempts = clampInt(options.helixRetryMaxAttempts, 1, 6, 3);
   const helixRetryBaseDelayMs = clampInt(options.helixRetryBaseDelayMs, 50, 5_000, 300);
   const helixRetryMaxDelayMs = clampInt(options.helixRetryMaxDelayMs, helixRetryBaseDelayMs, 15_000, 1_800);
@@ -129,6 +130,19 @@ module.exports = function createSystemOauthService(options = {}) {
   function getStatus() {
     const snapshot = normalizeProfileShape(profile);
     const presence = buildProfilePresence(snapshot);
+    const clientIdSource = presence.twitchClientId
+      ? (
+        bundledClientId &&
+        snapshot.bundledClientIdDisabled !== true &&
+        asString(snapshot.twitchClientId) === bundledClientId
+          ? "bundled"
+          : "custom"
+      )
+      : (
+        bundledClientId && snapshot.bundledClientIdDisabled === true
+          ? "cleared"
+          : "missing"
+      );
     const tokenExpiresAt = Math.max(0, Number(snapshot.tokenExpiresAt || 0));
     const helix = buildHelixReadiness(snapshot, Date.now());
     return {
@@ -149,6 +163,10 @@ module.exports = function createSystemOauthService(options = {}) {
         hasOauthRedirectUri: false
       },
       hasValues: hasAnyProfileValue(snapshot),
+      bundledClientIdAvailable: Boolean(bundledClientId),
+      bundledClientIdActive: clientIdSource === "bundled",
+      bundledClientIdDisabled: snapshot.bundledClientIdDisabled === true,
+      clientIdSource,
       presence: {
         twitchClientId: presence.twitchClientId,
         twitchBroadcasterId: presence.twitchBroadcasterId,
@@ -204,13 +222,29 @@ module.exports = function createSystemOauthService(options = {}) {
     if (Object.prototype.hasOwnProperty.call(source, "tokenExpiresAt")) {
       next.tokenExpiresAt = patch.tokenExpiresAt;
     }
+    if (
+      Object.prototype.hasOwnProperty.call(source, "bundledClientIdDisabled") ||
+      Object.prototype.hasOwnProperty.call(source, "clearBundledClientId") ||
+      Object.prototype.hasOwnProperty.call(source, "useBundledClientId")
+    ) {
+      next.bundledClientIdDisabled = patch.bundledClientIdDisabled === true;
+    }
     profile = normalizeProfileShape(next);
     persistProfile("seed_profile");
     return getStatus();
   }
 
-  function clearProfile() {
-    profile = normalizeProfileShape(profileDefaults);
+  function clearProfile(optionsInput = {}) {
+    const source = optionsInput && typeof optionsInput === "object" && !Array.isArray(optionsInput)
+      ? optionsInput
+      : {};
+    profile = normalizeProfileShape(
+      source.clearBundledClientId === true
+        ? {
+          bundledClientIdDisabled: true
+        }
+        : profileDefaults
+    );
     deviceFlow = createEmptyDeviceFlowState();
     persistProfile("clear_profile");
     return getStatus();
@@ -237,6 +271,17 @@ module.exports = function createSystemOauthService(options = {}) {
     }
     if (Object.prototype.hasOwnProperty.call(source, "tokenExpiresAt")) {
       profilePatch.tokenExpiresAt = clampInt(source.tokenExpiresAt, 0, 4_102_444_800_000, 0);
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(source, "bundledClientIdDisabled") ||
+      Object.prototype.hasOwnProperty.call(source, "clearBundledClientId") ||
+      Object.prototype.hasOwnProperty.call(source, "useBundledClientId")
+    ) {
+      profilePatch.bundledClientIdDisabled = (
+        source.bundledClientIdDisabled === true ||
+        source.clearBundledClientId === true ||
+        source.useBundledClientId === false
+      );
     }
     if (!Object.keys(profilePatch).length) {
       return false;
@@ -373,6 +418,8 @@ module.exports = function createSystemOauthService(options = {}) {
 
   const systemOauthDeviceFlow = createSystemOauthDeviceFlow({
     now,
+    setTimeoutRef: typeof options.setTimeoutRef === "function" ? options.setTimeoutRef : undefined,
+    clearTimeoutRef: typeof options.clearTimeoutRef === "function" ? options.clearTimeoutRef : undefined,
     buildActivateUrl,
     buildPublicDeviceFlowSnapshot,
     createEmptyDeviceFlowState,

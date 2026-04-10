@@ -11,46 +11,39 @@ RaveLink Bridge is open source. If you fork/remix and ship your own distro, attr
 
 ## Download
 
-- Current Windows release (v1.6.2): https://github.com/NameSRoby/ravelink-bridge/releases/latest
+- Current Windows release (v1.6.3): https://github.com/NameSRoby/ravelink-bridge/releases/latest
 - All releases: https://github.com/NameSRoby/ravelink-bridge/releases
 
-This repository is aligned to `v1.6.2`.
+This repository is aligned to `v1.6.3`.
 
 ## Quick Install (Windows)
 
-1. Preferred when available: download `RaveLink-Bridge-Windows-v1.6.2-setup-installer.exe` and run it.
-2. Portable fallback: download `RaveLink-Bridge-Windows-v1.6.2-self-contained.zip` and extract it.
-3. Standard ZIP fallback: download `RaveLink-Bridge-Windows-v1.6.2.zip` and extract it.
+1. Preferred when available: download `RaveLink-Bridge-Windows-v1.6.3-setup-installer.exe` and run it.
+2. Portable fallback: download `RaveLink-Bridge-Windows-v1.6.3-self-contained.zip` and extract it.
+3. Standard ZIP fallback: download `RaveLink-Bridge-Windows-v1.6.3.zip` and extract it.
 4. Run `RaveLink-Bridge-Start.bat`.
 5. Open `http://127.0.0.1:5050`.
 
-## v1.6.2 (UI Refresh + Workflow Upgrade)
+## v1.6.3 (Bridge OAuth + Packaging Hotfixes)
 
-This update focuses on making RaveLink Bridge easier to use live, easier to understand at a glance, and more reliable across the parts people actually touch during a stream.
+This update is a short stability release focused on bridge-owned Twitch OAuth, public-safe mod docking, and packaging cleanup for the public repository.
 
 ### What improved
 
-- Server UI refresh:
-  - LIVE, Fixtures, Audio, MIDI, Mods, and System were cleaned up heavily
-  - tabs, sections, collapsible lanes, and everyday controls are more organized and easier to scan during a show
-  - theme customization is broader now, while the classic preset feel is still there
-- Better onboarding:
-  - the server now has a real guided tour instead of only expecting trial-and-error
-  - onboarding can be replayed by tab, which is much nicer when you only want to revisit one area
-- Better audio workflow:
-  - desktop capture and app-isolation flow were cleaned up
-  - common audio actions are easier to reach and behave more predictably
-- Better LIVE behavior:
-  - scene, brightness, and quiet/loud interpretation were tuned so the engine reads music more naturally
-  - the LIVE tab is laid out more like an actual control surface than a debug screen
-- Better MIDI workflow:
-  - MIDI is now action-first, so you think in terms of what you want the controller to do instead of raw note/CC numbers
-- Better packaging:
-  - the Windows installer is back
-  - self-contained and standard zip builds are included again
+- System OAuth is more resilient:
+  - device-code approval can complete through server-side polling instead of depending on a fragile browser-only poll loop
+  - widget status can recover a half-saved OAuth state from compatible mod data when needed
+  - bundled Twitch app ID support is clearer and can be overridden or permanently cleared per install
+- Public packaging is safer:
+  - the public repo now ships a real `mods/` dock with a safe empty tracked config
+  - local-only mod enablement can live in `mods/mods.local.config.json` without getting published
+  - the local song-request mod remains excluded from the public repo and packaged release
+- Release workflow polish:
+  - packaged `mods/` output now includes the dock guide and safe baseline config instead of a placeholder text file
+  - machine-specific path examples in public tests were sanitized
 
 Detailed release notes:
-- https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.6.2
+- https://github.com/NameSRoby/ravelink-bridge/releases/tag/v1.6.3
 
 ## What This Is
 
@@ -64,7 +57,7 @@ RaveLink Bridge runs on your stream PC and turns live audio + operator/chat acti
 - Local-first safe internet + Twitch Helix redemption sync lane
 - Optional local mods without making mods a required boot dependency
 
-## Public Repo Boundary (v1.6.2)
+## Public Repo Boundary (v1.6.3)
 
 This public repository keeps the runnable server source, UI, scripts, tests, and the full `docs/repo-documentation` book.
 
@@ -73,7 +66,7 @@ It intentionally does **not** include:
 - local runtime state, logs, vaults, caches, and machine-specific user data
 - the current local song-request mod
 
-Optional local mods can still be added later under `mods/`, but they are not bundled in this public source tree or in the packaged public release.
+Optional local mods can still be added later under `mods/`. The public repo now includes a safe tracked `mods/README.md` and `mods/mods.config.json`, while local-only enablement should live in `mods/mods.local.config.json`, which stays out of source control and out of the packaged public release.
 
 > Developer note: this README is intentionally streamer-first. The deep maintainer material lives under `docs/repo-documentation/`.
 
@@ -164,15 +157,13 @@ Notes:
 - The dock URL redirects to `/?obsDock=1&compact=...` and enables dock-specific layout behavior.
 - Remove or rename docks from OBS `View -> Docks -> Custom Browser Docks`.
 
-## Version 1.6.2 Notes
+## Version 1.6.3 Notes
 
-- This is the biggest public update since `v1.5.3`, not a small hotfix.
+- This is a short bug-fix release, not a major feature drop.
 - Main focus:
-  - cleaner day-to-day UI across LIVE, Audio, MIDI, System, and Mods
-  - better onboarding so setup is easier to understand
-  - more polished audio capture and app-isolation workflow
-  - improved LIVE interpretation of quiet vs loud musical sections
-  - restored installer + portable packaging options
+  - System-owned Twitch OAuth and Helix readiness recovery
+  - public-safe mod docking and release packaging
+  - keeping local-only song-request work out of the public repo and release
 - The bundled server still supports mods, but the current local-only song-request mod is intentionally not part of this public package.
 
 ## Developer Quick Start
@@ -207,7 +198,7 @@ npm run package:installer
 - `public/`: browser UI, templates, styles, frontend runtime composition
 - `scripts/`: verification, release, packaging, and helper automation
 - `test/`: runtime, browser, route, docs, and architecture guard suites
-- `docs/repo-documentation/`: packaged maintainer/study-guide documentation
+- `docs/repo-documentation/`: packaged maintainer/reference documentation
 - `THIRD_PARTY_NOTICES.md`: third-party notices included in public release
 
 ## Runtime Architecture
@@ -239,9 +230,9 @@ npm run package:installer
 ```
 
 Outputs:
-- `dist/RaveLink-Bridge-Windows-v1.6.2.zip`
-- `dist/RaveLink-Bridge-Windows-v1.6.2-self-contained.zip`
-- `dist/RaveLink-Bridge-Windows-v1.6.2-setup-installer.exe`
+- `dist/RaveLink-Bridge-Windows-v1.6.3.zip`
+- `dist/RaveLink-Bridge-Windows-v1.6.3-self-contained.zip`
+- `dist/RaveLink-Bridge-Windows-v1.6.3-setup-installer.exe`
 
 ## Security And Data Hygiene
 
