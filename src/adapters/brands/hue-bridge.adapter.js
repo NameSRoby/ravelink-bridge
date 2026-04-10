@@ -328,7 +328,6 @@ module.exports = function createHueBridgeAdapter(options = {}) {
     const key = buildHueBridgeFailureKey(bridgeIp, username);
     if (!key) return;
     hueBridgeFailureState.delete(key);
-    setHueBridgeTransportHint(bridgeIp, username, "https", 0);
   }
 
   function getHueEntertainmentSuppression(bridgeIp = "", username = "") {
@@ -455,7 +454,9 @@ module.exports = function createHueBridgeAdapter(options = {}) {
       || message.includes("unable to verify")
       || message.includes("certificate")
       || message.includes("self signed")
-      || message.includes("tls");
+      || message.includes("tls")
+      || message.includes("socket is closed")
+      || message.includes("cannot send data");
   }
 
   async function readBridgeConfig(bridgeHost = "", username = "", input = {}) {
@@ -879,7 +880,7 @@ module.exports = function createHueBridgeAdapter(options = {}) {
 
     const startedAt = Number(now() || Date.now());
     let entertainmentSent = 0;
-    let entertainmentFailed = 0;
+    let entertainmentFallbackCount = 0;
     let entertainmentAttempted = 0;
     const entertainmentStatus = hueEntertainment.getStatus();
     if (entertainmentEnabled && entertainmentReadyGroups.size > 0 && entertainmentStatus.available === true) {
@@ -895,7 +896,7 @@ module.exports = function createHueBridgeAdapter(options = {}) {
           clearHueEntertainmentSuppression(group.config.bridgeIp, group.config.username);
           entertainmentSent += group.fixtures.length;
         } else {
-          entertainmentFailed += group.fixtures.length;
+          entertainmentFallbackCount += group.fixtures.length;
           const entertainmentError = result?.error || "hue_entertainment_send_failed";
           logSendErrorThrottled(entertainmentError);
           if (shouldSuppressHueEntertainmentFromError(entertainmentError)) {
@@ -956,6 +957,7 @@ module.exports = function createHueBridgeAdapter(options = {}) {
       if (shouldTryHttpFirst) {
         try {
           const result = await sendHttpWithTimeout(HUE_REQUEST_TIMEOUT_MS);
+          setHueBridgeTransportHint(bridgeIp, username, "http", HUE_HTTP_FORCE_HINT_MS);
           clearHueBridgeFailure(bridgeIp, username);
           return result;
         } catch (httpHintError) {
@@ -971,6 +973,7 @@ module.exports = function createHueBridgeAdapter(options = {}) {
           timeout: HUE_REQUEST_TIMEOUT_MS,
           httpsAgent
         });
+        setHueBridgeTransportHint(bridgeIp, username, "https", 0);
         clearHueBridgeFailure(bridgeIp, username);
         return {
           ok: true,
@@ -1002,7 +1005,7 @@ module.exports = function createHueBridgeAdapter(options = {}) {
         }
         try {
           await sendHttpWithTimeout(HUE_REQUEST_TIMEOUT_FALLBACK_MS);
-          setHueBridgeTransportHint(bridgeIp, username, "http", HUE_HTTP_HINT_MS);
+          setHueBridgeTransportHint(bridgeIp, username, "http", HUE_HTTP_FORCE_HINT_MS);
           clearHueBridgeFailure(bridgeIp, username);
           return {
             ok: true,
@@ -1043,9 +1046,9 @@ module.exports = function createHueBridgeAdapter(options = {}) {
       ...transportTelemetry,
       sent: Number(transportTelemetry.sent || 0) + sent + entertainmentSent,
       skipped: Number(transportTelemetry.skipped || 0) + skipped,
-      sendErrors: Number(transportTelemetry.sendErrors || 0) + failed + entertainmentFailed,
+      sendErrors: Number(transportTelemetry.sendErrors || 0) + failed,
       lastDurationMs: durationMs,
-      transportFallbackReason: entertainmentFailed > 0
+      transportFallbackReason: entertainmentFallbackCount > 0
         ? "entertainment_failed_rest_fallback"
         : (httpFallbackSent > 0 ? "rest_https_failed_http_fallback" : transportTelemetry.transportFallbackReason),
       entertainment: {
@@ -1055,7 +1058,7 @@ module.exports = function createHueBridgeAdapter(options = {}) {
           ? (
             entertainmentSuppressedCount > 0
               ? "entertainment_temporarily_suppressed"
-              : (entertainmentFailed > 0
+              : (entertainmentFallbackCount > 0
                 ? "entertainment_partial_failure"
                 : (entertainmentAttempted > 0 ? "entertainment_active" : "entertainment_idle"))
           )
@@ -1070,7 +1073,7 @@ module.exports = function createHueBridgeAdapter(options = {}) {
     };
     return {
       sent: sent + entertainmentSent,
-      failed: failed + entertainmentFailed,
+      failed,
       skipped,
       dryRun: false
     };
@@ -1083,10 +1086,45 @@ module.exports = function createHueBridgeAdapter(options = {}) {
 
   function logSendErrorThrottled(reason) {
     const rawMessage = String(reason?.message || reason || "").trim() || "unknown_hue_send_error";
-    const normalizedMessage = (() => {
-      const lower = rawMessage.toLowerCase();
+    const lower = rawMessage.toLowerCase();
+    const logDetail = (() => {
+      if (
+        lower.includes("hue_entertainment_start_timeout")
+        || lower.includes("dtls handshake timed out")
+      ) {
+        return {
+          code: "hue_entertainment_start_timeout",
+          message: "Entertainment fallback -> REST (DTLS start timed out)"
+        };
+      }
+      if (
+        lower.includes("socket is closed")
+        || lower.includes("cannot send data")
+        || lower.includes("hue_entertainment_socket_error")
+      ) {
+        return {
+          code: "hue_entertainment_session_closed",
+          message: "Entertainment fallback -> REST (session closed)"
+        };
+      }
+      if (
+        lower.includes("hue_entertainment_start_failed")
+        || lower.includes("hue_entertainment_area_unavailable")
+        || lower.includes("certificate")
+        || lower.includes("self signed")
+        || lower.includes("tls")
+        || lower.includes("unable to verify")
+      ) {
+        return {
+          code: "hue_entertainment_unavailable",
+          message: "Entertainment fallback -> REST (bridge transport unavailable)"
+        };
+      }
       if (lower.includes("timeout") || lower.includes("timed out") || lower.includes("econnaborted")) {
-        return "hue_request_timeout";
+        return {
+          code: "hue_request_timeout",
+          message: "REST send failed (bridge timeout)"
+        };
       }
       if (
         lower.includes("fetch failed")
@@ -1098,16 +1136,22 @@ module.exports = function createHueBridgeAdapter(options = {}) {
         || lower.includes("econnrefused")
         || lower.includes("socket hang up")
       ) {
-        return "hue_network_unreachable";
+        return {
+          code: "hue_network_unreachable",
+          message: "REST send failed (bridge unreachable)"
+        };
       }
-      return rawMessage;
+      return {
+        code: rawMessage,
+        message: `Send failed (${rawMessage})`
+      };
     })();
     const at = Number(now() || Date.now());
-    const sameMessage = normalizedMessage === String(lastSendErrorLog.message || "");
+    const sameMessage = logDetail.code === String(lastSendErrorLog.message || "");
     const withinWindow = (at - Number(lastSendErrorLog.at || 0)) < HUE_SEND_ERROR_LOG_WINDOW_MS;
     if (sameMessage && withinWindow) return;
-    lastSendErrorLog = { message: normalizedMessage, at };
-    log.warn("[HUE] state send failed:", rawMessage);
+    lastSendErrorLog = { message: logDetail.code, at };
+    log.warn(`[HUE] ${logDetail.message}`);
   }
 
   function setTransportMode(mode = "auto") {

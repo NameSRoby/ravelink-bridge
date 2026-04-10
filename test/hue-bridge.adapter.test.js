@@ -99,8 +99,8 @@ test("Hue adapter throttles repeated identical send errors", async () => {
   ], { on: true });
 
   assert.equal(logWarnings.length, 2);
-  assert.equal(logWarnings[0].includes("[HUE] state send failed:"), true);
-  assert.equal(logWarnings[1].includes("[HUE] state send failed:"), true);
+  assert.equal(logWarnings[0].includes("[HUE] REST send failed (bridge timeout)"), true);
+  assert.equal(logWarnings[1].includes("[HUE] REST send failed (bridge timeout)"), true);
 });
 
 test("Hue adapter applies temporary cooldown after timeout failures", async () => {
@@ -184,6 +184,107 @@ test("Hue adapter honors fixture capability forceHttp hint", async () => {
   assert.equal(result.failed, 0);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].startsWith("http://"), true);
+});
+
+test("Hue adapter keeps using HTTP after fallback finds a working rest path", async () => {
+  let nowTick = 1000;
+  const calls = [];
+  const axios = {
+    put: async (url) => {
+      calls.push(url);
+      if (url.startsWith("https://")) {
+        const error = new Error("timeout of 1800ms exceeded");
+        error.code = "ECONNABORTED";
+        throw error;
+      }
+      return { status: 200, data: [{ success: true }] };
+    }
+  };
+  const adapter = createHueBridgeAdapter({
+    axios,
+    dryRun: false,
+    now: () => nowTick
+  });
+  const fixture = {
+    brand: "hue",
+    bridgeIp: "192.168.1.10",
+    username: "testuser",
+    lightId: 1
+  };
+
+  const first = await adapter.sendState([fixture], { on: true, bri: 120 });
+  assert.equal(first.sent, 1);
+  assert.equal(first.failed, 0);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].startsWith("https://"), true);
+  assert.equal(calls[1].startsWith("http://"), true);
+
+  nowTick += 11 * 60 * 1000;
+  const second = await adapter.sendState([fixture], { on: true, bri: 120 });
+  assert.equal(second.sent, 1);
+  assert.equal(second.failed, 0);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].startsWith("http://"), true);
+});
+
+test("Hue adapter suppresses repeated entertainment retries after closed socket fallback", async () => {
+  let nowTick = 1000;
+  let entertainmentCalls = 0;
+  const logWarnings = [];
+  const entertainmentRuntime = {
+    getStatus: () => ({
+      available: true,
+      reason: ""
+    }),
+    sendFrame: async () => {
+      entertainmentCalls += 1;
+      return { ok: false, error: "The socket is closed. Cannot send data." };
+    },
+    stopAll: async () => ({ ok: true })
+  };
+  const axios = {
+    put: async () => ({ status: 200, data: [{ success: true }] })
+  };
+  const adapter = createHueBridgeAdapter({
+    axios,
+    dryRun: false,
+    now: () => nowTick,
+    createHueEntertainmentRuntime: () => entertainmentRuntime,
+    log: {
+      warn: (...args) => {
+        logWarnings.push(args.join(" "));
+      }
+    }
+  });
+  const fixture = {
+    brand: "hue",
+    bridgeIp: "192.168.1.10",
+    username: "ent-user",
+    lightId: 1,
+    clientKey: "A".repeat(32),
+    entertainmentAreaId: "desk-area",
+    bridgeId: "ECB5FAFFFE923D75",
+    extras: {
+      hueBridgeCapabilities: {
+        supportsEntertainment: true,
+        supportsHttps: true,
+        forceHttp: false,
+        bridgeModelId: "BSB002"
+      }
+    }
+  };
+
+  const first = await adapter.sendState([fixture], { on: true, bri: 140 });
+  assert.equal(first.sent, 1);
+  assert.equal(first.failed, 0);
+  assert.equal(entertainmentCalls, 1);
+  assert.equal(logWarnings.some(entry => entry.includes("[HUE] Entertainment fallback -> REST (session closed)")), true);
+
+  nowTick += 1000;
+  const second = await adapter.sendState([fixture], { on: true, bri: 140 });
+  assert.equal(second.sent, 1);
+  assert.equal(second.failed, 0);
+  assert.equal(entertainmentCalls, 1);
 });
 
 test("Hue adapter keeps entertainment RGB independent from bri when __rgb is unavailable", async () => {

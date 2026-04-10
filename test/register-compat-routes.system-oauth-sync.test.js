@@ -256,6 +256,68 @@ test("/system/oauth/sync-to-mod falls back to admin policy patch for older mods"
   });
 });
 
+test("/system/oauth/status is rate limited because it can hydrate fallback oauth state", async () => {
+  const deps = createDeps({
+    systemOauthService: {
+      getStatus: () => ({
+        ok: true,
+        helix: { ready: false },
+        hasValues: false,
+        presence: {}
+      }),
+      getProfileForInternal: () => ({
+        twitchClientId: "",
+        twitchUserAccessToken: "",
+        twitchBroadcasterId: "",
+        twitchRefreshToken: "",
+        tokenExpiresAt: 0
+      }),
+      seedProfile: () => ({ ok: true })
+    },
+    modRuntime: {
+      list: () => ({ ok: true, mods: [{ id: "music-request-engine", enabled: true, loaded: true }] }),
+      getSupportedHooks: () => [],
+      getUiCatalog: () => ({ ok: true, mods: [] }),
+      reload: async () => ({ ok: true }),
+      setDebugEnabled: () => ({ ok: true }),
+      clearDebugBuffer: () => ({ ok: true }),
+      importMods: async () => ({ ok: true }),
+      updateConfig: async () => ({ ok: true }),
+      invokeAction: async (modId, action) => {
+        if (modId === "music-request-engine" && action === "oauth_twitch_profile_get") {
+          return {
+            status: 200,
+            body: {
+              ok: true,
+              profile: {
+                twitchClientId: "client-from-mod",
+                twitchUserAccessToken: "token-from-mod",
+                twitchBroadcasterId: "123456",
+                twitchRefreshToken: "refresh-from-mod",
+                tokenExpiresAt: 42
+              }
+            }
+          };
+        }
+        return { status: 404, body: { ok: false, error: "mod_action_not_found" } };
+      },
+      handleHttp: async () => ({ status: 200, body: { ok: true } }),
+      resolveUiAsset: () => ({ ok: false, error: "mod_ui_not_found" })
+    }
+  });
+
+  await withCompatServer(deps, async baseUrl => {
+    for (let index = 0; index < 60; index += 1) {
+      const response = await requestJson(baseUrl, "GET", "/system/oauth/status");
+      assert.equal(response.status, 200);
+      assert.equal(response.data?.ok, true);
+    }
+    const blocked = await requestJson(baseUrl, "GET", "/system/oauth/status");
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.data?.error, "rate_limited");
+  });
+});
+
 test("/system/widget-template-get can fall back to oauth profile from mod state", async () => {
   let capturedPayload = null;
   const deps = createDeps({

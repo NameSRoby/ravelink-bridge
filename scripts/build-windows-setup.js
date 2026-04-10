@@ -82,6 +82,9 @@ function createZipFromDirectory(sourceDir, targetZip) {
     });
     return;
   } catch (tarError) {
+    if (fileExists(targetZip)) {
+      fs.rmSync(targetZip, { force: true });
+    }
     const escapedSource = sourceDir.replace(/'/g, "''");
     const escapedTarget = targetZip.replace(/'/g, "''");
     const psScript = [

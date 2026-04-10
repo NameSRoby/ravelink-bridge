@@ -272,10 +272,10 @@ test("audio orchestrator loads config through bounded runtimes and startup wirin
         formatAudioAppIsoScanSummary: () => "scan-summary"
       };
     },
-    createAudioTelemetryRuntimeUi() {
+    createAudioTelemetryRuntimeUi({ applyAudioAppIsolationTelemetry }) {
       return {
         updateAudioTelemetry(value) {
-          records.telemetry.push(value);
+          applyAudioAppIsolationTelemetry(value);
         }
       };
     },
@@ -465,62 +465,40 @@ test("palette orchestrator applies runtime snapshots through metadata and scoped
         }
       };
     },
-    createPaletteRuntimeSnapshotRuntimeUi(deps = {}) {
-      const applyPaletteRuntimeSnapshotToUi = (snapshot = {}, options = {}) => {
-        deps.applyPaletteRuntimeMetadataUi?.(snapshot);
-        deps.applyPaletteSnapshotToUi?.(snapshot.config || {}, {
-          ...options,
-          fixtureOverrides: snapshot.fixtureOverrides || {},
-          brandFixtures: snapshot.brandFixtures || {}
-        });
-        deps.applyFixtureMetricRoutingSnapshotToUi?.(snapshot.metricRouting || {});
-        if (deps.renderPaletteBrandMenus) {
-          deps.renderPaletteBrandMenus({
+    createPaletteRuntimeSnapshotRuntimeUi({
+      windowRef,
+      CustomEventRef,
+      applyPaletteRuntimeMetadataUi,
+      applyPaletteSnapshotToUi,
+      applyFixtureMetricRoutingSnapshotToUi,
+      renderPaletteBrandMenus
+    }) {
+      return {
+        applyPaletteRuntimeSnapshotToUi(snapshot = {}, options = {}) {
+          applyPaletteRuntimeMetadataUi(snapshot);
+          applyPaletteSnapshotToUi(snapshot.config || {}, {
+            fixtureOverrides: snapshot.fixtureOverrides || {},
+            brandFixtures: snapshot.brandFixtures || {},
+            forceRender: options.forceRender === true
+          });
+          applyFixtureMetricRoutingSnapshotToUi(snapshot.metricRouting || {});
+          renderPaletteBrandMenus({
             reason: "palette_runtime_snapshot",
             force: options.forceRender === true
           });
+          if (windowRef && typeof windowRef.dispatchEvent === "function" && typeof CustomEventRef === "function") {
+            windowRef.dispatchEvent(new CustomEventRef("ravelink:live-scope-targets-updated", {
+              detail: { catalog: Array.isArray(snapshot.catalog) ? snapshot.catalog.slice() : [] }
+            }));
+          }
+          ui.paletteCatalog = Array.isArray(snapshot.catalog) ? snapshot.catalog.slice() : [];
         }
-        if (ui) {
-          ui.paletteCatalog = Array.isArray(snapshot.catalog) ? [...snapshot.catalog] : [];
-          ui.__applyPaletteRuntimeSnapshotToUi = applyPaletteRuntimeSnapshotToUi;
-        }
-        if (deps.windowRef && deps.CustomEventRef) {
-          deps.windowRef.dispatchEvent(new deps.CustomEventRef("ravelink:live-scope-targets-updated", {
-            detail: { source: "palette_runtime_snapshot" }
-          }));
-        }
-      };
-      return {
-        applyPaletteRuntimeSnapshotToUi
       };
     }
   });
+  const applyPaletteRuntimeSnapshotToUi = vm.runInContext("applyPaletteRuntimeSnapshotToUi", context);
 
-  if (typeof ui.__applyPaletteRuntimeSnapshotToUi !== "function") {
-    ui.__applyPaletteRuntimeSnapshotToUi = (snapshot = {}, options = {}) => {
-      records.metadata.push(snapshot);
-      records.configSnapshots.push({
-        config: snapshot.config || {},
-        options: {
-          ...options,
-          fixtureOverrides: snapshot.fixtureOverrides || {},
-          brandFixtures: snapshot.brandFixtures || {}
-        }
-      });
-      records.metricRouting.push(snapshot.metricRouting || {});
-      ui.paletteCatalog = Array.isArray(snapshot.catalog) ? [...snapshot.catalog] : [];
-      records.renders.push({
-        reason: "palette_runtime_snapshot",
-        force: options.forceRender === true
-      });
-      records.events.push({
-        type: "ravelink:live-scope-targets-updated",
-        detail: { source: "palette_runtime_snapshot" }
-      });
-    };
-  }
-
-  ui.__applyPaletteRuntimeSnapshotToUi({
+  applyPaletteRuntimeSnapshotToUi({
     catalog: [{ id: "fixture-1", brand: "hue" }],
     config: { cycleMode: "timed", timedIntervalSec: 9 },
     fixtureOverrides: { "fixture-1": { vividness: 3 } },

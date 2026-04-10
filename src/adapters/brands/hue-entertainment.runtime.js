@@ -87,6 +87,8 @@ const baseDnsLookup = typeof dns.lookup === "function"
 const hueDnsOverrides = new Map();
 let hueDnsPatchInstalled = false;
 let patchedHueLookupFn = null;
+let hueDnsPatchReadyLogged = false;
+const hueCaTrustReadyByPath = new Set();
 
 function isValidIpv4Host(value = "") {
   return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(String(value || "").trim());
@@ -146,7 +148,10 @@ function installHueDnsOverride(log = console) {
   };
   dns.lookup = patchedHueLookupFn;
   hueDnsPatchInstalled = true;
-  log.log?.("[HUE][ENT] installed Node DNS bridge-id override patch");
+  if (!hueDnsPatchReadyLogged) {
+    hueDnsPatchReadyLogged = true;
+    log.log?.("[HUE] Entertainment DNS bridge-id override ready");
+  }
 }
 
 function registerHueDnsOverride(bridgeId = "", bridgeIp = "", log = console) {
@@ -197,7 +202,10 @@ function ensureHueCaTrust(rootDir = "", log = console) {
   const existing = String(process.env.NODE_EXTRA_CA_CERTS || "").trim();
   if (!existing) {
     process.env.NODE_EXTRA_CA_CERTS = certPath;
-    log.log?.(`[HUE][ENT] installed Hue CA trust (${path.basename(certPath)})`);
+    if (!hueCaTrustReadyByPath.has(certPath)) {
+      hueCaTrustReadyByPath.add(certPath);
+      log.log?.(`[HUE] Entertainment CA trust ready (${path.basename(certPath)})`);
+    }
     return {
       installed: true,
       reason: "node_extra_ca_set",
@@ -229,6 +237,10 @@ module.exports = function createHueEntertainmentRuntime(options = {}) {
   let availabilityReason = "";
   let crossFetchEnabled = false;
   const caTrust = ensureHueCaTrust(rootDir, log);
+  let lastSessionStopLog = {
+    reason: "",
+    at: 0
+  };
 
   try {
     const crossFetch = require("cross-fetch");
@@ -259,6 +271,33 @@ module.exports = function createHueEntertainmentRuntime(options = {}) {
   const startPromiseByKey = new Map();
   let lastError = "";
   let lastErrorAt = 0;
+
+  function shouldLogSessionStop(reason = "") {
+    const token = String(reason || "").trim().toLowerCase();
+    if (!token) return false;
+    if (
+      token === "idle_timeout"
+      || token === "transition_failed"
+      || token === "transport_mode_rest"
+      || token === "shutdown"
+    ) {
+      return false;
+    }
+    const at = Number(now() || Date.now());
+    const sameReason = token === String(lastSessionStopLog.reason || "");
+    const withinWindow = (at - Number(lastSessionStopLog.at || 0)) < 15000;
+    if (sameReason && withinWindow) return false;
+    lastSessionStopLog = { reason: token, at };
+    return true;
+  }
+
+  function formatSessionStopReason(reason = "") {
+    return String(reason || "")
+      .trim()
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .toLowerCase() || "unknown";
+  }
 
   async function stopSessionByKey(key = "", reason = "stop") {
     const token = String(key || "").trim();
@@ -300,8 +339,8 @@ module.exports = function createHueEntertainmentRuntime(options = {}) {
     } catch {
       // best effort
     }
-    if (reason && String(reason || "").trim()) {
-      log.warn?.(`[HUE][ENT] session stopped (${String(reason || "").trim()})`);
+    if (shouldLogSessionStop(reason)) {
+      log.warn?.(`[HUE] Entertainment session stopped (${formatSessionStopReason(reason)})`);
     }
   }
 

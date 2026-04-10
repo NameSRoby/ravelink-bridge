@@ -21,6 +21,11 @@ let serverListening = false;
 const recoverableLifecycleErrorTimestamps = [];
 const RECOVERABLE_ERROR_WINDOW_MS = 60000;
 const RECOVERABLE_ERROR_BURST_LIMIT = 30;
+const RECOVERABLE_ERROR_LOG_WINDOW_MS = 15000;
+let lastRecoverableLifecycleLog = {
+  key: "",
+  at: 0
+};
 
 const { app, services } = createServer({
   rootDir: ROOT_DIR,
@@ -231,6 +236,17 @@ function requestShutdown(signal) {
   };
 }
 
+function logRecoverableLifecycleError(kind, error) {
+  const message = String(error?.message || error || "unknown_recoverable_error").trim() || "unknown_recoverable_error";
+  const key = `${String(kind || "recoverable").trim().toLowerCase()}|${message.toLowerCase()}`;
+  const at = Date.now();
+  const sameLog = key === String(lastRecoverableLifecycleLog.key || "");
+  const withinWindow = (at - Number(lastRecoverableLifecycleLog.at || 0)) < RECOVERABLE_ERROR_LOG_WINDOW_MS;
+  if (sameLog && withinWindow) return;
+  lastRecoverableLifecycleLog = { key, at };
+  console.warn(`[LIFECYCLE] recoverable ${kind} suppressed: ${message}`);
+}
+
 process.on("SIGINT", () => requestShutdown("SIGINT"));
 process.on("SIGTERM", () => requestShutdown("SIGTERM"));
 process.on("beforeExit", code => {
@@ -257,7 +273,7 @@ process.on("uncaughtException", error => {
     ) {
       recoverableLifecycleErrorTimestamps.shift();
     }
-    console.warn(`[LIFECYCLE] recoverable uncaughtException suppressed: ${error?.message || error}`);
+    logRecoverableLifecycleError("uncaughtException", error);
     if (recoverableLifecycleErrorTimestamps.length > RECOVERABLE_ERROR_BURST_LIMIT) {
       console.error(
         `[LIFECYCLE] recoverable error burst exceeded ${RECOVERABLE_ERROR_BURST_LIMIT}/` +
@@ -280,7 +296,7 @@ process.on("unhandledRejection", reason => {
     ) {
       recoverableLifecycleErrorTimestamps.shift();
     }
-    console.warn(`[LIFECYCLE] recoverable unhandledRejection suppressed: ${reason?.message || reason}`);
+    logRecoverableLifecycleError("unhandledRejection", reason);
     if (recoverableLifecycleErrorTimestamps.length > RECOVERABLE_ERROR_BURST_LIMIT) {
       console.error(
         `[LIFECYCLE] recoverable rejection burst exceeded ${RECOVERABLE_ERROR_BURST_LIMIT}/` +

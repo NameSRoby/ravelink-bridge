@@ -1124,14 +1124,15 @@ body.onboardLock .liveMainCluster{
 .onboardingTourLayer{
   position:fixed;
   inset:0;
-  z-index:3200;
+  z-index:7200;
+  isolation:isolate;
   pointer-events:auto;
   background:rgba(2,5,12,.38);
 }
 
 .onboardingTourHighlight{
   position:fixed;
-  z-index:3201;
+  z-index:7201;
   border:1px solid rgba(255,255,255,.78);
   border-radius:16px;
   box-shadow:
@@ -1144,7 +1145,7 @@ body.onboardLock .liveMainCluster{
 
 .onboardingTourTargetActive{
   position:relative;
-  z-index:3202 !important;
+  z-index:7202 !important;
   filter:none !important;
   opacity:1 !important;
   box-shadow:
@@ -1156,12 +1157,13 @@ body.onboardLock .liveMainCluster{
 
 .onboardingTourCard{
   position:fixed;
-  z-index:3210;
+  z-index:7210;
   width:min(440px, calc(100vw - 24px));
   padding:16px;
   border:1px solid rgba(118,154,226,.42);
   border-radius:20px;
   isolation:isolate;
+  overflow:visible;
   background:
     radial-gradient(circle at top left, rgba(139,0,31,.18), transparent 42%),
     linear-gradient(180deg, #121b32, #09101f);

@@ -1,13 +1,14 @@
 # RaveLink Bridge v1.6.3
 
-Short bug-fix release focused on bridge reliability and packaging polish.
+Polish release focused on reliability, recovery, and a cleaner public package.
 
 ## Highlights
 
-- fixes System-first Twitch OAuth behavior so compatible docked mods can prefer the bridge-owned OAuth lane instead of trying to own credentials locally
-- improves bridge-side Helix readiness recovery when OAuth approval completes or credentials need to be re-hydrated
-- restores a public-safe `mods/` dock in the source tree and packaged release so optional mods can be hot-loaded or swapped without manual folder setup
-- keeps the song-request mod excluded from the public repo and packaged public release
+- improves Philips Hue reliability by sticking with the connection path that works and falling back more cleanly when Hue Entertainment is unstable
+- reduces repeated Hue handshake and fallback warning spam so startup and runtime logs are easier to read
+- improves Twitch sign-in recovery so bridge-linked features reconnect more reliably after approval, restart, or credential refresh
+- updates the bundled network client to address newly published Axios security advisories
+- includes a public-safe `mods/` dock in the repo and packaged release so optional mods can be added or removed without manual folder setup
 
 ## Public Package Note
 

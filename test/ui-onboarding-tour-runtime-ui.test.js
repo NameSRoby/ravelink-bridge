@@ -210,3 +210,74 @@ test("onboarding tour starts, renders controls, and marks completion", () => {
   assert.equal(layer.classList.contains("hidden"), true);
   assert.equal(storage.get("ravelink_onboard_ack_v1"), "1");
 });
+
+test("onboarding tour wires per-tab help buttons from document fallback queries", () => {
+  const createOnboardingTourRuntimeUi = loadRuntime();
+  const liveTourBtn = createNode("tour-live");
+  liveTourBtn.dataset.tourTab = "live";
+  const layer = createNode("onboardingTourLayer");
+  const highlight = createNode("onboardingTourHighlight");
+  const card = createNode("onboardingTourCard");
+  const target = createNode("onBtn");
+  const tabs = [];
+  const runtime = createOnboardingTourRuntimeUi({
+    el: {
+      onboardingTourLayer: layer,
+      onboardingTourHighlight: highlight,
+      onboardingTourCard: card,
+      onboardingTourKicker: createNode("onboardingTourKicker"),
+      onboardingTourTitle: createNode("onboardingTourTitle"),
+      onboardingTourBody: createNode("onboardingTourBody"),
+      onboardingTourProgress: createNode("onboardingTourProgress"),
+      onboardingTourPrevBtn: createNode("onboardingTourPrevBtn"),
+      onboardingTourNextBtn: createNode("onboardingTourNextBtn"),
+      onboardingTourSkipBtn: createNode("onboardingTourSkipBtn"),
+      onboardingTourDoneBtn: createNode("onboardingTourDoneBtn"),
+      health: {}
+    },
+    ui: {},
+    documentRef: {
+      querySelector(selector) {
+        return selector === "#onBtn" || selector === '[data-tab="live"]' ? target : null;
+      },
+      querySelectorAll(selector) {
+        return selector === "[data-tour-tab]" ? [liveTourBtn] : [];
+      }
+    },
+    windowRef: {
+      innerWidth: 1024,
+      innerHeight: 768,
+      setTimeout(fn) {
+        fn();
+      },
+      addEventListener() {}
+    },
+    localStorageRef: {
+      setItem() {},
+      removeItem() {}
+    },
+    showTab(tab) {
+      tabs.push(tab);
+    },
+    setBadge() {}
+  });
+
+  assert.equal(runtime.wireOnboardingTourControls(), true);
+  assert.equal(typeof liveTourBtn.onclick, "function");
+
+  let prevented = false;
+  let stopped = false;
+  liveTourBtn.onclick({
+    preventDefault() {
+      prevented = true;
+    },
+    stopPropagation() {
+      stopped = true;
+    }
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(stopped, true);
+  assert.equal(layer.classList.contains("hidden"), false);
+  assert.deepEqual(tabs, ["live"]);
+});

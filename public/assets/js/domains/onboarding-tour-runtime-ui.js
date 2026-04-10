@@ -14,7 +14,13 @@ function createOnboardingTourRuntimeUi(deps = {}) {
   const localStorageRef = deps.localStorageRef || localStorage;
   const showTabRef = typeof deps.showTab === "function" ? deps.showTab : (typeof showTab === "function" ? showTab : null);
   const setBadgeRef = typeof deps.setBadge === "function" ? deps.setBadge : (typeof setBadge === "function" ? setBadge : null);
-  const tabTourButtonsRef = Array.isArray(deps.tabTourButtons) ? deps.tabTourButtons : [];
+  const tabTourButtonsRef = Array.isArray(deps.tabTourButtons) && deps.tabTourButtons.length
+    ? deps.tabTourButtons
+    : (
+      documentRef && typeof documentRef.querySelectorAll === "function"
+        ? Array.from(documentRef.querySelectorAll("[data-tour-tab]"))
+        : []
+    );
   const TOUR_ACK_KEY = String(deps.TOUR_ACK_KEY || "ravelink_onboard_ack_v1");
 
   const state = {
@@ -456,7 +462,8 @@ function createOnboardingTourRuntimeUi(deps = {}) {
     for (const btn of tabTourButtonsRef) {
       if (!btn || typeof btn.addEventListener !== "function") continue;
       btn.addEventListener("click", event => {
-        event.preventDefault();
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
         const tab = sanitizeTab(btn.dataset?.tourTab);
         startOnboardingTour({ tab });
       });

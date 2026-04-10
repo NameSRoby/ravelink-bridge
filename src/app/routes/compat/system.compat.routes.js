@@ -106,6 +106,7 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     }
   });
   const oauthWriteRateLimit = createCompatWriteRateLimit("system_oauth", 20, 60_000);
+  const oauthStatusRateLimit = createCompatWriteRateLimit("system_oauth_status", 60, 60_000);
   const widgetWriteRateLimit = createCompatWriteRateLimit("system_widget", 15, 60_000);
 
   async function hydrateSystemOauthFromModFallback(hintModId = "") {
@@ -254,7 +255,9 @@ module.exports = function registerSystemCompatRoutes(app, deps = {}) {
     res.json(result);
   });
 
-  app.get("/system/oauth/status", enforceWriteAccess, async (_req, res) => {
+  // [DEV] This GET can hydrate missing OAuth state from the fallback mod profile,
+  // [DEV] so it needs throttling even though the verb is read-oriented.
+  app.get("/system/oauth/status", enforceWriteAccess, oauthStatusRateLimit, async (_req, res) => {
     if (!systemOauthService || typeof systemOauthService.getStatus !== "function") {
       toCompatError(res, 503, "system_oauth_unavailable");
       return;
