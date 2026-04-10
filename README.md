@@ -57,17 +57,6 @@ RaveLink Bridge runs on your stream PC and turns live audio + operator/chat acti
 - Local-first safe internet + Twitch Helix redemption sync lane
 - Optional local mods without making mods a required boot dependency
 
-## Public Repo Boundary (v1.6.3)
-
-This public repository keeps the runnable server source, UI, scripts, tests, and the full `docs/repo-documentation` book.
-
-It intentionally does **not** include:
-
-- local runtime state, logs, vaults, caches, and machine-specific user data
-- the current local song-request mod
-
-Optional local mods can still be added later under `mods/`. The public repo now includes a safe tracked `mods/README.md` and `mods/mods.config.json`, while local-only enablement should live in `mods/mods.local.config.json`, which stays out of source control and out of the packaged public release.
-
 > Developer note: this README is intentionally streamer-first. The deep maintainer material lives under `docs/repo-documentation/`.
 
 ## Streamer Quick Start
