@@ -137,8 +137,10 @@ test("oauth vault helper roundtrips encrypted data on Windows", () => {
 
   const written = writeVaultToDisk(profile, vaultPath);
   if (process.platform !== "win32") {
-    assert.equal(written.ok, false);
-    assert.equal(written.error, "oauth_vault_requires_windows_dpapi");
+    assert.equal(written.ok, true);
+    assert.equal(written.provider, "volatile_only");
+    assert.equal(written.volatileOnly, true);
+    assert.equal(fs.existsSync(vaultPath), false);
     return;
   }
 
